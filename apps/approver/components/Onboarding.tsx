@@ -11,6 +11,7 @@ export function Onboarding({ me, onChange }: { me: Me; onChange: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recovery, setRecovery] = useState("");
+  const [setupCode, setSetupCode] = useState("");
   const run = (fn: () => Promise<unknown>) => async () => {
     setBusy(true);
     setError(null);
@@ -31,10 +32,24 @@ export function Onboarding({ me, onChange }: { me: Me; onChange: () => void }) {
           Your passkey (Face ID, fingerprint, security key) will own your smart account and approve big agent actions.
           No seed phrase. The first passkey registered here becomes the owner.
         </p>
+        {me.setupCodeRequired && (
+          <Field
+            label="Setup code"
+            hint="Printed in the server log / set as OWNER_SETUP_CODE by whoever runs this server."
+          >
+            <input
+              className={inputClass}
+              value={setupCode}
+              onChange={(e) => setSetupCode(e.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </Field>
+        )}
         <Button
-          disabled={busy}
+          disabled={busy || (me.setupCodeRequired && !setupCode.trim())}
           onClick={run(async () => {
-            const { challengeId, options } = await api.registerOptions();
+            const { challengeId, options } = await api.registerOptions(setupCode || undefined);
             await api.registerVerify(challengeId, await startRegistration({ optionsJSON: options }));
           })}
         >

@@ -15,7 +15,7 @@ const ACCOUNT = "0x4444444444444444444444444444444444444444" as Address;
 const SHOP = privateKeyToAddress(generatePrivateKey());
 const MIXER = privateKeyToAddress(generatePrivateKey());
 
-function setup(overrides: Partial<ChainAdapter> = {}) {
+function setup(overrides: Partial<ChainAdapter> = {}, extraConfig: { setupCode?: string } = {}) {
   let chainTime = 1_800_000_000;
   const chain: ChainAdapter = {
     chainId: 84532,
@@ -41,6 +41,7 @@ function setup(overrides: Partial<ChainAdapter> = {}) {
       sessionTtlSeconds: 3600,
       secureCookies: false,
       cosigner,
+      ...extraConfig,
     },
   });
   const passkey = createSoftPasskey({ rpId: "localhost", origin: "http://localhost:3000" });
@@ -53,8 +54,8 @@ function setup(overrides: Partial<ChainAdapter> = {}) {
   });
 
   const owner = {
-    async register() {
-      const o = (await (await app.request("/auth/register/options", { method: "POST" })).json()) as {
+    async register(setupCode?: string) {
+      const o = (await (await app.request("/auth/register/options", json({ setupCode }))).json()) as {
         challengeId: string;
         options: { challenge: string };
       };
@@ -149,6 +150,24 @@ describe("owner passkey auth", () => {
     expect((await t.owner.register()).status).toBe(200);
     expect(((await (await t.owner.get("/me")).json()) as { owner: unknown }).owner).not.toBeNull();
     expect((await t.app.request("/auth/register/options", { method: "POST" })).status).toBe(403);
+  });
+
+  it("with a setup code configured, registration needs the code (public deployments)", async () => {
+    const t = setup({}, { setupCode: "s3cret-code" });
+    expect(((await (await t.app.request("/me")).json()) as { setupCodeRequired: boolean }).setupCodeRequired).toBe(
+      true,
+    );
+    const attempt = (body?: unknown) =>
+      t.app.request("/auth/register/options", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      });
+    expect((await attempt()).status).toBe(403);
+    expect((await attempt({ setupCode: "wrong" })).status).toBe(403);
+    expect((await attempt({ setupCode: "s3cret-cod" })).status).toBe(403);
+    expect((await t.owner.register(" s3cret-code ")).status).toBe(200); // pasted with whitespace is fine
+    expect((await attempt({ setupCode: "s3cret-code" })).status).toBe(403); // closed after the owner exists
   });
 
   it("logs in with a valid assertion and rejects a reused challenge", async () => {

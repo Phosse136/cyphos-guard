@@ -7,7 +7,7 @@
  * - Agents authenticate every request with an EIP-191 signature from their own key.
  * - The owner authenticates with a passkey (WebAuthn), getting an HttpOnly session cookie.
  */
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import {
   checkApprovalDelegation,
   cosignerEnforcerAddress,
@@ -57,6 +57,11 @@ export type AppConfig = {
    * nothing by itself. Absent → co-signing disabled.
    */
   cosigner?: LocalAccount;
+  /**
+   * One-time owner setup code. When set, registering the owner passkey requires it, so on a public address a
+   * stranger cannot claim the instance before the owner does. Absent → the first passkey becomes the owner.
+   */
+  setupCode?: string;
 };
 
 type Env = { Variables: { owner: Owner; agent: Address; body: unknown } };
@@ -166,6 +171,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     const owner = ownerId ? store.owners.byId(ownerId) : null;
     return c.json({
       registrationOpen: store.owners.count() === 0,
+      setupCodeRequired: Boolean(config.setupCode),
       fork: chain.isFork,
       chainId: chain.chainId,
       owner: owner && {
@@ -181,6 +187,14 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
   app.post("/auth/register/options", async (c) => {
     // Single-owner, self-hosted MVP: the first passkey to register becomes the owner; afterwards closed.
     if (store.owners.count() > 0) throw new HTTPException(403, { message: "registration is closed" });
+    if (config.setupCode) {
+      // Only a caller with the code gets a challenge; /verify needs that challenge, so it is gated too.
+      const body = (await c.req.json().catch(() => ({}))) as { setupCode?: unknown };
+      const given = sha(typeof body.setupCode === "string" ? body.setupCode.trim() : "");
+      if (!timingSafeEqual(Buffer.from(given), Buffer.from(sha(config.setupCode)))) {
+        throw new HTTPException(403, { message: "wrong setup code" });
+      }
+    }
     const options = await generateRegistrationOptions({
       rpName: config.rpName,
       rpID: config.rpId,

@@ -3,6 +3,7 @@ import type { Address, Hex } from "viem";
 
 export type Me = {
   registrationOpen: boolean;
+  setupCodeRequired?: boolean;
   fork: boolean;
   chainId: number;
   owner: { credentialId: string; keyId: Hex; x: Hex; y: Hex; accountAddress: Address | null } | null;
@@ -30,7 +31,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const api = {
   me: () => call<Me>("GET", "/me"),
-  registerOptions: () => call<{ challengeId: string; options: never }>("POST", "/auth/register/options"),
+  registerOptions: (setupCode?: string) =>
+    call<{ challengeId: string; options: never }>("POST", "/auth/register/options", { setupCode }),
   registerVerify: (challengeId: string, response: unknown) =>
     call<{ keyId: Hex; x: Hex; y: Hex }>("POST", "/auth/register/verify", { challengeId, response }),
   loginOptions: () => call<{ challengeId: string; options: never }>("POST", "/auth/login/options"),

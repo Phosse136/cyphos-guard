@@ -33,10 +33,12 @@ const app = createApp({
     sessionTtlSeconds: 8 * 3600,
     secureCookies: origin.startsWith("https://"),
     ...(cosigner ? { cosigner } : {}),
+    ...(process.env.OWNER_SETUP_CODE ? { setupCode: process.env.OWNER_SETUP_CODE } : {}),
   },
 });
 
 serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, () => {
   const extras = [chain.isFork && "dev relay enabled", cosigner && `co-signer ${cosigner.address}`].filter(Boolean);
+  if (process.env.OWNER_SETUP_CODE && store.owners.count() === 0) extras.push("owner setup code required");
   console.log(`policy-service on http://127.0.0.1:${port}  (${[network, ...extras].join(", ")})`);
 });

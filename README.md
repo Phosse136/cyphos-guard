@@ -2,7 +2,7 @@
 
 **Fireblocks-grade guardrails for AI agents, for indie devs and small teams. Open source, self-serve, cheap.**
 
-> Status: Phase 1 (proof of concept). Testnet only (Base Sepolia). Not for real funds.
+> Status: Phase 2 (escalation and approval app). Testnet only (Base Sepolia). Not for real funds.
 
 AI agents increasingly need to spend money on-chain: pay for APIs, swap, rebalance. Today you either hand the agent
 a private key (full risk) or approve every transaction yourself (and the agent is pointless).
@@ -57,6 +57,30 @@ It's self-checking: it exits non-zero if anything that must be rejected gets thr
 
 How the pieces fit: [ADR 0003: owner actions without a bundler](docs/decisions/0003-owner-actions-without-bundler.md) ·
 [passkey path (Phase 2)](docs/passkey-path.md)
+
+## Try the approval app (Phase 2)
+
+```sh
+pnpm dev            # local fork + policy service + approver
+```
+
+Open **http://localhost:3000** (use `localhost`, because the passkey is bound to that hostname):
+
+1. **Create passkey.** It becomes the owner. No seed phrase.
+2. **Create account.** Deploys a Hybrid smart account owned by the passkey. Add a recovery address if you have one.
+3. **Grant a new agent.** Enter an agent address, an allowed recipient and a daily limit, then sign with the passkey.
+4. The agent pays within its limit on its own. When it needs more, the request appears under **Pending approvals**.
+   **Approve** signs a one-shot permission with your passkey for exactly that payment. **Revoke** cuts the agent off on-chain.
+
+Automated checks:
+
+```sh
+pnpm e2e            # HTTP-level escalation flow on a fork (software passkey)
+pnpm e2e:browser    # the same through the UI in Chromium with a virtual WebAuthn authenticator
+```
+
+How it fits together, and what the server can and can't do:
+[ADR 0004: escalation and approval flow](docs/decisions/0004-approval-flow.md)
 
 ## Repo layout
 

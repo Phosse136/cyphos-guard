@@ -18,7 +18,11 @@
     "e2e": "pnpm --filter @phoswallet/poc e2e:escalation",
     "dev": "pnpm --filter @phoswallet/approver dev:all",
     "e2e:browser": "pnpm --filter @phoswallet/approver build && pnpm --filter @phoswallet/approver e2e:browser",
-    "test:fork": "vitest run --config vitest.fork.config.ts"
+    "test:fork": "vitest run --config vitest.fork.config.ts",
+    "demo:selftest": "pnpm --filter @phoswallet/demo-agent run demo-selftest --",
+    "demo:setup": "pnpm --filter @phoswallet/demo-agent run demo-setup",
+    "demo:agent": "pnpm --filter @phoswallet/demo-agent run demo-agent",
+    "e2e:demo": "pnpm --filter @phoswallet/approver build && pnpm --filter @phoswallet/approver e2e:demo"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

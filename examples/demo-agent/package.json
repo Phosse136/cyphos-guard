@@ -1,0 +1,26 @@
+{
+  "name": "@phoswallet/demo-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "demo-setup": "node --env-file-if-exists=../../.env src/setup.ts",
+    "demo-agent": "node --env-file-if-exists=../../.env src/main.ts",
+    "demo-selftest": "node --env-file-if-exists=../../.env src/selftest.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.11.0",
+    "@phoswallet/sdk": "workspace:*",
+    "@phoswallet/shared": "workspace:*",
+    "viem": "^2.58.2",
+    "zod": "^4.6.7",
+    "@phoswallet/policy-service": "workspace:*",
+    "@hono/node-server": "^2.1.11",
+    "@metamask/smart-accounts-kit": "2.0.0"
+  },
+  "exports": {
+    "./setup": "./src/setup.ts",
+    "./scenario": "./src/scenario.ts"
+  }
+}

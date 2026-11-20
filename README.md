@@ -2,7 +2,7 @@
 
 **Fireblocks-grade guardrails for AI agents, for indie devs and small teams. Open source, self-serve, cheap.**
 
-> Status: Phase 3 (SDK). Phase 4 (demo agent) next. Testnet only (Base Sepolia). Not for real funds.
+> Status: Phase 4 (demo agent). Phase 5 (polish) next. Testnet only (Base Sepolia). Not for real funds.
 
 AI agents increasingly need to spend money on-chain: pay for APIs, swap, rebalance. Today you either hand the agent
 a private key (full risk) or approve every transaction yourself (and the agent is pointless).
@@ -58,6 +58,18 @@ It's self-checking: it exits non-zero if anything that must be rejected gets thr
 How the pieces fit: [ADR 0003: owner actions without a bundler](docs/decisions/0003-owner-actions-without-bundler.md) ·
 [passkey path (Phase 2)](docs/passkey-path.md)
 
+## Watch an agent use it (Phase 4)
+
+A Claude accounts-payable agent pays four invoices. Two are routine (paid alone), one is big (you approve with
+your passkey) and one goes to a denylisted vendor (blocked). See [examples/demo-agent](examples/demo-agent/README.md)
+and the [demo video script](docs/demo-script.md).
+
+```sh
+pnpm dev            # then create passkey + account at http://localhost:3000
+pnpm demo:setup     # open the printed link, grant the agent with your passkey
+pnpm demo:agent     # needs ANTHROPIC_API_KEY in .env
+```
+
 ## Use the SDK (Phase 3)
 
 ```ts
@@ -93,6 +105,8 @@ Automated checks:
 pnpm e2e            # HTTP-level escalation flow on a fork (software passkey)
 pnpm e2e:browser    # the same through the UI in Chromium with a virtual WebAuthn authenticator
 pnpm test:fork      # SDK integration tests against a Base Sepolia fork
+pnpm demo:selftest --fake-model   # demo scenario headless (scripted model)
+pnpm e2e:demo       # the interactive demo in Chromium (virtual passkey, scripted model)
 ```
 
 How it fits together, and what the server can and can't do:

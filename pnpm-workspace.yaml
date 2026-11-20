@@ -5,3 +5,4 @@ packages:
 minimumReleaseAgeExclude:
   - viem@2.58.2
   - "@hono/node-server@2.1.11"
+  - "@anthropic-ai/sdk@1.11.0"

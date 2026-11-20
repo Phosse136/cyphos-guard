@@ -32,6 +32,8 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
 - Off-chain rules (ERC-20 per-tx, non-eq args) do NOT bind a compromised agent. Never sell them as security; keep critical rules on-chain.
 - Writes must go through the same node as reads (SDK `writeTransport`). Never let a client fall back to a default RPC.
 - One active grant per (account, agent): re-grant = revoke on-chain first.
+- Demo agent: Claude API via the SDK tool runner (`claude-opus-5-5`, `fallbacks: "default"`). The scripted `--fake-model` is a test double; never present its output as Claude's.
+- Activity is recorded from the chain (decoded redemption tx + delegator), never from agent claims.
 - Services bind to localhost. The approver proxies `/api` to the policy service.
 - Flag anything that could put funds at risk, even on testnet.
 
@@ -45,7 +47,7 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
 ## Commands
 
 - `pnpm install` · `pnpm lint` · `pnpm format` · `pnpm typecheck` · `pnpm test` · `pnpm check-secrets`
-- `pnpm poc` (Phase 1) · `pnpm dev` (fork + service + approver) · `pnpm e2e` · `pnpm e2e:browser` · `pnpm test:fork` · `pnpm --filter @phoswallet/poc spike:passkey`
+- `pnpm poc` (Phase 1) · `pnpm dev` (fork + service + approver) · `pnpm e2e` · `pnpm e2e:browser` · `pnpm test:fork` · `pnpm demo:setup|demo:agent|demo:selftest [--fake-model]` · `pnpm e2e:demo` · `pnpm --filter @phoswallet/poc spike:passkey`
 - Node ≥ 24 (Vitest 5 needs ≥ 22.12), pnpm 12, TypeScript 7, Biome 2, Vitest 5, zod 4, viem 2, Foundry 1.10 (anvil for local forks), gitleaks.
 - Local fork: `anvil --fork-url https://sepolia.base.org` has the MetaMask v1.3.0 contracts and the RIP-7212 precompile (verified).
 

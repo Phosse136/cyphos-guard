@@ -15,7 +15,9 @@
     "check-secrets": "bash scripts/check-secrets.sh --all",
     "poc": "pnpm --filter @phoswallet/poc poc",
     "poc:keys": "pnpm --filter @phoswallet/poc keys",
-    "e2e": "pnpm --filter @phoswallet/poc e2e:escalation"
+    "e2e": "pnpm --filter @phoswallet/poc e2e:escalation",
+    "dev": "pnpm --filter @phoswallet/approver dev:all",
+    "e2e:browser": "pnpm --filter @phoswallet/approver build && pnpm --filter @phoswallet/approver e2e:browser"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

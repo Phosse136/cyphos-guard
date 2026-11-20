@@ -16,3 +16,4 @@ packages/contracts/out/
 packages/contracts/cache/
 broadcast/
 *.sqlite*
+e2e/screenshots/

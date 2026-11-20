@@ -1,0 +1,31 @@
+import { decodeErc20Transfer } from "@phoswallet/shared";
+import { type Address, formatEther, type Hex } from "viem";
+
+export const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+export const eth = (wei: string | bigint) => `${formatEther(BigInt(wei))} ETH`;
+export const ago = (unix: number) => {
+  const s = Math.max(0, Math.floor(Date.now() / 1000) - unix);
+  return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ago` : `${Math.floor(s / 3600)}h ago`;
+};
+
+/**
+ * Human-readable description of an execution, decoded locally from the raw fields that will be
+ * signed. Never display server-provided summaries for approvals.
+ */
+export function describe(exec: { to: Address; value: string; data: Hex }): { title: string; lines: string[] } {
+  const value = BigInt(exec.value);
+  if (exec.data === "0x") return { title: `Send ${eth(value)}`, lines: [`to ${exec.to}`] };
+  const erc20 = decodeErc20Transfer(exec.data);
+  if (erc20) {
+    return {
+      title: `Token transfer of ${erc20.amount.toString()} base units`,
+      lines: [`token ${exec.to}`, `to ${erc20.recipient}`, ...(value > 0n ? [`plus ${eth(value)}`] : [])],
+    };
+  }
+  return {
+    title: `Contract call ${exec.data.slice(0, 10)}`,
+    lines: [`contract ${exec.to}`, `value ${eth(value)}`, `calldata ${exec.data.length / 2 - 1} bytes`],
+  };
+}
+
+export const explorer = (fork: boolean, tx: string) => (fork ? null : `https://sepolia.basescan.org/tx/${tx}`);

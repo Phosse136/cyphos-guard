@@ -38,7 +38,8 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
 ## Commands
 
 - `pnpm install` · `pnpm lint` · `pnpm format` · `pnpm typecheck` · `pnpm test` · `pnpm check-secrets`
-- Node ≥ 24 (Vitest 5 needs ≥ 22.12), pnpm 12, TypeScript 7, Biome 2, Vitest 5, zod 4, viem 2.
+- Node ≥ 24 (Vitest 5 needs ≥ 22.12), pnpm 12, TypeScript 7, Biome 2, Vitest 5, zod 4, viem 2, Foundry 1.10 (anvil for local forks), gitleaks.
+- Local fork: `anvil --fork-url https://sepolia.base.org` has the MetaMask v1.3.0 contracts and the RIP-7212 precompile (verified).
 
 ## Layout
 

@@ -135,6 +135,12 @@ export const policySchema = z
     expiresAt: unixSeconds,
     permissions: z.array(permissionSchema).min(1),
     escalation: escalationSchema.default({ enabled: true, approvalTtlSeconds: 900, hardMax: [] }),
+    /**
+     * Optional co-signer (ADR 0005). When set, every grant delegation requires a fresh signature from this
+     * address per redemption (CosignerEnforcer). The policy service co-signs only if the off-chain rules
+     * pass, which makes ERC-20 per-tx caps and non-eq argument rules binding even for a compromised agent.
+     */
+    cosigner: addressSchema.optional(),
     /** Never executed by the agent and never offered for approval. */
     forbidden: z.object({ targets: z.array(addressSchema).default([]) }).default({ targets: [] }),
   })
@@ -189,12 +195,19 @@ export const ENFORCEMENT = {
     where: "onchain",
     how: "AllowedCalldataEnforcer @ offset 4 (one recipient; several via LogicalOrWrapperEnforcer)",
   },
-  "erc20Transfer.perTx": { where: "offchain", how: "SDK pre-check → escalation" },
+  "erc20Transfer.perTx": {
+    where: "offchain",
+    how: "SDK pre-check → escalation; BINDING on-chain via CosignerEnforcer when policy.cosigner is set",
+  },
   "erc20Transfer.perPeriod": { where: "onchain", how: "ERC20PeriodTransferEnforcer" },
   "contractCall.target": { where: "onchain", how: "AllowedTargetsEnforcer" },
   "contractCall.functions": { where: "onchain", how: "AllowedMethodsEnforcer" },
   "contractCall.args[eq, static types]": { where: "onchain", how: "AllowedCalldataEnforcer" },
-  "contractCall.args[other ops]": { where: "offchain", how: "SDK pre-check; later co-signer enforcer" },
+  "contractCall.args[other ops]": {
+    where: "offchain",
+    how: "SDK pre-check; BINDING on-chain via CosignerEnforcer when policy.cosigner is set",
+  },
+  cosigner: { where: "onchain", how: "CosignerEnforcer: fresh co-signer signature per redemption (can only block)" },
   "contractCall.value": { where: "onchain", how: "ValueLteEnforcer + NativeTokenPeriodTransferEnforcer" },
   "escalation.*": {
     where: "offchain",

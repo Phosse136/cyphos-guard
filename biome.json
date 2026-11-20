@@ -26,5 +26,8 @@
     "parser": {
       "tailwindDirectives": true
     }
+  },
+  "files": {
+    "includes": ["**", "!packages/contracts/lib", "!packages/contracts/out", "!packages/contracts/cache"]
   }
 }

@@ -1,5 +1,6 @@
 export * from "./approval.ts";
 export * from "./compile.ts";
+export * from "./cosigner.ts";
 export * from "./delegations.ts";
 export * from "./errors.ts";
 export * from "./owner.ts";

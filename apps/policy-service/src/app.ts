@@ -9,7 +9,14 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import type { Delegation } from "@metamask/smart-accounts-kit";
-import { checkApprovalDelegation, passkeyKeyId, type UserOpJSON } from "@phoswallet/sdk";
+import {
+  checkApprovalDelegation,
+  cosignerEnforcerAddress,
+  cosignTypedData,
+  delegationCosigner,
+  passkeyKeyId,
+  type UserOpJSON,
+} from "@phoswallet/sdk";
 import {
   AGENT_AUTH_MAX_SKEW_SECONDS,
   AGENT_HEADERS,
@@ -18,6 +25,7 @@ import {
   createApprovalRequestSchema,
   delegationSchema,
   escalationDecision,
+  offchainCheck,
   parsePolicy,
   policySchema,
   requestStatusSchema,
@@ -32,7 +40,7 @@ import { cose, decodeCredentialPublicKey } from "@simplewebauthn/server/helpers"
 import { Hono, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
-import { type Address, type Hex, isAddressEqual, isHex, toHex, verifyMessage } from "viem";
+import { type Address, type Hex, isAddressEqual, isHex, type LocalAccount, toHex, verifyMessage } from "viem";
 import { z } from "zod";
 import type { ChainAdapter } from "./chain.ts";
 import type { Owner, Store } from "./store.ts";
@@ -44,6 +52,11 @@ export type AppConfig = {
   origins: string[];
   sessionTtlSeconds: number;
   secureCookies: boolean;
+  /**
+   * Co-signer key (ADR 0005). It can only BLOCK: a cosignature adds a requirement to a redemption and grants
+   * nothing by itself. Absent → co-signing disabled.
+   */
+  cosigner?: LocalAccount;
 };
 
 type Env = { Variables: { owner: Owner; agent: Address; body: unknown } };
@@ -299,6 +312,17 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
         throw new HTTPException(400, { message: "delegation does not match account/agent" });
       }
     }
+    if (policy.cosigner) {
+      if (!config.cosigner || !isAddressEqual(policy.cosigner, config.cosigner.address)) {
+        throw new HTTPException(400, { message: "policy names a co-signer this service doesn't hold" });
+      }
+      const cosigner = policy.cosigner;
+      if (
+        !body.delegations.every((d) => delegationCosigner(d as Delegation)?.toLowerCase() === cosigner.toLowerCase())
+      ) {
+        throw new HTTPException(400, { message: "every delegation must carry the co-signer caveat" });
+      }
+    }
     // One active grant per agent: each grant has its own on-chain period counters, so two overlapping
     // grants would double the agent's effective daily cap. The old one must be revoked on-chain first.
     if (store.grants.activeFor(account, policy.agent).length > 0) {
@@ -415,6 +439,70 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
   app.get("/agent/grants", agentAuth, (c) => c.json(store.grants.activeForAgent(c.get("agent"))));
 
   app.get("/agent/activity", agentAuth, (c) => c.json(store.activity.forAgent(c.get("agent"))));
+
+  // ---------- co-signer (ADR 0005) ----------
+
+  app.get("/cosigner", (c) =>
+    c.json({
+      enabled: !!config.cosigner,
+      address: config.cosigner?.address ?? null,
+      enforcer: cosignerEnforcerAddress,
+    }),
+  );
+
+  /**
+   * Co-sign one redemption: only for an active grant of this agent, a delegation that names our co-signer,
+   * and an execution that passes the permission's off-chain rules. The cosignature binds the exact call,
+   * the redeemer and the delegation, expires in 5 minutes and can be used once.
+   */
+  app.post("/agent/cosign", agentAuth, async (c) => {
+    if (!config.cosigner) throw new HTTPException(404, { message: "co-signing is not enabled on this service" });
+    const agent = c.get("agent");
+    const body = parse(
+      z.object({
+        account: addressSchema,
+        grantId: z.string(),
+        delegationIndex: z.number().int().nonnegative(),
+        to: addressSchema,
+        value: z.string().regex(/^\d+$/),
+        data: z.string().regex(/^0x([0-9a-fA-F]{2})*$/),
+      }),
+      c.get("body"),
+    );
+    const grant = store.grants.byId(body.grantId);
+    if (
+      grant?.status !== "active" ||
+      !isAddressEqual(grant.agent, agent) ||
+      !isAddressEqual(grant.account, body.account)
+    ) {
+      throw new HTTPException(404, { message: "no such active grant for this agent" });
+    }
+    const delegation = grant.delegations[body.delegationIndex] as Delegation | undefined;
+    const permission = parsePolicy(grant.policy).permissions[body.delegationIndex];
+    if (!delegation || !permission) throw new HTTPException(404, { message: "no such delegation" });
+    const named = delegationCosigner(delegation);
+    if (!named || !isAddressEqual(named, config.cosigner.address)) {
+      throw new HTTPException(400, { message: "delegation does not require this co-signer" });
+    }
+    const execution = { to: body.to, value: BigInt(body.value), data: body.data as Hex };
+    const violation = offchainCheck(permission, execution);
+    if (violation) return c.json({ error: "offchain_rule", message: violation }, 403);
+
+    const salt = toHex(randomBytes(32));
+    const deadline = BigInt((await chain.now()) + 300);
+    const signature = await config.cosigner.signTypedData(
+      cosignTypedData({
+        chainId: chain.chainId,
+        delegationManager: chain.environment.DelegationManager,
+        delegation,
+        redeemer: agent,
+        execution,
+        salt,
+        deadline,
+      }),
+    );
+    return c.json({ salt, deadline: deadline.toString(), signature });
+  });
 
   app.post("/agent/requests", agentAuth, async (c) => {
     const agent = c.get("agent");

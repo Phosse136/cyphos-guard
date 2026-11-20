@@ -1,0 +1,32 @@
+# phoswallet contracts. Compiled with the same compiler settings as MetaMask Delegation Framework v1.3.0
+# (the version deployed on Base Sepolia), so our enforcer plugs into the deployed DelegationManager.
+[profile.default]
+src = "src"
+test = "test"
+out = "out"
+libs = ["lib"]
+solc = "0.8.23"
+auto_detect_solc = false
+evm_version = "london"
+optimizer = true
+optimizer_runs = 200
+# Reproducible bytecode → stable CREATE2 address across machines.
+bytecode_hash = "none"
+cbor_metadata = false
+remappings = [
+  "@delegator/=lib/delegation-framework/",
+  # The framework's own remappings, pointed into its lib/ (needed for its transitive imports):
+  "@account-abstraction/=lib/delegation-framework/lib/account-abstraction/contracts/",
+  "@openzeppelin/contracts/=lib/delegation-framework/lib/openzeppelin-contracts/contracts/",
+  "@erc7579/=lib/delegation-framework/lib/erc7579-implementation/src/",
+  "@bytes-utils/=lib/delegation-framework/lib/solidity-bytes-utils/contracts/",
+  "@solidity-stringutils/=lib/delegation-framework/lib/solidity-stringutils/src/",
+  "@FCL/=lib/delegation-framework/lib/FCL/solidity/src/",
+  "@SCL=lib/delegation-framework/lib/SCL/src",
+  "FreshCryptoLib/=lib/delegation-framework/lib/FreshCryptoLib/solidity/src/",
+  "forge-std/=lib/delegation-framework/lib/forge-std/src/",
+]
+
+[fmt]
+line_length = 120
+tab_width = 4

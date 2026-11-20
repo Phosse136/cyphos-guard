@@ -40,6 +40,7 @@ import {
 import { baseSepolia, sepolia } from "viem/chains";
 import { buildApprovalDelegation } from "./approval.ts";
 import { compilePolicy } from "./compile.ts";
+import { type Cosignature, delegationCosigner, withCosignature } from "./cosigner.ts";
 import { type Execution, encodeRedeem, revertReason, revokeCall } from "./delegations.ts";
 import {
   ApprovalExpired,
@@ -249,7 +250,30 @@ export function createPhoswallet(opts: PhoswalletOptions) {
             violations.push(offchain);
             continue;
           }
-          const r = await redeem(delegation as Delegation, exec);
+          // Co-signed grant: get a fresh cosignature for this exact call (the service re-checks the
+          // off-chain rules and refuses if they fail; on-chain, the redemption can't happen without it).
+          let toRedeem = delegation as Delegation;
+          if (delegationCosigner(toRedeem)) {
+            const cs = await request<Cosignature & { error?: string; message?: string }>(
+              "agent",
+              "POST",
+              "/agent/cosign",
+              {
+                account,
+                grantId: grant.id,
+                delegationIndex: i,
+                to: exec.to,
+                value: exec.value.toString(),
+                data: exec.data,
+              },
+            );
+            if (cs.status !== 200) {
+              violations.push(`co-signer refused: ${cs.data.message ?? cs.data.error ?? `HTTP ${cs.status}`}`);
+              continue;
+            }
+            toRedeem = withCosignature(toRedeem, cs.data);
+          }
+          const r = await redeem(toRedeem, exec);
           if ("hash" in r) {
             await request("agent", "POST", "/agent/activity", {
               account,

@@ -25,6 +25,7 @@ import {
   toFunctionSelector,
   toHex,
 } from "viem";
+import { cosignerCaveat } from "./cosigner.ts";
 
 /** One caveat in object form, e.g. { type: "timestamp", afterThreshold, beforeThreshold }. */
 type CaveatConfig = Extract<Caveats, readonly unknown[]>[number];
@@ -65,6 +66,8 @@ function compilePermission(
   startDate: number,
 ): Delegation {
   const base = { environment, from: delegator, to: policy.agent, salt: randomSalt() } as const;
+  // A named co-signer becomes an extra caveat on every grant delegation (not on one-shot approvals).
+  const extra: CaveatConfig[] = policy.cosigner ? [cosignerCaveat(policy.cosigner)] : [];
   const expiry: CaveatConfig = {
     type: "timestamp",
     afterThreshold: policy.validFrom ?? 0, // 0 = no lower bound
@@ -82,6 +85,7 @@ function compilePermission(
         // The period scope only constrains *value*; the recipient allowlist must be added explicitly.
         { type: "allowedTargets", targets: permission.recipients },
         expiry,
+        ...extra,
       ];
       if (permission.perTx !== undefined) caveats.push({ type: "valueLte", maxValue: permission.perTx });
       return createDelegation({
@@ -103,7 +107,7 @@ function compilePermission(
       return createDelegation({
         ...base,
         scope: { type: ScopeType.Erc20PeriodTransfer, tokenAddress: permission.token, ...period(permission.perPeriod) },
-        caveats: [{ type: "allowedCalldata", startIndex: 4, value: pad(recipient, { size: 32 }) }, expiry],
+        caveats: [{ type: "allowedCalldata", startIndex: 4, value: pad(recipient, { size: 32 }) }, expiry, ...extra],
       });
     }
 
@@ -122,7 +126,7 @@ function compilePermission(
         startIndex: 4 + 32 * rule.index,
         value: encodeStaticArg(fn.abi, rule.index, rule.value),
       }));
-      const caveats: CaveatConfig[] = [expiry];
+      const caveats: CaveatConfig[] = [expiry, ...extra];
       if (permission.value) {
         caveats.push({ type: "nativeTokenPeriodTransfer", ...period(permission.value.perPeriod) });
       }

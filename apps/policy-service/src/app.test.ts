@@ -1,8 +1,8 @@
 import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
-import { buildApprovalDelegation } from "@phoswallet/sdk";
+import { buildApprovalDelegation, cosignerCaveat, cosignerEnforcerAddress, cosignTypedData } from "@phoswallet/sdk";
 import { createSoftPasskey } from "@phoswallet/sdk/testing";
 import type { ApprovalRequestJSON } from "@phoswallet/shared";
-import { type Address, parseEther } from "viem";
+import { type Address, encodeFunctionData, erc20Abi, type Hex, parseEther, recoverTypedDataAddress } from "viem";
 import { generatePrivateKey, privateKeyToAccount, privateKeyToAddress } from "viem/accounts";
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app.ts";
@@ -29,6 +29,7 @@ function setup(overrides: Partial<ChainAdapter> = {}) {
     ...overrides,
   };
   const store = openStore(":memory:");
+  const cosigner = privateKeyToAccount(generatePrivateKey());
   const app = createApp({
     store,
     chain,
@@ -38,6 +39,7 @@ function setup(overrides: Partial<ChainAdapter> = {}) {
       origins: ["http://localhost:3000"],
       sessionTtlSeconds: 3600,
       secureCookies: false,
+      cosigner,
     },
   });
   const passkey = createSoftPasskey({ rpId: "localhost", origin: "http://localhost:3000" });
@@ -129,6 +131,7 @@ function setup(overrides: Partial<ChainAdapter> = {}) {
   return {
     app,
     store,
+    cosigner,
     owner,
     asAgent,
     agent,
@@ -383,5 +386,105 @@ describe("grants and revocation", () => {
     await t.ready();
     expect((await t.owner.post("/dev/fund", { address: SHOP })).status).toBe(404);
     expect((await t.owner.post("/dev/relay", { userOp: {} })).status).toBe(404);
+  });
+});
+
+describe("co-signer (ADR 0005)", () => {
+  const TOKEN = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address;
+  /** Owner with account and a co-signed ERC-20 grant (≤2 per payment) for the test agent. */
+  const cosignedGrant = async (t: ReturnType<typeof setup>, cosignerAddr: Address, withCaveat = true) => {
+    await t.owner.register();
+    await t.owner.put("/me/account", { accountAddress: ACCOUNT });
+    const policy = {
+      version: 1,
+      chainId: 84532,
+      agent: t.agent.address,
+      expiresAt: 1_800_086_400,
+      cosigner: cosignerAddr,
+      permissions: [
+        {
+          kind: "erc20Transfer",
+          token: TOKEN,
+          recipients: [SHOP],
+          perTx: "2000000",
+          perPeriod: { amount: "5000000", periodSeconds: 86_400 },
+        },
+      ],
+    };
+    const delegation = {
+      delegate: t.agent.address,
+      delegator: ACCOUNT,
+      authority: `0x${"f".repeat(64)}`,
+      caveats: withCaveat ? [cosignerCaveat(cosignerAddr)] : [],
+      salt: "0x01",
+      signature: "0x01",
+    };
+    return t.owner.post("/grants", { policy, delegations: [delegation] });
+  };
+  const transfer = (amount: bigint) =>
+    encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [SHOP, amount] });
+
+  it("publishes its co-signer address and the enforcer", async () => {
+    const t = setup();
+    const info = (await (await t.app.request("/cosigner")).json()) as {
+      enabled: boolean;
+      address: string;
+      enforcer: string;
+    };
+    expect(info).toEqual({ enabled: true, address: t.cosigner.address, enforcer: cosignerEnforcerAddress });
+  });
+
+  it("rejects grants naming another co-signer or missing the caveat", async () => {
+    const other = setup();
+    expect((await cosignedGrant(other, privateKeyToAddress(generatePrivateKey()))).status).toBe(400);
+    const missing = setup();
+    expect((await cosignedGrant(missing, missing.cosigner.address, false)).status).toBe(400);
+  });
+
+  it("co-signs an in-policy call (signature recovers to the co-signer) and refuses an off-chain violation", async () => {
+    const t = setup();
+    const res = await cosignedGrant(t, t.cosigner.address);
+    expect(res.status).toBe(201);
+    const grant = (await res.json()) as { id: string; delegations: unknown[] };
+    const ask = (amount: bigint) =>
+      t.asAgent("POST", "/agent/cosign", {
+        account: ACCOUNT,
+        grantId: grant.id,
+        delegationIndex: 0,
+        to: TOKEN,
+        value: "0",
+        data: transfer(amount),
+      });
+
+    const ok = await ask(1_500_000n);
+    expect(ok.status).toBe(200);
+    const cs = (await ok.json()) as { salt: Hex; deadline: string; signature: Hex };
+    const typed = cosignTypedData({
+      chainId: 84532,
+      delegationManager: env.DelegationManager,
+      delegation: grant.delegations[0] as never,
+      redeemer: t.agent.address,
+      execution: { to: TOKEN, value: 0n, data: transfer(1_500_000n) },
+      salt: cs.salt,
+      deadline: BigInt(cs.deadline),
+    });
+    expect(await recoverTypedDataAddress({ ...typed, signature: cs.signature })).toBe(t.cosigner.address);
+    expect(BigInt(cs.deadline)).toBe(1_800_000_000n + 300n);
+
+    const refused = await ask(3_000_000n);
+    expect(refused.status).toBe(403);
+    expect(((await refused.json()) as { error: string }).error).toBe("offchain_rule");
+  });
+
+  it("won't co-sign for another agent's grant or a revoked grant", async () => {
+    const t = setup();
+    const grant = (await (await cosignedGrant(t, t.cosigner.address)).json()) as { id: string };
+    const body = { account: ACCOUNT, grantId: grant.id, delegationIndex: 0, to: TOKEN, value: "0", data: transfer(1n) };
+    const stranger = privateKeyToAccount(generatePrivateKey());
+    expect(
+      (await t.app.request("/agent/cosign", await agentRequest(stranger, "POST", "/agent/cosign", body))).status,
+    ).toBe(404);
+    await t.owner.post(`/grants/${grant.id}/revoked`);
+    expect((await t.asAgent("POST", "/agent/cosign", body)).status).toBe(404);
   });
 });

@@ -1,15 +1,22 @@
 "use client";
 
 import type { MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
-import { buildApprovalDelegation } from "@phoswallet/sdk";
 import type { ApprovalRequestJSON } from "@phoswallet/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { ago, describe, short } from "@/lib/format";
-import { environment, signDelegation } from "@/lib/wallet";
+import { ownerClient } from "@/lib/wallet";
 import { Button, Card, ErrorText } from "./ui";
 
-export function Requests({ account, onDecided }: { account: MetaMaskSmartAccount; onDecided: () => void }) {
+export function Requests({
+  account,
+  fork,
+  onDecided,
+}: {
+  account: MetaMaskSmartAccount;
+  fork: boolean;
+  onDecided: () => void;
+}) {
   const [pending, setPending] = useState<ApprovalRequestJSON[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,15 +48,8 @@ export function Requests({ account, onDecided }: { account: MetaMaskSmartAccount
     setError(null);
     try {
       if (approve) {
-        // Build the one-shot approval from the SAME raw fields shown above, and sign with the passkey.
-        const unsigned = buildApprovalDelegation({
-          environment,
-          delegator: account.address,
-          agent: req.agent,
-          execution: { to: req.to, value: BigInt(req.value), data: req.data },
-          expiresAt: req.expiresAt,
-        });
-        await api.approve(req.id, await signDelegation(account, unsigned));
+        // SDK builds the one-shot approval from the SAME request object shown above, and signs with the passkey.
+        await ownerClient(account, fork).approve(req);
       } else {
         await api.reject(req.id);
       }

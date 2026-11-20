@@ -323,6 +323,29 @@ describe("grants and revocation", () => {
     expect(after).toHaveLength(0);
   });
 
+  it("allows only one active grant per agent (caps must not stack)", async () => {
+    const t = setup();
+    await t.ready();
+    const [g] = (await (await t.owner.get("/grants")).json()) as {
+      id: string;
+      policy: unknown;
+      delegations: unknown[];
+    }[];
+    if (!g) throw new Error("no grant");
+    const again = await t.owner.post("/grants", { policy: g.policy, delegations: g.delegations });
+    expect(again.status).toBe(409);
+    await t.owner.post(`/grants/${g.id}/revoked`);
+    expect((await t.owner.post("/grants", { policy: g.policy, delegations: g.delegations })).status).toBe(201);
+  });
+
+  it("lets an agent read its own activity", async () => {
+    const t = setup();
+    await t.ready();
+    await t.requestApproval();
+    const items = (await (await t.asAgent("GET", "/agent/activity")).json()) as { kind: string }[];
+    expect(items.map((i) => i.kind)).toContain("request_created");
+  });
+
   it("has no dev relay/funding endpoints unless running against a fork", async () => {
     const t = setup();
     await t.ready();

@@ -3,6 +3,8 @@
  * AllowedTargets × AllowedMethods is a cross-product on-chain, so merging permissions would widen them.
  *
  * Every delegation gets a TimestampEnforcer (expiry). Value-moving ones always get a period cap.
+ * Anything that can't be expressed on-chain exactly is either rejected here (CompileError) or left to
+ * the off-chain pre-check (offchainCheck), never silently dropped.
  */
 import {
   type Caveats,
@@ -12,10 +14,24 @@ import {
   type SmartAccountsEnvironment,
 } from "@metamask/smart-accounts-kit";
 import type { Permission, Policy } from "@phoswallet/shared";
-import { type Address, type Hex, toHex } from "viem";
+import {
+  type AbiFunction,
+  type Address,
+  encodeAbiParameters,
+  type Hex,
+  isAddress,
+  pad,
+  parseAbiItem,
+  toFunctionSelector,
+  toHex,
+} from "viem";
 
 /** One caveat in object form, e.g. { type: "timestamp", afterThreshold, beforeThreshold }. */
 type CaveatConfig = Extract<Caveats, readonly unknown[]>[number];
+
+export class CompileError extends Error {
+  override name = "CompileError";
+}
 
 export type CompiledPermission = { permission: Permission; delegation: Delegation };
 
@@ -31,10 +47,14 @@ export type CompilePolicyArgs = {
 export function compilePolicy({ policy, delegator, environment, now }: CompilePolicyArgs): CompiledPermission[] {
   // Period enforcers require startDate <= block.timestamp at first use; back off a minute for clock skew.
   const startDate = policy.validFrom ?? (now ?? Math.floor(Date.now() / 1000)) - 60;
-  return policy.permissions.map((permission) => ({
-    permission,
-    delegation: compilePermission(policy, permission, delegator, environment, startDate),
-  }));
+  return policy.permissions.map((permission, i) => {
+    try {
+      return { permission, delegation: compilePermission(policy, permission, delegator, environment, startDate) };
+    } catch (e) {
+      if (e instanceof CompileError) throw new CompileError(`permissions[${i}] (${permission.kind}): ${e.message}`);
+      throw e;
+    }
+  });
 }
 
 function compilePermission(
@@ -44,11 +64,17 @@ function compilePermission(
   environment: SmartAccountsEnvironment,
   startDate: number,
 ): Delegation {
+  const base = { environment, from: delegator, to: policy.agent, salt: randomSalt() } as const;
   const expiry: CaveatConfig = {
     type: "timestamp",
     afterThreshold: policy.validFrom ?? 0, // 0 = no lower bound
     beforeThreshold: policy.expiresAt,
   };
+  const period = (p: { amount: bigint; periodSeconds: number }) => ({
+    periodAmount: p.amount,
+    periodDuration: p.periodSeconds,
+    startDate,
+  });
 
   switch (permission.kind) {
     case "nativeTransfer": {
@@ -59,25 +85,77 @@ function compilePermission(
       ];
       if (permission.perTx !== undefined) caveats.push({ type: "valueLte", maxValue: permission.perTx });
       return createDelegation({
-        environment,
-        from: delegator,
-        to: policy.agent,
-        // The kit adds ExactCalldata("0x") for this scope by default, so only plain ETH sends pass
-        // (no value smuggled into arbitrary contract calls). See createNativeTokenPeriodicCaveatBuilder.
-        scope: {
-          type: ScopeType.NativeTokenPeriodTransfer,
-          periodAmount: permission.perPeriod.amount,
-          periodDuration: permission.perPeriod.periodSeconds,
-          startDate,
-        },
+        ...base,
+        // The kit adds ExactCalldata("0x") for this scope by default, so only plain ETH sends pass.
+        scope: { type: ScopeType.NativeTokenPeriodTransfer, ...period(permission.perPeriod) },
         caveats,
-        salt: randomSalt(),
       });
     }
-    case "erc20Transfer":
-    case "contractCall":
-      throw new Error(`permission kind "${permission.kind}" is not compiled yet (planned for Phase 3)`);
+
+    case "erc20Transfer": {
+      // ERC20PeriodTransferEnforcer pins target == token and the transfer() selector; the scope adds
+      // ValueLte(0). The recipient is calldata bytes 4..36: one AllowedCalldata caveat can pin exactly one.
+      // Several recipients would need several delegations, each with its own period cap (= a wider cap).
+      const [recipient, ...more] = permission.recipients;
+      if (!recipient || more.length > 0) {
+        throw new CompileError("exactly one recipient per erc20Transfer permission is supported on-chain");
+      }
+      return createDelegation({
+        ...base,
+        scope: { type: ScopeType.Erc20PeriodTransfer, tokenAddress: permission.token, ...period(permission.perPeriod) },
+        caveats: [{ type: "allowedCalldata", startIndex: 4, value: pad(recipient, { size: 32 }) }, expiry],
+      });
+    }
+
+    case "contractCall": {
+      const fns = permission.functions.map((f) => ({
+        ...f,
+        abi: parseAbiItem(`function ${f.signature}`) as AbiFunction,
+      }));
+      const eqRules = fns.flatMap((f) => f.args.filter((a) => a.op === "eq").map((a) => ({ fn: f, rule: a })));
+      // AllowedCalldata applies to EVERY call under the delegation, so per-function argument pins are only
+      // sound when the permission has a single function.
+      if (eqRules.length > 0 && fns.length > 1) {
+        throw new CompileError("on-chain argument rules (op eq) require exactly one function per permission");
+      }
+      const allowedCalldata = eqRules.map(({ fn, rule }) => ({
+        startIndex: 4 + 32 * rule.index,
+        value: encodeStaticArg(fn.abi, rule.index, rule.value),
+      }));
+      const caveats: CaveatConfig[] = [expiry];
+      if (permission.value) {
+        caveats.push({ type: "nativeTokenPeriodTransfer", ...period(permission.value.perPeriod) });
+      }
+      return createDelegation({
+        ...base,
+        scope: {
+          type: ScopeType.FunctionCall,
+          targets: [permission.target],
+          selectors: fns.map((f) => toFunctionSelector(f.abi)),
+          ...(allowedCalldata.length ? { allowedCalldata } : {}),
+          // Default (no `value`): calls must carry 0 ETH.
+          valueLte: { maxValue: permission.value ? (permission.value.perTx ?? permission.value.perPeriod.amount) : 0n },
+        },
+        caveats,
+      });
+    }
   }
+}
+
+/** ABI-encode one static argument as its 32-byte calldata word. Dynamic types can't be pinned by offset. */
+function encodeStaticArg(fn: AbiFunction, index: number, raw: string): Hex {
+  const param = fn.inputs[index];
+  if (!param) throw new CompileError(`${fn.name} has no argument at index ${index}`);
+  const t = param.type;
+  let value: unknown;
+  if (t === "address") {
+    if (!isAddress(raw)) throw new CompileError(`argument ${index} of ${fn.name} must be an address`);
+    value = raw;
+  } else if (/^u?int\d*$/.test(t)) value = BigInt(raw);
+  else if (t === "bool") value = raw === "true";
+  else if (/^bytes([1-9]|[12]\d|3[0-2])$/.test(t)) value = raw;
+  else throw new CompileError(`argument ${index} of ${fn.name} has dynamic type ${t}; only static types can be pinned`);
+  return encodeAbiParameters([{ type: t }], [value]);
 }
 
 /** Random salt so two otherwise-identical grants get distinct hashes (and separate period state). */

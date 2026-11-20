@@ -275,6 +275,10 @@ export function openStore(path = ":memory:") {
           a.txHash,
           a.createdAt,
         ),
+      forAgent: (agent: string, limit = 100) =>
+        all("SELECT * FROM activity WHERE lower(agent) = lower(?) ORDER BY id DESC LIMIT ?", agent, limit).map(
+          toActivity,
+        ),
       list: (account: string, limit = 100) =>
         all("SELECT * FROM activity WHERE lower(account) = lower(?) ORDER BY id DESC LIMIT ?", account, limit).map(
           toActivity,

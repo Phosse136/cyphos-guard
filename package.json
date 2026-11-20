@@ -17,7 +17,8 @@
     "poc:keys": "pnpm --filter @phoswallet/poc keys",
     "e2e": "pnpm --filter @phoswallet/poc e2e:escalation",
     "dev": "pnpm --filter @phoswallet/approver dev:all",
-    "e2e:browser": "pnpm --filter @phoswallet/approver build && pnpm --filter @phoswallet/approver e2e:browser"
+    "e2e:browser": "pnpm --filter @phoswallet/approver build && pnpm --filter @phoswallet/approver e2e:browser",
+    "test:fork": "vitest run --config vitest.fork.config.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

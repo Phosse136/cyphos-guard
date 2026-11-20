@@ -9,7 +9,7 @@ import {
   type MetaMaskSmartAccount,
   toMetaMaskSmartAccount,
 } from "@metamask/smart-accounts-kit";
-import { buildUserOp, userOpToJSON } from "@phoswallet/sdk";
+import { buildUserOp, createPhoswallet, userOpToJSON } from "@phoswallet/sdk";
 import {
   type Address,
   type Chain,
@@ -93,4 +93,14 @@ export async function sendOwnerCalls(
   const receipt = await bundler.waitForUserOperationReceipt({ hash });
   if (!receipt.success) throw new Error(`userOp failed (${hash})`);
   return receipt.receipt.transactionHash;
+}
+
+/** Owner-side SDK client for the linked account. Session cookie rides along via same-origin /api. */
+export function ownerClient(account: MetaMaskSmartAccount, fork: boolean) {
+  return createPhoswallet({
+    accountAddress: account.address,
+    policyServiceUrl: `${window.location.origin}/api`,
+    publicClient: publicClient(),
+    owner: { account, sendCalls: (calls) => sendOwnerCalls(account, fork, calls) },
+  });
 }

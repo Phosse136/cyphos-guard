@@ -56,7 +56,7 @@ export default function Home() {
       {me && !account && <Onboarding me={me} onChange={refresh} />}
       {me && account && (
         <>
-          <Requests account={account} onDecided={() => setRefreshKey((k) => k + 1)} />
+          <Requests account={account} fork={me.fork} onDecided={() => setRefreshKey((k) => k + 1)} />
           <Grants
             account={account}
             fork={me.fork}

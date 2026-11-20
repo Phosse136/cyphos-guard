@@ -299,6 +299,11 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
         throw new HTTPException(400, { message: "delegation does not match account/agent" });
       }
     }
+    // One active grant per agent: each grant has its own on-chain period counters, so two overlapping
+    // grants would double the agent's effective daily cap. The old one must be revoked on-chain first.
+    if (store.grants.activeFor(account, policy.agent).length > 0) {
+      throw new HTTPException(409, { message: "agent already has an active grant; revoke it first" });
+    }
     const grant = {
       id: crypto.randomUUID(),
       account,
@@ -408,6 +413,8 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
   // ---------- agent API ----------
 
   app.get("/agent/grants", agentAuth, (c) => c.json(store.grants.activeForAgent(c.get("agent"))));
+
+  app.get("/agent/activity", agentAuth, (c) => c.json(store.activity.forAgent(c.get("agent"))));
 
   app.post("/agent/requests", agentAuth, async (c) => {
     const agent = c.get("agent");

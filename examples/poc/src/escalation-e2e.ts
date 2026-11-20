@@ -1,44 +1,44 @@
 /**
- * Phase 2 end-to-end on a local fork: passkey-only owner + policy service + agent.
- * Exercises all three layers and the approval flow through the real HTTP API, with the owner's
- * passkey simulated by a software authenticator (same bytes a real one produces).
- *
- *   routine  → agent pays within its daily cap on its own
- *   escalate → over the cap: request → owner approves with passkey → agent redeems once
- *   forbidden / over hard max → denied, never offered to the owner
- *   revoke   → passkey-signed userOp disables the grant on-chain → agent has nothing left
+ * End-to-end on a local fork through the public SDK: a passkey-only owner and an agent, both using
+ * createPhoswallet(), talking to the real policy service. Exercises all three layers, the typed errors,
+ * ERC-20 (real Base Sepolia test USDC) and grant replacement.
  */
 import { serve } from "@hono/node-server";
-import { getSmartAccountsEnvironment, Implementation, toMetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
+import { Implementation, toMetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
 import { createApp } from "@phoswallet/policy-service/app";
 import { createChainAdapter } from "@phoswallet/policy-service/chain";
 import { openStore } from "@phoswallet/policy-service/store";
 import { registrationResponse } from "@phoswallet/policy-service/testing";
 import {
-  buildApprovalDelegation,
+  ApprovalPending,
+  ApprovalRejected,
   buildUserOp,
-  compilePolicy,
-  createAgentClient,
-  revokeCall,
+  createPhoswallet,
+  encodeRedeem,
+  PolicyViolation,
+  revertReason,
   userOpToJSON,
 } from "@phoswallet/sdk";
 import { createSoftPasskey, ensureFork } from "@phoswallet/sdk/testing";
-import { type ApprovalRequestJSON, type GrantJSON, parsePolicy } from "@phoswallet/shared";
+import type { PolicyInput } from "@phoswallet/shared";
 import {
   type Address,
   type Chain,
   createPublicClient,
-  createWalletClient,
+  encodeFunctionData,
+  erc20Abi,
   type Hex,
   http,
   keccak256,
   type PublicClient,
   parseEther,
+  parseUnits,
   toHex,
   zeroAddress,
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount, privateKeyToAddress } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
+import { fundUsdc, USDC } from "./usdc.ts";
 
 const chain: Chain = baseSepolia;
 const FORK = process.env.FORK_RPC_URL || "http://127.0.0.1:8545";
@@ -57,7 +57,6 @@ await new Promise((r) => server.once("listening", r));
 const addr = server.address();
 const SERVICE = `http://127.0.0.1:${typeof addr === "object" && addr ? addr.port : 0}`;
 
-// ---------- output / checks ----------
 const failures: string[] = [];
 const check = (label: string, pass: boolean, detail = "") => {
   console.log(
@@ -66,174 +65,190 @@ const check = (label: string, pass: boolean, detail = "") => {
   if (!pass) failures.push(label);
 };
 const step = (s: string) => console.log(`\n\x1b[1m▸ ${s}\x1b[0m`);
+async function expectError<E extends Error>(fn: () => Promise<unknown>, type: abstract new (...a: never[]) => E) {
+  try {
+    await fn();
+    return null;
+  } catch (e) {
+    return e instanceof type ? e : null;
+  }
+}
 
-// ---------- owner (browser stand-in): passkey + cookie session ----------
+// ---------- owner session (stand-in for the approver app) ----------
 const passkey = createSoftPasskey({ rpId: "localhost", origin: ORIGIN });
 let cookie = "";
-const owner = async <T>(method: string, path: string, body?: unknown): Promise<{ status: number; data: T }> => {
-  const res = await fetch(SERVICE + path, {
-    method,
-    headers: { "content-type": "application/json", cookie },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
+const ownerFetch: typeof fetch = async (input, init) => {
+  const res = await fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), cookie } });
   const set = res.headers.get("set-cookie");
   if (set) cookie = set.split(";")[0] ?? "";
-  return { status: res.status, data: (await res.json()) as T };
+  return res;
 };
+const post = async <T>(path: string, body?: unknown) =>
+  (await (
+    await ownerFetch(SERVICE + path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    })
+  ).json()) as T;
 
 const publicClient: PublicClient = createPublicClient({ chain, transport: http(FORK) });
-const env = getSmartAccountsEnvironment(chain.id);
 const SHOP = privateKeyToAddress(generatePrivateKey());
 const MIXER = privateKeyToAddress(generatePrivateKey());
 
-step("1. Owner registers a passkey with the policy service");
-const regOpts = await owner<{ challengeId: string; options: { challenge: string } }>("POST", "/auth/register/options");
-const reg = await owner<{ keyId: Hex; x: Hex; y: Hex }>("POST", "/auth/register/verify", {
-  challengeId: regOpts.data.challengeId,
-  response: registrationResponse(passkey, regOpts.data.options.challenge),
+step("1. Owner: passkey, passkey-only smart account, link");
+const regOpts = await post<{ challengeId: string; options: { challenge: string } }>("/auth/register/options");
+const reg = await post<{ keyId: Hex; x: Hex; y: Hex }>("/auth/register/verify", {
+  challengeId: regOpts.challengeId,
+  response: registrationResponse(passkey, regOpts.options.challenge),
 });
-check("passkey registered, session started", reg.status === 200 && cookie.startsWith("phos_session="));
-
-step("2. Deploy a passkey-only smart account (first userOp carries the factory call)");
 const account = await toMetaMaskSmartAccount({
   client: publicClient,
   implementation: Implementation.Hybrid,
-  // No EOA owner in this test: every owner action below must be signed by the passkey.
-  // In the approver app the user can (and should) add a recovery EOA here.
-  deployParams: [zeroAddress, [reg.data.keyId], [BigInt(reg.data.x)], [BigInt(reg.data.y)]],
+  deployParams: [zeroAddress, [reg.keyId], [BigInt(reg.x)], [BigInt(reg.y)]],
   deploySalt: keccak256(toHex(passkey.credentialId)),
-  signer: { webAuthnAccount: passkey.account, keyId: reg.data.keyId },
+  signer: { webAuthnAccount: passkey.account, keyId: reg.keyId },
 });
-const passkeyUserOp = async (calls: { to: Address; data?: Hex; value?: bigint }[]) => {
+const sendCalls = async (calls: { to: Address; data?: Hex; value?: bigint }[]) => {
   const op = await buildUserOp(account, publicClient, calls);
   op.signature = await account.signUserOperation({ ...op, chainId: chain.id });
-  return owner<{ txHash?: Hex; error?: string }>("POST", "/dev/relay", { userOp: userOpToJSON(op) });
+  const r = await post<{ txHash?: Hex; error?: string }>("/dev/relay", { userOp: userOpToJSON(op) });
+  if (!r.txHash) throw new Error(r.error);
+  return r.txHash;
 };
-const deployed = await passkeyUserOp([{ to: account.address, value: 0n }]);
-check(
-  "account deployed via passkey-signed userOp",
-  !!deployed.data.txHash && (await account.isDeployed()),
-  deployed.data.error ?? account.address,
-);
-await owner("POST", "/dev/fund", { address: account.address });
-const link = await owner("PUT", "/me/account", { accountAddress: account.address });
-check("service verified the passkey is a signer on-chain and linked the account", link.status === 200);
+await sendCalls([{ to: account.address, value: 0n }]); // deploys
+await post("/dev/fund", { address: account.address });
+await fundUsdc(publicClient, account.address, parseUnits("100", 6));
+const linked = await ownerFetch(`${SERVICE}/me/account`, {
+  method: "PUT",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ accountAddress: account.address }),
+});
+check("passkey-only account deployed, funded (ETH + test USDC) and linked", linked.status === 200, account.address);
 
-step("3. Owner grants the agent 0.001 ETH/day to SHOP (hard max 0.01, MIXER forbidden)");
+const owner = createPhoswallet({
+  accountAddress: account.address,
+  policyServiceUrl: SERVICE,
+  publicClient,
+  owner: { account, sendCalls, fetch: ownerFetch },
+});
+
+step("2. Owner grants: 0.001 ETH/day + 5 USDC/day (max 2 USDC per payment) to SHOP");
 const agentKey = privateKeyToAccount(generatePrivateKey());
 await publicClient.request({
   method: "anvil_setBalance" as never,
   params: [agentKey.address, toHex(parseEther("1"))] as never,
 });
 const now = Number((await publicClient.getBlock()).timestamp);
-const policyInput = {
+const policy = (dailyEth: string): PolicyInput => ({
   version: 1,
-  chainId: chain.id,
+  chainId: 84532,
   agent: agentKey.address,
-  name: "invoice-bot",
   validFrom: now - 60,
   expiresAt: now + 7 * 86_400,
   permissions: [
+    { kind: "nativeTransfer", recipients: [SHOP], perPeriod: { amount: parseEther(dailyEth), periodSeconds: 86_400 } },
     {
-      kind: "nativeTransfer",
+      kind: "erc20Transfer",
+      token: USDC,
       recipients: [SHOP],
-      perPeriod: { amount: parseEther("0.001").toString(), periodSeconds: 86_400 },
+      perTx: parseUnits("2", 6),
+      perPeriod: { amount: parseUnits("5", 6), periodSeconds: 86_400 },
     },
   ],
-  escalation: {
-    enabled: true,
-    approvalTtlSeconds: 900,
-    hardMax: [{ token: "native", amount: parseEther("0.01").toString() }],
-  },
+  escalation: { enabled: true, approvalTtlSeconds: 900, hardMax: [{ token: "native", amount: parseEther("0.01") }] },
   forbidden: { targets: [MIXER] },
-};
-const compiled = compilePolicy({ policy: parsePolicy(policyInput), delegator: account.address, environment: env, now });
-const signed = await Promise.all(
-  compiled.map(async (c) => ({
-    ...c.delegation,
-    signature: await account.signDelegation({ delegation: c.delegation }),
-  })),
-);
-const grant = await owner<GrantJSON>("POST", "/grants", { policy: policyInput, delegations: signed });
-check("grant stored (delegation signed by the passkey, no gas)", grant.status === 201);
+});
+const grant = await owner.grantAgent({ policy: policy("0.001") });
+check("grant registered (2 passkey-signed delegations, no gas)", grant.delegations.length === 2);
 
-const agent = createAgentClient({
-  agent: agentKey,
-  account: account.address,
+const agent = createPhoswallet({
+  accountAddress: account.address,
   policyServiceUrl: SERVICE,
   publicClient,
-  walletClient: createWalletClient({ account: agentKey, chain, transport: http(FORK) }),
-  environment: env,
+  agent: agentKey,
 });
+const usdcTransfer = (amount: string) =>
+  encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [SHOP, parseUnits(amount, 6)] });
 
-step("4. Routine: agent pays 0.0005 ETH on its own");
-const routine = await agent.execute({ to: SHOP, value: parseEther("0.0005"), reason: "API usage" });
+step("3. Routine (agent alone)");
+const r1 = await agent.execute({ to: SHOP, value: parseEther("0.0005"), reason: "API usage" });
+check("0.0005 ETH paid within grant", r1.via === "grant", r1.txHash);
+const r2 = await agent.execute({ to: USDC, data: usdcTransfer("1.5"), reason: "API usage" });
+check("1.5 USDC paid within grant", r2.via === "grant", r2.txHash);
+
+step("4. Escalation → ApprovalPending → owner approves → waitForApproval executes");
+const pending = await expectError(
+  () => agent.execute({ to: SHOP, value: parseEther("0.005"), reason: "invoice #42" }),
+  ApprovalPending,
+);
+check("over daily ETH cap → ApprovalPending", !!pending, pending?.violations.join("; "));
+const usdcPending = await expectError(
+  () => agent.execute({ to: USDC, data: usdcTransfer("3"), reason: "big invoice" }),
+  ApprovalPending,
+);
+check("over per-tx USDC limit (off-chain rule) → ApprovalPending", !!usdcPending, usdcPending?.violations.join("; "));
+if (!pending || !usdcPending) throw new Error("no pending requests");
+const queue = await owner.getRequests("pending");
+check("owner sees both requests", queue.length === 2);
+for (const req of queue) await owner.approve(req);
+const done = await agent.waitForApproval(pending.request.id, { pollMs: 200 });
+check("approved ETH payment executed", done.via === "approval", done.txHash);
+const doneUsdc = await agent.waitForApproval(usdcPending.request.id, { pollMs: 200 });
+check("approved USDC payment executed", doneUsdc.via === "approval", doneUsdc.txHash);
+const shopUsdc = await publicClient.readContract({
+  address: USDC,
+  abi: erc20Abi,
+  functionName: "balanceOf",
+  args: [SHOP],
+});
+check("shop received 4.5 USDC", shopUsdc === parseUnits("4.5", 6), shopUsdc.toString());
+
+step("5. Rejection and denials (typed errors)");
+const another = await expectError(
+  () => agent.execute({ to: SHOP, value: parseEther("0.002"), reason: "one more" }),
+  ApprovalPending,
+);
+if (!another) throw new Error("expected pending");
+await owner.reject(another.request.id);
+const rejected = await expectError(() => agent.waitForApproval(another.request.id, { pollMs: 200 }), ApprovalRejected);
+check("owner rejection → ApprovalRejected", !!rejected);
+const forbidden = await expectError(() => agent.execute({ to: MIXER, value: 1n, reason: "trust me" }), PolicyViolation);
+check("forbidden address → PolicyViolation(forbidden)", forbidden?.reason === "forbidden");
+const huge = await expectError(
+  () => agent.execute({ to: SHOP, value: parseEther("0.05"), reason: "big" }),
+  PolicyViolation,
+);
+check("above hard max → PolicyViolation(over_hard_max)", huge?.reason === "over_hard_max");
+
+step("6. Re-grant replaces the old grant (revoked on-chain first, caps don't stack)");
+const regrant = await owner.grantAgent({ policy: policy("0.002") });
+const grants = await owner.getGrants();
 check(
-  "executed via grant without asking",
-  routine.status === "executed",
-  routine.status === "executed" ? routine.txHash : JSON.stringify(routine),
+  "old grant revoked, new grant active",
+  grants.find((g) => g.id === grant.id)?.status === "revoked" && regrant.status === "active",
+);
+let staleReason = "";
+try {
+  // Use the OLD delegation directly, bypassing the SDK: the chain itself must refuse it.
+  const data = encodeRedeem(grant.delegations[0] as never, { to: SHOP, value: 1n });
+  await publicClient.call({ account: agentKey, to: owner.environment.DelegationManager, data });
+} catch (e) {
+  staleReason = revertReason(e);
+}
+check(
+  "old delegation is dead on-chain even when used directly",
+  /CannotUseADisabledDelegation/.test(staleReason),
+  staleReason,
 );
 
-step("5. Escalation: agent needs 0.005 ETH (over the daily cap)");
-const big = await agent.execute({ to: SHOP, value: parseEther("0.005"), reason: "annual licence, invoice #42" });
-check(
-  "approval request created instead of failing",
-  big.status === "pending",
-  big.status !== "executed" ? big.violations.join("; ") : "",
-);
-const pending = await owner<ApprovalRequestJSON[]>("GET", "/requests?status=pending");
-const req = pending.data[0];
-check("owner sees it in the pending queue", pending.data.length === 1 && req?.value === parseEther("0.005").toString());
-if (!req) throw new Error("no pending request");
+step("7. Revoke");
+await owner.revoke(regrant.id);
+const after = await expectError(() => agent.execute({ to: SHOP, value: 1n, reason: "after revoke" }), PolicyViolation);
+check("after revoke → PolicyViolation(no_grant)", after?.reason === "no_grant");
 
-// Browser stand-in: build the one-shot approval from the raw request fields, sign with the passkey.
-const unsigned = buildApprovalDelegation({
-  environment: env,
-  delegator: account.address,
-  agent: req.agent,
-  execution: { to: req.to, value: BigInt(req.value), data: req.data },
-  expiresAt: req.expiresAt,
-});
-const approve = await owner<ApprovalRequestJSON & { error?: string }>("POST", `/requests/${req.id}/approve`, {
-  delegation: { ...unsigned, signature: await account.signDelegation({ delegation: unsigned }) },
-});
-check("owner approved with passkey; service re-verified it on-chain", approve.status === 200, approve.data.error ?? "");
-
-const decided = await agent.waitForApproval(req.id, { pollMs: 200 });
-const redeemed = await agent.redeemApproval(decided);
-check("agent redeemed the approval", "hash" in redeemed, "hash" in redeemed ? redeemed.hash : redeemed.reason);
-const replay = await agent.redeemApproval({ ...decided, status: "approved" });
-check("the same approval cannot be used twice", !("hash" in replay), "reason" in replay ? replay.reason : "");
-const executed = await agent.getRequest(req.id);
-check("request marked executed with tx hash", executed.status === "executed" && !!executed.txHash);
-
-step("6. Forbidden & over hard max: denied, never shown to the owner");
-const forbidden = await agent.execute({ to: MIXER, value: parseEther("0.0001"), reason: "trust me" });
-check("payment to forbidden address denied", forbidden.status === "denied" && forbidden.code === "forbidden");
-const huge = await agent.execute({ to: SHOP, value: parseEther("0.05"), reason: "big one" });
-check("payment above hard max denied", huge.status === "denied" && huge.code === "over_hard_max");
-const stillOne = await owner<ApprovalRequestJSON[]>("GET", "/requests?status=pending");
-check("owner's pending queue is empty", stillOne.data.length === 0);
-
-step("7. Owner rejects a request");
-const another = await agent.execute({ to: SHOP, value: parseEther("0.002"), reason: "one more" });
-if (another.status !== "pending") throw new Error("expected pending");
-await owner("POST", `/requests/${another.request.id}/reject`);
-const rejected = await agent.waitForApproval(another.request.id, { pollMs: 200 });
-check("agent sees rejection", rejected.status === "rejected");
-
-step("8. One-click revoke: passkey-signed userOp disables the grant on-chain");
-const g = grant.data;
-const revoke = await passkeyUserOp(g.delegations.map((d) => revokeCall(env, d as never)));
-check("revocation userOp executed", !!revoke.data.txHash, revoke.data.error ?? revoke.data.txHash ?? "");
-const marked = await owner<{ error?: string }>("POST", `/grants/${g.id}/revoked`, { txHash: revoke.data.txHash });
-check("service confirmed on-chain that the delegation is disabled", marked.status === 200, marked.data.error ?? "");
-const after = await agent.execute({ to: SHOP, value: parseEther("0.0001"), reason: "after revoke" });
-check("agent can no longer act or escalate", after.status === "denied" && after.code === "no_grant");
-
-step("Activity log (as the approver app shows it)");
-const activity = await owner<{ kind: string; txHash: string | null }[]>("GET", "/activity");
-for (const a of [...activity.data].reverse()) console.log(`    ${a.kind.padEnd(18)} ${a.txHash ?? ""}`);
+step("Agent's own activity");
+for (const a of [...(await agent.getActivity())].reverse()) console.log(`    ${a.kind.padEnd(18)} ${a.txHash ?? ""}`);
 
 console.log(
   failures.length

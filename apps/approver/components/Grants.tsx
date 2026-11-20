@@ -1,13 +1,12 @@
 "use client";
 
-import type { Delegation, MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
-import { compilePolicy, revokeCall } from "@phoswallet/sdk";
-import { type GrantJSON, parsePolicy } from "@phoswallet/shared";
+import type { MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
+import type { GrantJSON, PolicyInput } from "@phoswallet/shared";
 import { useCallback, useEffect, useState } from "react";
 import { isAddress, parseEther } from "viem";
 import { api } from "@/lib/api";
 import { ago, eth, short } from "@/lib/format";
-import { chain, environment, publicClient, sendOwnerCalls, signDelegation } from "@/lib/wallet";
+import { ownerClient, publicClient } from "@/lib/wallet";
 import { Button, Card, ErrorText, Field, inputClass } from "./ui";
 
 const DAY = 86_400;
@@ -53,15 +52,15 @@ export function Grants({
     setError(null);
     try {
       const now = Number((await publicClient().getBlock()).timestamp);
-      const policyInput = {
+      const policyInput: PolicyInput = {
         version: 1,
-        chainId: chain.id,
+        chainId: 84532, // Base Sepolia (the only chain the approver targets)
         agent: form.agent,
         validFrom: now - 60,
         expiresAt: now + Number(form.days) * DAY,
         permissions: [
           {
-            kind: "nativeTransfer",
+            kind: "nativeTransfer" as const,
             recipients: [form.recipient],
             perPeriod: { amount: parseEther(form.daily).toString(), periodSeconds: DAY },
           },
@@ -69,15 +68,13 @@ export function Grants({
         escalation: {
           enabled: true,
           approvalTtlSeconds: 900,
-          hardMax: form.hardMax ? [{ token: "native", amount: parseEther(form.hardMax).toString() }] : [],
+          hardMax: form.hardMax ? [{ token: "native" as const, amount: parseEther(form.hardMax).toString() }] : [],
         },
         forbidden: { targets: form.forbidden.split(/[\s,]+/).filter(Boolean) },
       };
-      const policy = parsePolicy(policyInput); // same validation as the server
-      const compiled = compilePolicy({ policy, delegator: account.address, environment, now });
-      const signed = [];
-      for (const c of compiled) signed.push(await signDelegation(account, c.delegation)); // one passkey prompt each
-      await api.createGrant(policyInput, signed);
+      // SDK: validates, compiles one delegation per permission, passkey-signs each, and revokes this
+      // agent's existing grant on-chain first so caps never stack.
+      await ownerClient(account, fork).grantAgent({ policy: policyInput });
       setForm((f) => ({ ...f, agent: "", recipient: "", forbidden: "" }));
       await load();
       onChanged();
@@ -93,12 +90,7 @@ export function Grants({
     setBusy(g.id);
     setError(null);
     try {
-      const tx = await sendOwnerCalls(
-        account,
-        fork,
-        g.delegations.map((d) => revokeCall(environment, d as Delegation)),
-      );
-      await api.markRevoked(g.id, tx);
+      await ownerClient(account, fork).revoke(g.id);
       await load();
       onChanged();
     } catch (e) {

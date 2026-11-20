@@ -10,23 +10,13 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { serve } from "@hono/node-server";
-import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
 import { createApp } from "@phoswallet/policy-service/app";
 import { createChainAdapter } from "@phoswallet/policy-service/chain";
 import { openStore } from "@phoswallet/policy-service/store";
-import { createAgentClient } from "@phoswallet/sdk";
+import { ApprovalPending, createPhoswallet, PolicyViolation } from "@phoswallet/sdk";
 import { ensureFork } from "@phoswallet/sdk/testing";
 import { chromium } from "playwright-core";
-import {
-  type Address,
-  type Chain,
-  createPublicClient,
-  createWalletClient,
-  http,
-  type PublicClient,
-  parseEther,
-  toHex,
-} from "viem";
+import { type Address, type Chain, createPublicClient, http, type PublicClient, parseEther, toHex } from "viem";
 import { generatePrivateKey, privateKeyToAccount, privateKeyToAddress } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 
@@ -120,33 +110,30 @@ try {
   await page.getByRole("button", { name: "Revoke" }).waitFor({ timeout: 30_000 });
   check("agent granted with a passkey-signed delegation", true);
 
-  const agent = createAgentClient({
-    agent: agentKey,
-    account: accountAddress,
+  const agent = createPhoswallet({
+    accountAddress,
     policyServiceUrl: "http://127.0.0.1:8787",
     publicClient,
-    walletClient: createWalletClient({ account: agentKey, chain, transport: http(FORK) }),
-    environment: getSmartAccountsEnvironment(chain.id),
+    agent: agentKey,
   });
 
   console.log("▸ routine + escalation");
   const routine = await agent.execute({ to: shop, value: parseEther("0.0005"), reason: "API usage" });
-  check("routine payment executed by the agent alone", routine.status === "executed");
-  const big = await agent.execute({ to: shop, value: parseEther("0.005"), reason: "Annual licence, invoice #42" });
-  check("over-limit payment became an approval request", big.status === "pending");
+  check("routine payment executed by the agent alone", routine.via === "grant");
+  let requestId = "";
+  try {
+    await agent.execute({ to: shop, value: parseEther("0.005"), reason: "Annual licence, invoice #42" });
+  } catch (e) {
+    if (e instanceof ApprovalPending) requestId = e.request.id;
+  }
+  check("over-limit payment became an approval request (ApprovalPending)", requestId !== "");
   await page.getByText("Send 0.005 ETH").waitFor({ timeout: 15_000 });
   await shot("1-pending-approval");
   check("request shown human-readably in the approver", true);
   await page.getByRole("button", { name: "Approve" }).click();
   await page.getByText("Nothing waiting").waitFor({ timeout: 30_000 });
-  if (big.status !== "pending") throw new Error("no request");
-  const approved = await agent.waitForApproval(big.request.id, { pollMs: 300, timeoutMs: 30_000 });
-  const redeemed = await agent.redeemApproval(approved);
-  check(
-    "browser passkey approval redeemed on-chain by the agent",
-    "hash" in redeemed,
-    "reason" in redeemed ? redeemed.reason : "",
-  );
+  const executed = await agent.waitForApproval(requestId, { pollMs: 300, timeoutMs: 30_000 });
+  check("browser passkey approval executed on-chain by the agent", executed.via === "approval", executed.txHash);
   await page.getByText("Approved payment sent").waitFor({ timeout: 15_000 });
   await shot("2-activity-after-approval");
 
@@ -154,11 +141,13 @@ try {
   await page.getByRole("button", { name: "Revoke" }).click();
   await page.getByText("revoked", { exact: true }).waitFor({ timeout: 30_000 });
   await shot("3-revoked");
-  const after = await agent.execute({ to: shop, value: parseEther("0.0001"), reason: "after revoke" });
-  check(
-    "after one-click revoke the agent can't act or escalate",
-    after.status === "denied" && after.code === "no_grant",
-  );
+  let code = "";
+  try {
+    await agent.execute({ to: shop, value: parseEther("0.0001"), reason: "after revoke" });
+  } catch (e) {
+    if (e instanceof PolicyViolation) code = e.reason;
+  }
+  check("after one-click revoke the agent can't act or escalate", code === "no_grant");
 } catch (e) {
   await shot("failure").catch(() => {});
   failures.push(`exception: ${(e as Error).message.split("\n")[0]}`);

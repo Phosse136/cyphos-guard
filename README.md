@@ -2,7 +2,7 @@
 
 **Fireblocks-grade guardrails for AI agents, for indie devs and small teams. Open source, self-serve, cheap.**
 
-> Status: Phase 0 (research and skeleton). Testnet only (Base Sepolia). Not for real funds.
+> Status: Phase 1 (proof of concept). Testnet only (Base Sepolia). Not for real funds.
 
 AI agents increasingly need to spend money on-chain: pay for APIs, swap, rebalance. Today you either hand the agent
 a private key (full risk) or approve every transaction yourself (and the agent is pointless).
@@ -29,6 +29,34 @@ phoswallet gives an agent **scoped, revocable permissions** on your smart accoun
 
 Design records: [ADR 0001: account stack](docs/decisions/0001-account-stack.md) ·
 [ADR 0002: policy schema](docs/decisions/0002-policy-schema.md)
+
+## Run the PoC in 5 minutes
+
+Requirements: Node ≥ 24, pnpm 12, [Foundry](https://getfoundry.sh) (for `anvil`).
+
+```sh
+pnpm install
+pnpm poc            # local fork of Base Sepolia: no faucet, no API key
+```
+
+The script spawns an anvil fork of Base Sepolia (real MetaMask Delegation Framework contracts) and generates
+throwaway keys into `.env`. Then it:
+
+1. Deploys a Hybrid smart account for the owner and funds it.
+2. Grants the agent **max 0.001 ETH per day, only to one address, for 7 days** (one signed delegation, no gas).
+3. Agent: sends 0.0005 ✔ · sends 0.0006 more (over the daily cap) ✘ · pays a stranger ✘ · smuggles calldata ✘.
+   Rejections are broadcast anyway, so you see reverted txs with the enforcer's reason.
+4. Fast-forwards one day: the allowance resets and 0.0006 ✔ (fork only).
+5. Owner revokes on-chain. The agent's next send ✘ `CannotUseADisabledDelegation()`.
+
+It's self-checking: it exits non-zero if anything that must be rejected gets through.
+
+**On real Base Sepolia** (explorer links): `NETWORK=live pnpm poc`. The first run prints the owner address. Send it
+~0.003 test ETH from a faucet ([Coinbase](https://portal.cdp.coinbase.com/products/faucet),
+[Superchain](https://console.optimism.io/faucet)) and run again.
+
+How the pieces fit: [ADR 0003: owner actions without a bundler](docs/decisions/0003-owner-actions-without-bundler.md) ·
+[passkey path (Phase 2)](docs/passkey-path.md)
 
 ## Repo layout
 

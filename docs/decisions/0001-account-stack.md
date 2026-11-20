@@ -79,6 +79,9 @@ Reasons, in order of weight:
 - **(d) permissionless.js**: a client library, not a permission layer. It doesn't answer the question on its own.
   We can still use it if we need Pimlico-specific helpers.
 
+> **Update (Phase 1):** owner-side userOps are self-submitted via `EntryPoint.handleOps` from the owner EOA, so no
+> bundler is needed for the PoC. See ADR 0003. A bundler becomes relevant again for passkey-only owner actions.
+
 ## Consequences and known limitations (security-relevant)
 
 - **Targets × methods is a cross-product.** `AllowedTargets` and `AllowedMethods` are independent sets. Granting

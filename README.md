@@ -88,6 +88,23 @@ invoice, and was blocked when it tried to pay the denylisted vendor. On-chain ba
 
 ## Use it from your agent
 
+### Create the agent's key
+
+The agent has its own key pair. The agent's developer creates it where the agent runs and gives the **owner only the
+address**. cyphos-guard never sees the key, and the key holds no owner funds (just a little gas):
+
+```sh
+pnpm cli agent new --env agent.env --approver https://your-approver.example
+#   Agent address  0x9520…0b01      ← give this to the owner, who grants it limits with their passkey
+#   Private key    stored in agent.env as CYPHOS_AGENT_PRIVATE_KEY (mode 600, never printed)
+pnpm cli agent show --env agent.env   # address + gas balance
+```
+
+It refuses to overwrite an existing key (`--force` replaces it and prints the old address) and warns if the file is in
+a git repo but not ignored. For production, a KMS or server-wallet key works just as well: only its address matters.
+
+### Call the SDK
+
 ```ts
 import { createCyphosGuard, ApprovalPending, PolicyViolation } from "@cyphos-guard/sdk";
 
@@ -259,6 +276,7 @@ corrections welcome).
 ```
 apps/approver         Next.js owner app: passkey login, approvals, grants, revoke, activity
 apps/policy-service   approval queue · grant registry · activity (Hono + node:sqlite), holds no keys
+packages/cli          cyphos-guard CLI: `agent new` / `agent show` (agent key, kept by the agent's developer)
 packages/contracts    CosignerEnforcer (Foundry, on Delegation Framework v1.3.0 as submodule)
 packages/mcp          MCP server (pay, check_approval, … for Claude Code / Claude Desktop)
 packages/sdk          @cyphos-guard/sdk: createCyphosGuard, policy compiler, co-signer, typed errors

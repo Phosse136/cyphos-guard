@@ -28,7 +28,8 @@
     "contracts:test": "pnpm --filter @cyphos-guard/contracts test",
     "contracts:build": "pnpm --filter @cyphos-guard/contracts build",
     "poc:cosigner": "pnpm --filter @cyphos-guard/poc run cosigner",
-    "e2e:live": "pnpm --filter @cyphos-guard/approver build && pnpm --filter @cyphos-guard/approver e2e:live"
+    "e2e:live": "pnpm --filter @cyphos-guard/approver build && pnpm --filter @cyphos-guard/approver e2e:live",
+    "cli": "node packages/cli/src/cli.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

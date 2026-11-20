@@ -11,6 +11,7 @@ decides: within limits → paid, above → you approve with your passkey, forbid
 | `get_wallet_status` | Account, ETH/USDC balances and the agent's current limits (read-only)                  |
 | `pay`               | Pay ETH or USDC with a reason → `paid` · `pending_approval` (+ `requestId`) · `denied` |
 | `call_contract`     | Advanced: contract call (calldata, optional ETH) under the same rules                  |
+| `fetch_paid_api`    | GET an x402 (HTTP 402) API, paying within the x402 limits; above them you're asked     |
 | `check_approval`    | Check or wait (≤ 300 s) for your decision; executes the payment if approved            |
 | `list_activity`     | The agent's recent payments, requests and denials (read-only)                          |
 

@@ -126,11 +126,36 @@ try {
 ### …or from any MCP agent
 
 The [cyphos-guard MCP server](packages/mcp/README.md) gives Claude Code, Claude Desktop and other MCP clients the tools
-`get_wallet_status`, `pay`, `call_contract`, `check_approval` and `list_activity`. They're backed by the same three layers:
+`get_wallet_status`, `pay`, `call_contract`, `fetch_paid_api` (x402), `check_approval` and `list_activity`. They're
+backed by the same three layers:
 
 ```sh
 claude mcp add cyphos-guard -e CYPHOS_AGENT_PRIVATE_KEY=0x… -- node /path/to/cyphos-guard/packages/mcp/src/server.ts
 ```
+
+### …and pay x402 APIs
+
+[x402](https://docs.x402.org) lets APIs charge per request over HTTP 402. With an `x402` permission, the agent pays
+allowed sellers within your limits, asks you above them, and never pays a forbidden seller:
+
+```ts
+const { response, paid } = await pw.payX402("https://api.example/report", {}, { reason: "weekly market report" });
+```
+
+How it works: an x402 payment must be signed by the payer, and only your passkey can sign for your account. So each
+payment moves exactly the price from your account to the agent's own address (on-chain: only to the agent, capped per
+period, per-payment cap binding via the co-signer), and the agent immediately signs the x402 payment to the seller.
+
+| Rule                                                   | Enforced                                                                                                                                                   |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Total x402 spend per period, top-ups only to the agent | on-chain                                                                                                                                                   |
+| Per-payment cap                                        | on-chain via the co-signer (required for x402)                                                                                                             |
+| Which sellers may be paid                              | SDK + co-signer. The last hop (agent → seller) is signed by the agent alone, so a **stolen agent key could redirect at most what the on-chain caps allow** |
+
+Verified against the official x402 server and facilitator (`@x402/core` / `@x402/evm` 2.30) on a Base Sepolia fork:
+routine payment, escalation with approval, forbidden seller, max-amount guard
+([test](examples/x402-seller/src/x402.fork.test.ts)). When x402's delegation-based transfer method (ERC-7710) is
+supported by facilitators, the last hop can move on-chain too.
 
 ## How it works
 
@@ -254,6 +279,8 @@ corrections welcome).
   policy-service signature per redemption. It makes ERC-20 per-payment caps and range checks on arguments binding
   even for a compromised agent, while the co-signer still can't move funds.
 
+- **x402**: agents pay HTTP 402 APIs within your limits (`payX402`, MCP `fetch_paid_api`).
+
 **Next**
 
 - Several ERC-20 recipients per permission (`LogicalOrWrapperEnforcer`), batch approvals, web push notifications.
@@ -277,6 +304,7 @@ corrections welcome).
 apps/approver         Next.js owner app: passkey login, approvals, grants, revoke, activity
 apps/policy-service   approval queue · grant registry · activity (Hono + node:sqlite), holds no keys
 packages/cli          cyphos-guard CLI: `agent new` / `agent show` (agent key, kept by the agent's developer)
+examples/x402-seller  x402 seller on the official x402 server logic (tests, live demo)
 packages/contracts    CosignerEnforcer (Foundry, on Delegation Framework v1.3.0 as submodule)
 packages/mcp          MCP server (pay, check_approval, … for Claude Code / Claude Desktop)
 packages/sdk          @cyphos-guard/sdk: createCyphosGuard, policy compiler, co-signer, typed errors

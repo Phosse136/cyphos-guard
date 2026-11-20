@@ -1,10 +1,10 @@
 "use client";
 
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
-import { useState } from "react";
-import { type Address, isAddress } from "viem";
+import { useEffect, useState } from "react";
+import { type Address, formatEther, isAddress, parseEther } from "viem";
 import { api, type Me } from "@/lib/api";
-import { newAccount, sendOwnerCalls } from "@/lib/wallet";
+import { newAccount, publicClient, sendOwnerCalls } from "@/lib/wallet";
 import { Button, Card, ErrorText, Field, inputClass } from "./ui";
 
 export function Onboarding({ me, onChange }: { me: Me; onChange: () => void }) {
@@ -64,6 +64,74 @@ export function Onboarding({ me, onChange }: { me: Me; onChange: () => void }) {
 
   const owner = me.owner;
   return (
+    <CreateAccount
+      me={me}
+      owner={owner}
+      busy={busy}
+      error={error}
+      recovery={recovery}
+      setRecovery={setRecovery}
+      onCreate={run}
+    />
+  );
+}
+
+/** On live Base Sepolia the account pays for its own deployment, so it must hold test ETH first. */
+const MIN_DEPLOY_BALANCE = parseEther("0.0003");
+
+function CreateAccount({
+  me,
+  owner,
+  busy,
+  error,
+  recovery,
+  setRecovery,
+  onCreate,
+}: {
+  me: Me;
+  owner: NonNullable<Me["owner"]>;
+  busy: boolean;
+  error: string | null;
+  recovery: string;
+  setRecovery: (v: string) => void;
+  onCreate: (fn: () => Promise<unknown>) => () => Promise<void>;
+}) {
+  const recoveryOk = recovery === "" || isAddress(recovery);
+  const [address, setAddress] = useState<Address | null>(null);
+  const [balance, setBalance] = useState<bigint | null>(null);
+
+  // The counterfactual address depends on the passkey AND the recovery address: recompute when it changes.
+  useEffect(() => {
+    if (!recoveryOk) return setAddress(null);
+    let stale = false;
+    newAccount(owner, recovery ? (recovery as Address) : null).then((a) => {
+      if (!stale) setAddress(a.address);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [owner, recovery, recoveryOk]);
+
+  // Live only: poll the balance so the owner sees when their faucet / wallet transfer has arrived.
+  useEffect(() => {
+    if (me.fork || !address) return;
+    let stop = false;
+    const tick = async () => {
+      const b = await publicClient()
+        .getBalance({ address })
+        .catch(() => null);
+      if (!stop) setBalance(b);
+    };
+    tick();
+    const t = setInterval(tick, 3000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, [address, me.fork]);
+
+  const funded = me.fork || (balance !== null && balance >= MIN_DEPLOY_BALANCE);
+  return (
     <Card title="Create your smart account">
       <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
         A MetaMask Hybrid smart account on Base Sepolia, owned by your passkey. cyphos-guard never holds a key to it.
@@ -79,10 +147,21 @@ export function Onboarding({ me, onChange }: { me: Me; onChange: () => void }) {
           onChange={(e) => setRecovery(e.target.value.trim())}
         />
       </Field>
+      {!me.fork && address && (
+        <div className="mt-4 rounded-lg bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+          <p className="font-medium">1. Fund your account address with test ETH</p>
+          <p className="mt-1 break-all font-mono text-xs">{address}</p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Balance: {balance === null ? "…" : `${formatEther(balance)} ETH`} · needs at least{" "}
+            {formatEther(MIN_DEPLOY_BALANCE)} ETH to pay for its own deployment. Send from your wallet or a Base Sepolia
+            faucet; this updates automatically. Changing the recovery address changes this address.
+          </p>
+        </div>
+      )}
       <div className="mt-4 flex gap-2">
         <Button
-          disabled={busy || (recovery !== "" && !isAddress(recovery))}
-          onClick={run(async () => {
+          disabled={busy || !recoveryOk || !funded}
+          onClick={onCreate(async () => {
             const account = await newAccount(owner, recovery ? (recovery as Address) : null);
             if (me.fork) await api.devFund(account.address);
             // First userOp deploys the account (factory call) and is signed by the passkey.
@@ -90,14 +169,9 @@ export function Onboarding({ me, onChange }: { me: Me; onChange: () => void }) {
             await api.linkAccount(account.address);
           })}
         >
-          {busy ? "Waiting for passkey…" : "Create account"}
+          {busy ? "Waiting for passkey…" : me.fork ? "Create account" : "2. Create account"}
         </Button>
       </div>
-      {!me.fork && (
-        <p className="mt-3 text-xs text-zinc-500">
-          On Base Sepolia the account pays its own gas: fund the counterfactual address with test ETH first.
-        </p>
-      )}
       <ErrorText error={error} />
     </Card>
   );

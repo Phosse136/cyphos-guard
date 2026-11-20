@@ -1,23 +1,12 @@
 import type { NextConfig } from "next";
 
-const policyService = process.env.POLICY_SERVICE_URL ?? "http://127.0.0.1:8787";
-const rpc =
-  (process.env.NETWORK ?? "fork") === "fork"
-    ? (process.env.FORK_RPC_URL ?? "http://127.0.0.1:8545")
-    : (process.env.RPC_URL ?? "https://sepolia.base.org");
-
 const config: NextConfig = {
   // Workspace packages ship TypeScript sources.
   transpilePackages: ["@cyphos-guard/sdk", "@cyphos-guard/shared"],
   // Type checking runs via `pnpm typecheck` (tsc), not inside `next build`.
   typescript: { ignoreBuildErrors: true },
-  // Same-origin proxying: the session cookie stays first-party and the browser never needs CORS.
-  async rewrites() {
-    return [
-      { source: "/api/:path*", destination: `${policyService}/:path*` },
-      { source: "/rpc", destination: rpc },
-    ];
-  },
+  // /api and /rpc are proxied by route handlers (app/api, app/rpc) so targets are chosen at runtime, not baked
+  // into the build like rewrites() destinations are.
   async headers() {
     return [
       {

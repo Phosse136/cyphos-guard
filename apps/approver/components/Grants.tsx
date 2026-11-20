@@ -60,6 +60,14 @@ export function Grants({
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<Form>(EMPTY);
   const [prefilled, setPrefilled] = useState(false);
+  const [cosigner, setCosigner] = useState<string | null>(null);
+  const [useCosigner, setUseCosigner] = useState(true);
+  useEffect(() => {
+    api
+      .cosigner()
+      .then((c) => setCosigner(c.enabled ? c.address : null))
+      .catch(() => setCosigner(null));
+  }, []);
   const set = (k: keyof Form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [k]: e.target.value.trim() }));
 
@@ -132,6 +140,7 @@ export function Grants({
         expiresAt: now + Number(form.days) * DAY,
         permissions: permissions(),
         escalation: { enabled: true, approvalTtlSeconds: 900, hardMax },
+        ...(cosigner && useCosigner ? { cosigner } : {}),
         forbidden: { targets: form.forbidden.split(/[\s,]+/).filter(Boolean) },
       };
       // SDK: validates, compiles one delegation per permission, passkey-signs each, and revokes this
@@ -243,6 +252,23 @@ export function Grants({
           <input className={inputClass} value={form.forbidden} onChange={set("forbidden")} />
         </Field>
       </div>
+      {cosigner && (
+        <label className="mt-4 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={useCosigner}
+            onChange={(e) => setUseCosigner(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium">Require the phoswallet co-signer</span>
+            <span className="block text-xs text-zinc-500">
+              Makes the per-payment limit binding on-chain, even if the agent is compromised. The co-signer can only
+              block; it can never move funds. If the service is down, the agent can't act on its own.
+            </span>
+          </span>
+        </label>
+      )}
       <Button className="mt-4" disabled={!valid || busy !== null} onClick={grant}>
         {busy === "grant" ? "Confirm with passkey…" : "Grant (sign with passkey)"}
       </Button>

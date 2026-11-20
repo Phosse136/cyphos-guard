@@ -23,7 +23,10 @@
     "demo:selftest": "pnpm --filter @phoswallet/demo-agent run demo-selftest --",
     "demo:setup": "pnpm --filter @phoswallet/demo-agent run demo-setup",
     "demo:agent": "pnpm --filter @phoswallet/demo-agent run demo-agent",
-    "e2e:demo": "pnpm --filter @phoswallet/approver build && pnpm --filter @phoswallet/approver e2e:demo"
+    "e2e:demo": "pnpm --filter @phoswallet/approver build && pnpm --filter @phoswallet/approver e2e:demo",
+    "contracts:deploy": "pnpm --filter @phoswallet/poc run deploy-cosigner",
+    "contracts:test": "pnpm --filter @phoswallet/contracts test",
+    "contracts:build": "pnpm --filter @phoswallet/contracts build"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

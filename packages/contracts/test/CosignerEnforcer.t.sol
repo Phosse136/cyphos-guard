@@ -149,7 +149,7 @@ contract CosignerEnforcerTest is Test {
     }
 
     function test_missingOrGarbageArgsRevert() public {
-        vm.expectRevert();
+        vm.expectRevert("CosignerEnforcer:missing-cosignature");
         _hook(abi.encodePacked(cosigner), hex"", singleDefault, execution, redeemer);
         vm.expectRevert();
         _hook(abi.encodePacked(cosigner), hex"deadbeef", singleDefault, execution, redeemer);

@@ -17,7 +17,6 @@ import {
   createWalletClient,
   encodeFunctionData,
   erc20Abi,
-  type Hex,
   http,
   type PublicClient,
   parseEther,
@@ -148,7 +147,7 @@ describe("CosignerEnforcer through the deployed DelegationManager (fork)", () =>
   });
 
   it("rejects the same call without a cosignature (agent bypassing the service)", async () => {
-    expect(await simulate(delegation, usdc("1.5"))).not.toBe("ok");
+    expect(await simulate(delegation, usdc("1.5"))).toMatch(/missing-cosignature/);
   });
 
   it("rejects a cosignature forged with the agent's own key", async () => {

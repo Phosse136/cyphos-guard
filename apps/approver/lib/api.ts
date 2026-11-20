@@ -46,6 +46,7 @@ export const api = {
   createGrant: (policy: unknown, delegations: unknown[]) => call<GrantJSON>("POST", "/grants", { policy, delegations }),
   markRevoked: (id: string, txHash: Hex) => call("POST", `/grants/${id}/revoked`, { txHash }),
   activity: () => call<ActivityJSON[]>("GET", "/activity"),
+  cosigner: () => call<{ enabled: boolean; address: Address | null; enforcer: Address }>("GET", "/cosigner"),
   devRelay: (userOp: unknown) => call<{ txHash: Hex }>("POST", "/dev/relay", { userOp }),
   devFund: (address: Address) => call("POST", "/dev/fund", { address }),
 };

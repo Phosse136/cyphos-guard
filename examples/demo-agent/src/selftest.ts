@@ -56,17 +56,21 @@ await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
 const print = createPrinter({ live: false });
 const publicClient: PublicClient = createPublicClient({ chain, transport: http(FORK) });
 
-// ---- policy service ----
+// ---- policy service (with co-signer) ----
+const adapter = await createChainAdapter({ rpcUrl: FORK, network: "fork" });
+await adapter.ensureCosignerEnforcer();
+const cosigner = privateKeyToAccount(generatePrivateKey());
 const service = serve({
   fetch: createApp({
     store: openStore(":memory:"),
-    chain: await createChainAdapter({ rpcUrl: FORK, network: "fork" }),
+    chain: adapter,
     config: {
       rpId: "localhost",
       rpName: "phoswallet",
       origins: [ORIGIN],
       sessionTtlSeconds: 3600,
       secureCookies: false,
+      cosigner,
     },
   }).fetch,
   port: 0,
@@ -128,7 +132,7 @@ await publicClient.request({
   params: [agentKey.address, toHex(parseEther("0.05"))] as never,
 });
 const now = Number((await publicClient.getBlock()).timestamp);
-await owner.grantAgent({ policy: demoPolicy(agentKey.address, now) });
+await owner.grantAgent({ policy: demoPolicy(agentKey.address, now, cosigner.address) });
 console.log(`  account ${account.address} (passkey-only), agent ${agentKey.address}`);
 console.log(
   "  grant: ≤2 USDC/payment & 5 USDC/day to Inference API · 0.001 ETH/day to GPU market · DataHarvest forbidden",

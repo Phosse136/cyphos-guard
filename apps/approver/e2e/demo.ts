@@ -46,11 +46,20 @@ const check = (label: string, pass: boolean, detail = "") => {
 };
 
 await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
+const adapter = await createChainAdapter({ rpcUrl: FORK, network: "fork" });
+await adapter.ensureCosignerEnforcer();
 const service = serve({
   fetch: createApp({
     store: openStore(":memory:"),
-    chain: await createChainAdapter({ rpcUrl: FORK, network: "fork" }),
-    config: { rpId: "localhost", rpName: "phoswallet", origins: [APP], sessionTtlSeconds: 3600, secureCookies: false },
+    chain: adapter,
+    config: {
+      rpId: "localhost",
+      rpName: "phoswallet",
+      origins: [APP],
+      sessionTtlSeconds: 3600,
+      secureCookies: false,
+      cosigner: privateKeyToAccount(generatePrivateKey()), // approver grants are co-signed by default
+    },
   }).fetch,
   port: 8787,
   hostname: "127.0.0.1",

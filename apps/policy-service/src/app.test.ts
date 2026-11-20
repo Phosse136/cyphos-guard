@@ -26,6 +26,7 @@ function setup(overrides: Partial<ChainAdapter> = {}) {
     isDisabled: async () => true,
     verifiedRedeem: async () => null, // overridden per test
     accountHasPasskey: async () => true,
+    ensureCosignerEnforcer: async () => true,
     ...overrides,
   };
   const store = openStore(":memory:");

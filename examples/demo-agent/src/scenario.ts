@@ -67,7 +67,7 @@ export const INVOICES: Invoice[] = [
 ];
 
 /** The grant the owner gives the agent (via the approver form, or programmatically in the self-test). */
-export function demoPolicy(agent: Address, now: number): PolicyInput {
+export function demoPolicy(agent: Address, now: number, cosigner?: Address): PolicyInput {
   return {
     version: 1,
     chainId: 84532,
@@ -98,5 +98,6 @@ export function demoPolicy(agent: Address, now: number): PolicyInput {
       ],
     },
     forbidden: { targets: [VENDORS.dataHarvest] },
+    ...(cosigner ? { cosigner } : {}),
   };
 }

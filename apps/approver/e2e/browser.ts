@@ -36,11 +36,19 @@ await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
 
 // policy service on the port the Next rewrites point to
 const adapter = await createChainAdapter({ rpcUrl: FORK, network: "fork" });
+await adapter.ensureCosignerEnforcer();
 const service = serve({
   fetch: createApp({
     store: openStore(":memory:"),
     chain: adapter,
-    config: { rpId: "localhost", rpName: "phoswallet", origins: [APP], sessionTtlSeconds: 3600, secureCookies: false },
+    config: {
+      rpId: "localhost",
+      rpName: "phoswallet",
+      origins: [APP],
+      sessionTtlSeconds: 3600,
+      secureCookies: false,
+      cosigner: privateKeyToAccount(generatePrivateKey()), // approver grants are co-signed by default
+    },
   }).fetch,
   port: 8787,
   hostname: "127.0.0.1",

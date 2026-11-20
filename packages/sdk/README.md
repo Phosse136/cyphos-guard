@@ -120,16 +120,17 @@ Options: `retry: { attempts = 3, baseDelayMs = 300 }`, `logger: { debug?, info?,
       value?: { perTx?: "…", perPeriod: { … } } },
   ],
   escalation?: { enabled: true, approvalTtlSeconds: 900, hardMax: [{ token: "native" | "0xToken", amount: "…" }] },
+  cosigner?: "0x…",               // policy-service co-signer (GET /cosigner): makes off-chain rules binding
   forbidden?: { targets: ["0x…"] },
 }
 ```
 
 ## What is enforced where
 
-| Rule                                                                                                                   | Enforced by                                  | Binds a compromised agent?                                                 |
-| ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------- |
-| recipients, targets, functions, `eq` args (static types), per-period caps, per-tx ETH caps, expiry, ETH value on calls | **on-chain caveat enforcers**                | **Yes**                                                                    |
-| ERC-20 per-tx caps, `neq/lt/lte/gt/gte` args                                                                           | SDK pre-check (escalates instead of acting)  | **No.** It holds the signed delegation and can redeem directly.            |
-| forbidden targets, hard max, escalation                                                                                | policy service (refuses to create a request) | n/a (the agent can't reach anything outside its on-chain allowlist anyway) |
+| Rule                                                                                                                   | Enforced by                                  | Binds a compromised agent?                                                                                                                                                                                                |
+| ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| recipients, targets, functions, `eq` args (static types), per-period caps, per-tx ETH caps, expiry, ETH value on calls | **on-chain caveat enforcers**                | **Yes**                                                                                                                                                                                                                   |
+| ERC-20 per-tx caps, `neq/lt/lte/gt/gte` args                                                                           | SDK pre-check (escalates instead of acting)  | **No** by default (it can redeem directly). **Yes with `cosigner`**: the on-chain CosignerEnforcer needs a co-signature the service only gives within policy ([ADR 0005](../../docs/decisions/0005-cosigner-enforcer.md)) |
+| forbidden targets, hard max, escalation                                                                                | policy service (refuses to create a request) | n/a (the agent can't reach anything outside its on-chain allowlist anyway)                                                                                                                                                |
 
-Put anything security-critical into on-chain rules. A co-signer enforcer that makes off-chain rules binding is on the roadmap.
+Put anything security-critical into on-chain rules, or set `cosigner` on the policy to make the off-chain ones binding.

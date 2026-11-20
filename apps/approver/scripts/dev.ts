@@ -3,12 +3,28 @@
  * NETWORK=live skips the fork and points everything at Base Sepolia.
  */
 import { type ChildProcess, spawn } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ensureFork } from "@phoswallet/sdk/testing";
+import { generatePrivateKey } from "viem/accounts";
 
 const network = process.env.NETWORK ?? "fork";
 const root = resolve(import.meta.dirname, "../../..");
+/** Fork dev: a throwaway co-signer key in .env (ADR 0005). On live, set COSIGNER_PRIVATE_KEY yourself. */
+function ensureCosignerKey() {
+  const envPath = resolve(root, ".env");
+  const env = existsSync(envPath) ? readFileSync(envPath, "utf8") : readFileSync(resolve(root, ".env.example"), "utf8");
+  if (/^COSIGNER_PRIVATE_KEY=0x[0-9a-fA-F]{64}\s*$/m.test(env)) return;
+  const line = `COSIGNER_PRIVATE_KEY=${generatePrivateKey()}`;
+  const next = /^COSIGNER_PRIVATE_KEY=.*$/m.test(env)
+    ? env.replace(/^COSIGNER_PRIVATE_KEY=.*$/m, line)
+    : `${env.trimEnd()}\n${line}\n`;
+  writeFileSync(envPath, next, { mode: 0o600 });
+  console.log("[dev]      generated a throwaway co-signer key in .env (COSIGNER_PRIVATE_KEY)");
+}
+
 if (network === "fork") {
+  ensureCosignerKey();
   await ensureFork(
     process.env.FORK_RPC_URL ?? "http://127.0.0.1:8545",
     process.env.RPC_URL ?? "https://sepolia.base.org",

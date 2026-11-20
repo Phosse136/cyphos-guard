@@ -10,6 +10,8 @@ import {
 import { DelegationManager, HybridDeleGator } from "@metamask/smart-accounts-kit/contracts";
 import { decodeDelegations, hashDelegation } from "@metamask/smart-accounts-kit/utils";
 import {
+  cosignerEnforcerAddress,
+  deployCosignerEnforcer,
   type Execution,
   encodeRedeem,
   revertReason,
@@ -58,6 +60,11 @@ export type ChainAdapter = {
   verifiedRedeem(hash: Hex, from: Address): Promise<VerifiedRedeem | null>;
   /** True if `account` is deployed and has the passkey (keyId → x,y) as a signer. */
   accountHasPasskey(account: Address, keyId: string, x: Hex, y: Hex): Promise<boolean>;
+  /**
+   * Makes sure the CosignerEnforcer exists at its CREATE2 address. Fork: deploys it with the dev relayer.
+   * Live: only checks (deploy once with `pnpm contracts:deploy`). Returns whether it is deployed.
+   */
+  ensureCosignerEnforcer(): Promise<boolean>;
   /** Fork only. Submits a passkey-signed userOp via EntryPoint.handleOps from a throwaway relayer key. */
   relayUserOp?(op: UserOpJSON): Promise<Hex>;
   /** Fork only. anvil_setBalance. */
@@ -136,6 +143,7 @@ export async function createChainAdapter(opts: { rpcUrl: string; network: "fork"
         return null;
       }
     },
+    ensureCosignerEnforcer: async () => !!(await client.getCode({ address: cosignerEnforcerAddress })),
     async accountHasPasskey(account, keyId, x, y) {
       if (!(await client.getCode({ address: account }))) return false;
       try {
@@ -154,6 +162,10 @@ export async function createChainAdapter(opts: { rpcUrl: string; network: "fork"
       client.request({ method: "anvil_setBalance" as never, params: [a, toHex(parseEther(eth))] as never });
     await setBalance(relayer.address, "100");
     adapter.relayUserOp = (op) => submitUserOp(userOpFromJSON(op), relayerWallet, client);
+    adapter.ensureCosignerEnforcer = async () => {
+      await deployCosignerEnforcer(relayerWallet, client);
+      return true;
+    };
     adapter.fund = async (address, ether) => {
       await setBalance(address, ether);
       await fundUsdc(client, address, 100_000_000n); // 100 test USDC (fork only, storage write)

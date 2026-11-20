@@ -1,4 +1,5 @@
 import { serve } from "@hono/node-server";
+import { privateKeyToAccount } from "viem/accounts";
 import { createApp } from "./app.ts";
 import { createChainAdapter } from "./chain.ts";
 import { openStore } from "./store.ts";
@@ -12,6 +13,15 @@ const port = Number(process.env.POLICY_SERVICE_PORT ?? 8787);
 const origin = process.env.APPROVER_ORIGIN ?? "http://localhost:3000";
 
 const chain = await createChainAdapter({ rpcUrl, network });
+
+// Co-signer (ADR 0005): a key that can only BLOCK redemptions; it never has authority over funds.
+let cosigner = process.env.COSIGNER_PRIVATE_KEY
+  ? privateKeyToAccount(process.env.COSIGNER_PRIVATE_KEY as `0x${string}`)
+  : undefined;
+if (cosigner && !(await chain.ensureCosignerEnforcer())) {
+  console.warn("CosignerEnforcer is not deployed on this chain; co-signing disabled (run `pnpm contracts:deploy`).");
+  cosigner = undefined;
+}
 const store = openStore(process.env.POLICY_DB_PATH ?? "policy-service.sqlite");
 const app = createApp({
   store,
@@ -22,9 +32,11 @@ const app = createApp({
     origins: [origin],
     sessionTtlSeconds: 8 * 3600,
     secureCookies: origin.startsWith("https://"),
+    ...(cosigner ? { cosigner } : {}),
   },
 });
 
 serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, () => {
-  console.log(`policy-service on http://127.0.0.1:${port}  (${network}${chain.isFork ? ", dev relay enabled" : ""})`);
+  const extras = [chain.isFork && "dev relay enabled", cosigner && `co-signer ${cosigner.address}`].filter(Boolean);
+  console.log(`policy-service on http://127.0.0.1:${port}  (${[network, ...extras].join(", ")})`);
 });

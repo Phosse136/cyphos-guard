@@ -46,10 +46,19 @@ await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
 
 // ---------- policy service (in-process, in-memory DB) ----------
 const adapter = await createChainAdapter({ rpcUrl: FORK, network: "fork" });
+await adapter.ensureCosignerEnforcer(); // fork: deploys the CosignerEnforcer at its CREATE2 address
+const cosigner = privateKeyToAccount(generatePrivateKey()); // the service's co-signer key (can only block)
 const app = createApp({
   store: openStore(":memory:"),
   chain: adapter,
-  config: { rpId: "localhost", rpName: "phoswallet", origins: [ORIGIN], sessionTtlSeconds: 3600, secureCookies: false },
+  config: {
+    rpId: "localhost",
+    rpName: "phoswallet",
+    origins: [ORIGIN],
+    sessionTtlSeconds: 3600,
+    secureCookies: false,
+    cosigner,
+  },
 });
 const server = serve({ fetch: app.fetch, port: 0, hostname: "127.0.0.1" });
 await new Promise((r) => server.once("listening", r));
@@ -157,6 +166,7 @@ const policy = (dailyEth: string): PolicyInput => ({
   ],
   escalation: { enabled: true, approvalTtlSeconds: 900, hardMax: [{ token: "native", amount: parseEther("0.01") }] },
   forbidden: { targets: [MIXER] },
+  cosigner: cosigner.address, // makes the 2 USDC per-payment limit binding on-chain
 });
 const grant = await owner.grantAgent({ policy: policy("0.001") });
 check("grant registered (2 passkey-signed delegations, no gas)", grant.delegations.length === 2);
@@ -175,6 +185,25 @@ const r1 = await agent.execute({ to: SHOP, value: parseEther("0.0005"), reason: 
 check("0.0005 ETH paid within grant", r1.via === "grant", r1.txHash);
 const r2 = await agent.execute({ to: USDC, data: usdcTransfer("1.5"), reason: "API usage" });
 check("1.5 USDC paid within grant", r2.via === "grant", r2.txHash);
+
+step("3b. Compromised agent bypasses the SDK: redeems 3 USDC directly (per-payment limit is 2)");
+{
+  // Without the co-signer this would pass on-chain (the per-payment cap is an off-chain rule). Now the
+  // CosignerEnforcer requires a fresh cosignature the service won't give for 3 USDC.
+  const usdcGrant = grant.delegations[1] as never;
+  let reason = "";
+  try {
+    await publicClient.call({
+      account: agentKey,
+      to: owner.environment.DelegationManager,
+      data: encodeRedeem(usdcGrant, { to: USDC, data: usdcTransfer("3") }),
+    });
+    reason = "succeeded";
+  } catch (e) {
+    reason = revertReason(e);
+  }
+  check("direct redemption without cosignature is rejected on-chain", reason !== "succeeded", reason);
+}
 
 step("4. Escalation → ApprovalPending → owner approves → waitForApproval executes");
 const pending = await expectError(

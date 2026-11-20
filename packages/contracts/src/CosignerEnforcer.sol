@@ -60,6 +60,7 @@ contract CosignerEnforcer is CaveatEnforcer, EIP712 {
         onlyDefaultExecutionMode(_mode)
     {
         address cosigner_ = getTermsInfo(_terms);
+        require(_args.length != 0, "CosignerEnforcer:missing-cosignature");
         (bytes32 salt_, uint256 deadline_, bytes memory signature_) = abi.decode(_args, (bytes32, uint256, bytes));
         require(block.timestamp <= deadline_, "CosignerEnforcer:expired");
 

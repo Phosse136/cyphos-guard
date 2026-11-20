@@ -37,6 +37,26 @@ pnpm demo:agent   # a Claude agent pays four invoices (needs ANTHROPIC_API_KEY i
 One run shows all three layers: two invoices paid alone, one approved by you with your passkey, one blocked by
 your denylist ([demo details](examples/demo-agent/README.md), [video script](docs/demo-script.md)).
 
+## Verified on Base Sepolia
+
+The proof of concept (`NETWORK=live pnpm poc`) ran against live Base Sepolia on 2026-11-20. Every rejection
+is a real transaction that the chain reverted; Basescan shows which caveat enforcer refused it.
+
+| Step                                              | Result                                                         | Transaction                                                                                                                                                                                                  |
+| ------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Owner's smart account (MetaMask Hybrid DeleGator) | deployed                                                       | [account](https://sepolia.basescan.org/address/0xBDCBf99882c8B1907d2D50B002b5442A909E39aC) · [deploy tx](https://sepolia.basescan.org/tx/0x8d45daa06ebaba7e97e0ebcf7f7b13f98681b6a219a061120ae247872a0a5054) |
+| Grant: max 0.001 ETH/day, one recipient, 7 days   | signed off-chain (no gas)                                      | n/a                                                                                                                                                                                                          |
+| Agent sends 0.0005 ETH                            | ✔ executed                                                     | [tx](https://sepolia.basescan.org/tx/0x2a80682ea8ceef5055348df41024e938186024fbbdf41425119322f3a4ef96d4)                                                                                                     |
+| Agent sends 0.0006 ETH more (0.0011 for the day)  | ✘ `NativeTokenPeriodTransferEnforcer:transfer-amount-exceeded` | [reverted](https://sepolia.basescan.org/tx/0xe63575d7c35c7969f3c06d6f6d28bec51f111e2258a2465068c5d7a0f1635551)                                                                                               |
+| Agent pays an address that isn't allowed          | ✘ `AllowedTargetsEnforcer:target-address-not-allowed`          | [reverted](https://sepolia.basescan.org/tx/0x5884582d3a6f8f039d37d41827abfadef98c31f3e74514daa6e6e1d41dcd6e55)                                                                                               |
+| Agent attaches calldata to an allowed payment     | ✘ `ExactCalldataEnforcer:invalid-calldata`                     | [reverted](https://sepolia.basescan.org/tx/0x2169ba5984a34d531e5b54afa860e3062b0a5655eaf69bbcea0cbe2d7a5412af)                                                                                               |
+| Owner revokes the grant                           | ✔ executed                                                     | [tx](https://sepolia.basescan.org/tx/0x4005499051f8fd8977a3ba6c511ed4c3ca387ae6fc3e7fbcaeacfe822ccb17e2)                                                                                                     |
+| Agent tries again after revocation                | ✘ `CannotUseADisabledDelegation()`                             | [reverted](https://sepolia.basescan.org/tx/0x3539b22250cf502d8f21a4840f770d6548a51723cf67bbbe2ef1b7abb4875125)                                                                                               |
+
+The demo agent was also run with the real Claude model (`claude-opus-5-5`, `pnpm demo:selftest`, on a local
+Base Sepolia fork). It paid the two routine invoices alone, waited for the owner's passkey approval on the 4 USDC
+invoice, and was blocked when it tried to pay the denylisted vendor. On-chain balances confirmed each outcome.
+
 ## Use it from your agent
 
 ```ts

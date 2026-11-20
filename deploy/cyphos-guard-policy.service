@@ -1,0 +1,24 @@
+[Unit]
+Description=cyphos-guard policy service (Base Sepolia, public at guard.cyphos.de)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=cyphos
+Group=cyphos
+WorkingDirectory=/opt/cyphos-guard/apps/policy-service
+EnvironmentFile=/etc/cyphos-guard/env
+ExecStart=/usr/local/bin/node src/server.ts
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/cyphos-guard
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

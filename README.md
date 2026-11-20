@@ -53,6 +53,11 @@ is a real transaction that the chain reverted; Basescan shows which caveat enfor
 | Owner revokes the grant                           | ✔ executed                                                     | [tx](https://sepolia.basescan.org/tx/0x4005499051f8fd8977a3ba6c511ed4c3ca387ae6fc3e7fbcaeacfe822ccb17e2)                                                                                                     |
 | Agent tries again after revocation                | ✘ `CannotUseADisabledDelegation()`                             | [reverted](https://sepolia.basescan.org/tx/0x3539b22250cf502d8f21a4840f770d6548a51723cf67bbbe2ef1b7abb4875125)                                                                                               |
 
+phoswallet's own **CosignerEnforcer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)) is deployed on Base Sepolia at
+[`0xDe95AB1D116AbF913584b6D3Bebf659D0CFfEA95`](https://sepolia.basescan.org/address/0xDe95AB1D116AbF913584b6D3Bebf659D0CFfEA95)
+([deploy tx](https://sepolia.basescan.org/tx/0x5ecd05ae046c75f422020e544aa8bbf9d9e8b154c55cd3c425bdcbdf1885c531)). It has the same address on every
+chain, no owner and no upgrade path.
+
 The demo agent was also run with the real Claude model (`claude-opus-5-5`, `pnpm demo:selftest`, on a local
 Base Sepolia fork). It paid the two routine invoices alone, waited for the owner's passkey approval on the 4 USDC
 invoice, and was blocked when it tried to pay the denylisted vendor. On-chain balances confirmed each outcome.

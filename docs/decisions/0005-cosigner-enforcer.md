@@ -55,6 +55,15 @@ CI rebuilds it and fails if `packages/contracts/generated/` differs from what th
 - Fork: the policy service deploys it on start (dev relayer).
 - Live: deploy once with `pnpm contracts:deploy` (anyone can; ~1 tx).
 
+## Deployed
+
+| Chain                | Address                                                                                                                         | Deploy tx                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Base Sepolia (84532) | [`0xDe95AB1D116AbF913584b6D3Bebf659D0CFfEA95`](https://sepolia.basescan.org/address/0xDe95AB1D116AbF913584b6D3Bebf659D0CFfEA95) | [2026-11-20](https://sepolia.basescan.org/tx/0x5ecd05ae046c75f422020e544aa8bbf9d9e8b154c55cd3c425bdcbdf1885c531) |
+
+Checked after deployment: `COSIGN_TYPEHASH` and `eip712Domain()` match the source. The address is the CREATE2 address
+of the committed bytecode, so the deployed initcode is exactly `packages/contracts/generated/`.
+
 ## Verified
 
 - 14 Foundry unit tests incl. a 256-run fuzz test: valid, replay, fresh salt, wrong signer, different execution,
@@ -70,7 +79,6 @@ CI rebuilds it and fails if `packages/contracts/generated/` differs from what th
 
 ## Not done
 
-- Not deployed on live Base Sepolia yet (`pnpm contracts:deploy`).
 - One co-signer per service; no key rotation helper (re-grant with the new address).
 - The co-signer could also enforce smart rules (anomaly detection, rate limits). That's the hook for the roadmap's
   "smart rules".

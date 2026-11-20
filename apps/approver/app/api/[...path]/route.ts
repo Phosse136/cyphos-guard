@@ -1,5 +1,6 @@
 // Same-origin proxy to the policy service so the HttpOnly session cookie stays first-party.
 // Target chosen at request time (see lib/upstream.ts).
+import { AGENT_HEADERS } from "@cyphos-guard/shared";
 import { policyServiceUrl } from "@/lib/upstream";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,9 @@ async function proxy(request: Request, ctx: { params: Promise<{ path: string[] }
   const url = new URL(request.url);
   const target = `${policyServiceUrl()}/${path.map(encodeURIComponent).join("/")}${url.search}`;
   const headers = new Headers();
-  for (const name of ["content-type", "cookie"]) {
+  // Agents reach the service through this proxy on a public deployment, so their signed-request headers must
+  // pass (the signature covers the service-relative path, which is what the proxy forwards to).
+  for (const name of ["content-type", "cookie", ...Object.values(AGENT_HEADERS)]) {
     const v = request.headers.get(name);
     if (v) headers.set(name, v);
   }

@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.next/
+coverage/
+*.tsbuildinfo
+# secrets
+.env
+.env.*
+!.env.example
+# local data
+*.sqlite
+*.sqlite-journal
+*.db
+# foundry
+packages/contracts/out/
+packages/contracts/cache/
+broadcast/

@@ -6,7 +6,8 @@
   "scripts": {
     "keys": "node --env-file-if-exists=../../.env src/keys.ts",
     "poc": "node --env-file-if-exists=../../.env src/poc.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "spike:passkey": "node --env-file-if-exists=../../.env src/spike-passkey.ts"
   },
   "dependencies": {
     "@metamask/smart-accounts-kit": "2.0.0",

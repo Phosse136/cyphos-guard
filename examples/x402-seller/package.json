@@ -9,17 +9,18 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=../../.env src/main.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "buy": "node --env-file-if-exists=../../.env src/buy.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.11",
     "@x402/core": "2.30.0",
     "@x402/evm": "2.30.0",
     "hono": "^4.13.19",
-    "viem": "^2.58.2"
+    "viem": "^2.58.2",
+    "@cyphos-guard/sdk": "workspace:*"
   },
   "devDependencies": {
-    "@cyphos-guard/policy-service": "workspace:*",
-    "@cyphos-guard/sdk": "workspace:*"
+    "@cyphos-guard/policy-service": "workspace:*"
   }
 }

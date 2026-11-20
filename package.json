@@ -14,7 +14,8 @@
     "test": "vitest run",
     "check-secrets": "bash scripts/check-secrets.sh --all",
     "poc": "pnpm --filter @phoswallet/poc poc",
-    "poc:keys": "pnpm --filter @phoswallet/poc keys"
+    "poc:keys": "pnpm --filter @phoswallet/poc keys",
+    "e2e": "pnpm --filter @phoswallet/poc e2e:escalation"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

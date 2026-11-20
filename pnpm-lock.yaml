@@ -217,9 +217,15 @@ importers:
 
   examples/poc:
     dependencies:
+      '@hono/node-server':
+        specifier: ^2.1.11
+        version: 2.1.11(hono@4.13.19)
       '@metamask/smart-accounts-kit':
         specifier: 2.0.0
         version: 2.0.0(typescript@7.0.2)(viem@2.58.2(typescript@7.0.2)(zod@4.6.7))(zod@4.6.7)
+      '@phoswallet/policy-service':
+        specifier: workspace:*
+        version: link:../../apps/policy-service
       '@phoswallet/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk

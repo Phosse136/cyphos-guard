@@ -7,12 +7,15 @@
     "keys": "node --env-file-if-exists=../../.env src/keys.ts",
     "poc": "node --env-file-if-exists=../../.env src/poc.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "spike:passkey": "node --env-file-if-exists=../../.env src/spike-passkey.ts"
+    "spike:passkey": "node --env-file-if-exists=../../.env src/spike-passkey.ts",
+    "e2e:escalation": "node --env-file-if-exists=../../.env src/escalation-e2e.ts"
   },
   "dependencies": {
     "@metamask/smart-accounts-kit": "2.0.0",
     "@phoswallet/sdk": "workspace:*",
     "@phoswallet/shared": "workspace:*",
-    "viem": "^2.58.2"
+    "viem": "^2.58.2",
+    "@phoswallet/policy-service": "workspace:*",
+    "@hono/node-server": "^2.1.11"
   }
 }

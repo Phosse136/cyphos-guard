@@ -58,6 +58,20 @@ cyphos-guard's own **CosignerEnforcer** ([ADR 0005](docs/decisions/0005-cosigner
 ([deploy tx](https://sepolia.basescan.org/tx/0x173932c273aa54d8d1751b2a1c646ba12c7fee64e8480e7869548d3523892b47)). It has the same address on every
 chain, no owner and no upgrade path.
 
+**Co-signer scenario** (`NETWORK=live pnpm poc:cosigner`, 2026-11-20). Grant: 0.001 ETH/day to one shop, with a co-signer.
+The co-signer key signs exactly the typed data the policy service signs.
+Account [0xd7a0…bD60](https://sepolia.basescan.org/address/0xd7a053F7d2063705FC0b5F84879331044Af6bD60).
+
+| What the agent tried                                       | Result                                                         | Transaction                                                                                                    |
+| ---------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Send 0.0002 ETH with a fresh cosignature                   | ✔ executed                                                     | [tx](https://sepolia.basescan.org/tx/0x98c8fbcfb21e4ab4b2772d56767a4460e6589f686f09361e11aa1605d63ad071)       |
+| Same payment without a cosignature (bypassing the service) | ✘ `CosignerEnforcer:missing-cosignature`                       | [reverted](https://sepolia.basescan.org/tx/0x74d20745be7b21a55ddf4634180db726b4f9ae3644adeb9069a8c5340b658041) |
+| Cosignature forged with the agent's own key                | ✘ `CosignerEnforcer:invalid-cosignature`                       | [reverted](https://sepolia.basescan.org/tx/0x4fd3b0f4b1e4210d7ee18e3a9cd97fae202dc8744bbedf45ddc0875e589cb7d1) |
+| Cosignature for 0.0002 used to send 0.0003                 | ✘ `CosignerEnforcer:invalid-cosignature`                       | [reverted](https://sepolia.basescan.org/tx/0x2da5e6a1f8d63b04e8994c4b5516bb405e68b19fcbc6cd95f512b9514ff98c2f) |
+| Replaying the used cosignature                             | ✘ `CosignerEnforcer:already-used`                              | [reverted](https://sepolia.basescan.org/tx/0x0abed9c6a41f151e4d97dcaa6f13780396a46f045137b974368114974bdec4b8) |
+| Expired cosignature                                        | ✘ `CosignerEnforcer:expired`                                   | [reverted](https://sepolia.basescan.org/tx/0x9cbe4bf88970cbfb55234e119422bdd943a5b2c2f006284ceec38e4b1288f902) |
+| 0.0009 ETH with a valid cosignature (over the daily cap)   | ✘ `NativeTokenPeriodTransferEnforcer:transfer-amount-exceeded` | [reverted](https://sepolia.basescan.org/tx/0xc4808b32771c1e941adda5219b2a3b2e96748d9fbbe76cfb53ceb9ec27f0437b) |
+
 The demo agent was also run with the real Claude model (`claude-opus-5-5`, `pnpm demo:selftest`, on a local
 Base Sepolia fork). It paid the two routine invoices alone, waited for the owner's passkey approval on the 4 USDC
 invoice, and was blocked when it tried to pay the denylisted vendor. On-chain balances confirmed each outcome.

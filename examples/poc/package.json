@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "spike:passkey": "node --env-file-if-exists=../../.env src/spike-passkey.ts",
     "e2e:escalation": "node --env-file-if-exists=../../.env src/escalation-e2e.ts",
-    "deploy-cosigner": "node --env-file-if-exists=../../.env src/deploy-cosigner.ts"
+    "deploy-cosigner": "node --env-file-if-exists=../../.env src/deploy-cosigner.ts",
+    "cosigner": "node --env-file-if-exists=../../.env src/cosigner-live.ts"
   },
   "dependencies": {
     "@metamask/smart-accounts-kit": "2.0.0",

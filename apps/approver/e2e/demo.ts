@@ -131,6 +131,16 @@ const shot = async (name: string, hold = 1800) => {
   await pause(hold);
 };
 const publicClient: PublicClient = createPublicClient({ chain, transport: http(FORK) });
+// The fork copies live Base Sepolia, where the demo vendors may already hold funds (e.g. from a live demo run),
+// so the checks below compare balance CHANGES, measured from here.
+const { VENDORS } = await import("@cyphos-guard/demo-agent/scenario");
+const usdcOf = (a: Address) =>
+  publicClient.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [a] });
+const start = {
+  inference: await usdcOf(VENDORS.inferenceApi),
+  gpu: await publicClient.getBalance({ address: VENDORS.gpuMarket }),
+  harvest: await publicClient.getBalance({ address: VENDORS.dataHarvest }),
+};
 
 try {
   console.log("▸ owner onboarding (approver)");
@@ -225,17 +235,17 @@ try {
   await page.screenshot({ path: resolve(SHOTS, "demo-4-details.png"), fullPage: true });
 
   console.log("▸ on-chain verification");
-  const usdcOf = (a: Address) =>
-    publicClient.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [a] });
-  const { VENDORS } = await import("@cyphos-guard/demo-agent/scenario");
-  check("Inference API got 1.20 + 4.00 USDC", (await usdcOf(VENDORS.inferenceApi)) === parseUnits("5.2", 6));
+  check(
+    "Inference API got 1.20 + 4.00 USDC",
+    (await usdcOf(VENDORS.inferenceApi)) - start.inference === parseUnits("5.2", 6),
+  );
   check(
     "GPU market got 0.0005 ETH",
-    (await publicClient.getBalance({ address: VENDORS.gpuMarket })) === parseEther("0.0005"),
+    (await publicClient.getBalance({ address: VENDORS.gpuMarket })) - start.gpu === parseEther("0.0005"),
   );
   check(
     "DataHarvest (forbidden) got nothing",
-    (await publicClient.getBalance({ address: VENDORS.dataHarvest })) === 0n,
+    (await publicClient.getBalance({ address: VENDORS.dataHarvest })) === start.harvest,
   );
   check("transcript shows the denial", /INV-1044 blocked by policy \(forbidden\)/.test(transcript));
 } catch (e) {

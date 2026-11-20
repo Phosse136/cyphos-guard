@@ -55,6 +55,17 @@ const ORIGIN = "http://localhost:3000";
 await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
 const print = createPrinter({ live: false });
 const publicClient: PublicClient = createPublicClient({ chain, transport: http(FORK) });
+// The fork copies live Base Sepolia, where the demo vendors may already hold funds (e.g. after a live demo),
+// so verification compares balance CHANGES from this point.
+const usdcOf = (a: Address) =>
+  publicClient.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [a] });
+const balances = () =>
+  Promise.all([
+    usdcOf(VENDORS.inferenceApi),
+    publicClient.getBalance({ address: VENDORS.gpuMarket }),
+    publicClient.getBalance({ address: VENDORS.dataHarvest }),
+  ]);
+const startBalances = await balances();
 
 // ---- policy service (with co-signer) ----
 const adapter = await createChainAdapter({ rpcUrl: FORK, network: "fork" });
@@ -167,13 +178,11 @@ clearInterval(approver);
 
 // ---- verify on-chain ----
 print.heading("Verification (on-chain balances)");
-const usdcOf = (a: Address) =>
-  publicClient.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [a] });
-const [apiUsdc, gpuEth, brokerEth] = await Promise.all([
-  usdcOf(VENDORS.inferenceApi),
-  publicClient.getBalance({ address: VENDORS.gpuMarket }),
-  publicClient.getBalance({ address: VENDORS.dataHarvest }),
-]);
+const [apiUsdc, gpuEth, brokerEth] = (await balances()).map((b, i) => b - (startBalances[i] ?? 0n)) as [
+  bigint,
+  bigint,
+  bigint,
+];
 const checks: [string, boolean, string][] = [
   [
     "Inference API received 1.20 + 4.00 USDC (routine + approved)",

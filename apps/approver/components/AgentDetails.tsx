@@ -158,6 +158,32 @@ export function AgentDetails({ grant, fork }: { grant: GrantJSON; fork: boolean 
                     ]}
                   />
                 )}
+                {p.kind === "x402" && (
+                  <Details
+                    rows={[
+                      ["Type", `Pay x402 APIs in ${tokenLabel(p.token)}`],
+                      [
+                        "Sellers",
+                        <span key="s">
+                          {p.sellers.map((r) => (
+                            <div key={r}>
+                              <Addr value={r} />
+                            </div>
+                          ))}
+                        </span>,
+                      ],
+                      [
+                        "Per period",
+                        `${formatUnits(p.perPeriod.amount, 6)} ${tokenLabel(p.token)} per ${duration(p.perPeriod.periodSeconds)}`,
+                      ],
+                      ["Per payment", `max ${formatUnits(p.perTx, 6)} ${tokenLabel(p.token)} (binding via co-signer)`],
+                      [
+                        "How",
+                        "Each payment moves exactly the price from your account to the agent's own address, then the agent signs the x402 payment to the seller. On-chain: only to the agent, capped per period. The seller check is done by the co-signer.",
+                      ],
+                    ]}
+                  />
+                )}
                 {delegation && (
                   <p className="mt-2 text-xs text-zinc-500">
                     Enforced on-chain by: {delegation.caveats.map((c) => enforcerName(c.enforcer)).join(" · ")}

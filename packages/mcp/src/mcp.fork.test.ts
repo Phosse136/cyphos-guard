@@ -108,11 +108,12 @@ afterAll(async () => {
 });
 
 describe("cyphos-guard MCP server (fork)", () => {
-  it("exposes the five tools with read-only / destructive hints", async () => {
+  it("exposes the six tools with read-only / destructive hints", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "call_contract",
       "check_approval",
+      "fetch_paid_api",
       "get_wallet_status",
       "list_activity",
       "pay",
@@ -176,7 +177,7 @@ describe("stdio server binary", () => {
     const c = new Client({ name: "stdio-test", version: "1.0.0" });
     await c.connect(transport);
     const { tools } = await c.listTools();
-    expect(tools).toHaveLength(5);
+    expect(tools).toHaveLength(6);
     await c.close();
   });
 });

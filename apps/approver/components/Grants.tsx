@@ -19,6 +19,9 @@ const EMPTY = {
   usdcRecipient: "",
   usdcPerTx: "",
   usdcDaily: "",
+  x402Sellers: "",
+  x402PerTx: "",
+  x402Daily: "",
   hardMaxEth: "0.01",
   hardMaxUsdc: "",
   days: "7",
@@ -26,7 +29,13 @@ const EMPTY = {
 };
 type Form = typeof EMPTY;
 
-type PermissionJSON = { kind: string; token?: string; recipients?: string[]; perPeriod?: { amount: string } };
+type PermissionJSON = {
+  kind: string;
+  token?: string;
+  recipients?: string[];
+  sellers?: string[];
+  perPeriod?: { amount: string };
+};
 
 function describeGrant(policy: unknown): string {
   const p = policy as { permissions: PermissionJSON[] };
@@ -37,6 +46,10 @@ function describeGrant(policy: unknown): string {
       if (perm.kind === "erc20Transfer" && perm.perPeriod) {
         const unit = perm.token?.toLowerCase() === USDC.toLowerCase() ? "USDC" : `token ${short(perm.token ?? "")}`;
         return `${formatUnits(BigInt(perm.perPeriod.amount), 6)} ${unit}/day${to}`;
+      }
+      if (perm.kind === "x402" && perm.perPeriod) {
+        const n = perm.sellers?.length ?? 0;
+        return `x402 APIs: ${formatUnits(BigInt(perm.perPeriod.amount), 6)} USDC/day · ${n} seller${n === 1 ? "" : "s"}`;
       }
       return perm.kind;
     })
@@ -121,6 +134,15 @@ export function Grants({
         perPeriod: { amount: parseUnits(form.usdcDaily, 6).toString(), periodSeconds: DAY },
       });
     }
+    if (form.x402Sellers) {
+      out.push({
+        kind: "x402",
+        token: USDC,
+        sellers: sellers,
+        perTx: parseUnits(form.x402PerTx, 6).toString(),
+        perPeriod: { amount: parseUnits(form.x402Daily, 6).toString(), periodSeconds: DAY },
+      });
+    }
     if (form.ethRecipient) {
       out.push({
         kind: "nativeTransfer",
@@ -179,10 +201,20 @@ export function Grants({
     }
   };
 
+  const sellers = form.x402Sellers.split(/[\s,]+/).filter(Boolean);
+  const cosigned = Boolean(cosigner && useCosigner);
+  const x402Ok =
+    !form.x402Sellers ||
+    (sellers.every((a) => isAddress(a)) && Number(form.x402PerTx) > 0 && Number(form.x402Daily) > 0 && cosigned);
   const ethOk = !form.ethRecipient || (isAddress(form.ethRecipient) && Number(form.ethDaily) > 0);
   const usdcOk = !form.usdcRecipient || (isAddress(form.usdcRecipient) && Number(form.usdcDaily) > 0);
   const valid =
-    isAddress(form.agent) && (form.ethRecipient || form.usdcRecipient) && ethOk && usdcOk && Number(form.days) > 0;
+    isAddress(form.agent) &&
+    (form.ethRecipient || form.usdcRecipient || form.x402Sellers) &&
+    ethOk &&
+    usdcOk &&
+    x402Ok &&
+    Number(form.days) > 0;
 
   return (
     <Card title="Agents">
@@ -252,6 +284,26 @@ export function Grants({
         <Field label="ETH per day" hint="On-chain">
           <input className={inputClass} value={form.ethDaily} onChange={set("ethDaily")} />
         </Field>
+
+        <Field
+          label="x402 API sellers (USDC)"
+          hint="Optional: payTo addresses of paid APIs (x402) the agent may pay; comma-separated. Needs the co-signer."
+        >
+          <input className={inputClass} value={form.x402Sellers} onChange={set("x402Sellers")} placeholder="0x…, 0x…" />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="x402 USDC per day" hint="On-chain">
+            <input className={inputClass} value={form.x402Daily} onChange={set("x402Daily")} />
+          </Field>
+          <Field label="x402 USDC per payment" hint="Above: ask me">
+            <input className={inputClass} value={form.x402PerTx} onChange={set("x402PerTx")} />
+          </Field>
+        </div>
+        {form.x402Sellers && !cosigned && (
+          <p className="text-xs text-red-600 sm:col-span-2">
+            x402 payments need the cyphos-guard co-signer (it binds the per-payment limit and the seller check).
+          </p>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Ask me up to (ETH)" hint="Above: denied">

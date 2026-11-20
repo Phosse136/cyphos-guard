@@ -45,6 +45,11 @@ type Detail = {
   reason?: string;
   requestId?: string;
   grantId?: string;
+  /** x402_paid: the paid API and the agent address that signed the payment. */
+  resource?: string;
+  payer?: `0x${string}`;
+  /** request_created for an x402 top-up: the seller and price it pays for. */
+  x402?: { payTo: `0x${string}`; amount: string; resource: string };
 };
 
 export function Activity({ fork, refreshKey }: { fork: boolean; refreshKey: number }) {
@@ -211,6 +216,28 @@ function EventDetails({
       ]);
     }
   }
+  if (d.resource)
+    rows.push([
+      "Paid API",
+      <span key="res" className="break-all font-mono text-xs">
+        {d.resource}
+      </span>,
+    ]);
+  if (d.payer)
+    rows.push([
+      "Paid from",
+      <span key="pay">
+        agent's own address <Addr value={d.payer} /> (topped up from your account just before)
+      </span>,
+    ]);
+  if (d.x402)
+    rows.push([
+      "x402 payment",
+      <span key="x4">
+        {Number(d.x402.amount) / 1e6} USDC to <Addr value={d.x402.payTo} /> for{" "}
+        <span className="break-all font-mono text-xs">{d.x402.resource}</span>
+      </span>,
+    ]);
   if (reason)
     rows.push([
       "Agent's reason",

@@ -28,6 +28,8 @@ import {
   parsePolicy,
   policySchema,
   requestStatusSchema,
+  type X402Context,
+  x402ContextSchema,
 } from "@cyphos-guard/shared";
 import type { Delegation } from "@metamask/smart-accounts-kit";
 import {
@@ -40,7 +42,17 @@ import { cose, decodeCredentialPublicKey } from "@simplewebauthn/server/helpers"
 import { Hono, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
-import { type Address, type Hex, isAddressEqual, isHex, type LocalAccount, toHex, verifyMessage } from "viem";
+import {
+  type Address,
+  encodeFunctionData,
+  erc20Abi,
+  type Hex,
+  isAddressEqual,
+  isHex,
+  type LocalAccount,
+  toHex,
+  verifyMessage,
+} from "viem";
 import { z } from "zod";
 import type { ChainAdapter } from "./chain.ts";
 import type { Owner, Store } from "./store.ts";
@@ -69,6 +81,8 @@ type Env = { Variables: { owner: Owner; agent: Address; body: unknown } };
 const SESSION_COOKIE = "cyphos_session";
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 const nowS = () => Math.floor(Date.now() / 1000);
+const toX402 = (x?: z.output<typeof x402ContextSchema>): X402Context | undefined =>
+  x && { payTo: x.payTo, amount: BigInt(x.amount), resource: x.resource };
 
 export function createApp({ store, chain, config }: { store: Store; chain: ChainAdapter; config: AppConfig }) {
   const app = new Hono<Env>();
@@ -487,6 +501,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
         to: addressSchema,
         value: z.string().regex(/^\d+$/),
         data: z.string().regex(/^0x([0-9a-fA-F]{2})*$/),
+        x402: x402ContextSchema.optional(),
       }),
       c.get("body"),
     );
@@ -506,7 +521,8 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
       throw new HTTPException(400, { message: "delegation does not require this co-signer" });
     }
     const execution = { to: body.to, value: BigInt(body.value), data: body.data as Hex };
-    const violation = offchainCheck(permission, execution);
+    const x402 = toX402(body.x402);
+    const violation = offchainCheck(permission, execution, x402 ? { x402 } : {});
     if (violation) return c.json({ error: "offchain_rule", message: violation }, 403);
 
     const salt = toHex(randomBytes(32));
@@ -545,6 +561,10 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     const policy = parsePolicy(grant.policy);
     const decision = escalationDecision(policy, { to: body.to, value: BigInt(body.value), data: body.data as Hex });
     if (!decision.ok) return deny(decision.code, decision.message, 403);
+    // An x402 top-up is judged by where the money finally goes, too: never ask the owner to fund a forbidden seller.
+    if (body.x402 && policy.forbidden.targets.some((t) => isAddressEqual(t, body.x402?.payTo ?? t))) {
+      return deny("forbidden", `x402 seller ${body.x402.payTo} is forbidden`, 403);
+    }
 
     const now = await chain.now();
     const req = {
@@ -563,7 +583,14 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
       account: body.account,
       agent,
       kind: "request_created",
-      detail: { requestId: req.id, to: req.to, value: req.value, data: req.data, reason: req.reason },
+      detail: {
+        requestId: req.id,
+        to: req.to,
+        value: req.value,
+        data: req.data,
+        reason: req.reason,
+        ...(body.x402 ? { x402: body.x402 } : {}),
+      },
       txHash: null,
       createdAt: nowS(),
     });
@@ -637,6 +664,46 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
         to: redeemed.to,
         value: redeemed.value.toString(),
         data: redeemed.data,
+        ...(body.reason ? { reason: body.reason } : {}),
+      },
+      txHash: body.txHash as Hex,
+      createdAt: nowS(),
+    });
+    return c.json({ ok: true }, 201);
+  });
+
+  app.post("/agent/x402/paid", agentAuth, async (c) => {
+    const agent = c.get("agent");
+    const body = parse(
+      z.object({
+        account: addressSchema,
+        /** The facilitator's settlement tx (it broadcasts the agent's signed authorization). */
+        txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
+        asset: addressSchema,
+        payTo: addressSchema,
+        amount: z.string().regex(/^\d+$/),
+        resource: z.string().trim().min(1).max(500),
+        reason: z.string().trim().max(500).optional(),
+      }),
+      c.get("body"),
+    );
+    if (store.grants.activeFor(body.account, agent).length === 0) throw new HTTPException(404, { message: "no grant" });
+    // Record what the chain shows: the agent's own address paid the seller exactly this amount in this tx.
+    const moved = await chain.erc20Transferred(body.txHash as Hex, body.asset, agent, body.payTo);
+    if (moved === null || moved !== BigInt(body.amount)) {
+      throw new HTTPException(400, { message: "tx does not show this payment from this agent to this seller" });
+    }
+    store.activity.add({
+      account: body.account,
+      agent,
+      kind: "x402_paid",
+      detail: {
+        // Rendered like any token payment: asset.transfer(payTo, amount), paid from the agent's address.
+        to: body.asset,
+        value: "0",
+        data: encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [body.payTo, BigInt(body.amount)] }),
+        resource: body.resource,
+        payer: agent,
         ...(body.reason ? { reason: body.reason } : {}),
       },
       txHash: body.txHash as Hex,

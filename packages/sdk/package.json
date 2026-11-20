@@ -12,9 +12,13 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@metamask/smart-accounts-kit": "2.0.0",
+    "@cyphos-guard/contracts": "workspace:*",
     "@cyphos-guard/shared": "workspace:*",
-    "viem": "^2.58.2",
-    "@cyphos-guard/contracts": "workspace:*"
+    "@metamask/smart-accounts-kit": "2.0.0",
+    "viem": "^2.58.2"
+  },
+  "devDependencies": {
+    "@x402/core": "2.30.0",
+    "@x402/evm": "2.30.0"
   }
 }

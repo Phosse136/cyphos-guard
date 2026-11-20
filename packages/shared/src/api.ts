@@ -46,11 +46,22 @@ export const executionSchema = z.object({
   data: hexSchema.default("0x"),
 });
 
+/** x402 payment a top-up is for (wire form; amount in token base units). */
+export const x402ContextSchema = z.object({
+  payTo: addressSchema,
+  amount: weiSchema,
+  /** The paid resource URL (untrusted text, shown to the owner). */
+  resource: z.string().trim().min(1).max(500),
+});
+export type X402ContextJSON = z.input<typeof x402ContextSchema>;
+
 export const createApprovalRequestSchema = executionSchema.extend({
   /** The owner's smart account the agent acts for. */
   account: addressSchema,
   /** Why the agent wants this; shown to the owner (untrusted text). */
   reason: z.string().trim().min(1).max(500),
+  /** Set when this is an x402 top-up: the seller and amount it pays for. */
+  x402: x402ContextSchema.optional(),
 });
 
 export const caveatSchema = z.object({ enforcer: addressSchema, terms: hexSchema, args: hexSchema });
@@ -110,7 +121,8 @@ export type ActivityJSON = {
     | "request_approved"
     | "request_rejected"
     | "request_executed"
-    | "request_denied";
+    | "request_denied"
+    | "x402_paid";
   detail: Record<string, unknown>;
   txHash: Hex | null;
   createdAt: number;

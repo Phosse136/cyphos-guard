@@ -131,6 +131,10 @@ export function createCyphosGuardMcpServer({ pw, publicClient, live = false }: S
             const perTx = p.perTx !== undefined ? `, max ${formatUnits(p.perTx, 6)} per payment` : "";
             return `${unit}: up to ${formatUnits(p.perPeriod.amount, 6)} per ${p.perPeriod.periodSeconds / 3600}h${perTx} to ${p.recipients.join(", ")}`;
           }
+          if (p.kind === "x402") {
+            const unit = isAddressEqual(p.token, USDC) ? "USDC" : `token ${p.token}`;
+            return `x402 APIs (${unit}): up to ${formatUnits(p.perPeriod.amount, 6)} per ${p.perPeriod.periodSeconds / 3600}h, max ${formatUnits(p.perTx, 6)} per payment, sellers ${p.sellers.join(", ")}`;
+          }
           return `contract calls to ${p.target}: ${p.functions.map((f) => f.signature).join(", ")}`;
         }),
       );

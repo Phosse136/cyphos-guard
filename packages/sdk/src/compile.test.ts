@@ -162,3 +162,62 @@ describe("compilePolicy: contractCall", () => {
     expect(() => compilePolicy({ policy: dynamic, delegator: ACCOUNT, environment: env })).toThrow(/dynamic type/);
   });
 });
+
+describe("compilePolicy: x402", () => {
+  const COSIGNER = "0x5555555555555555555555555555555555555555";
+  const SELLER = "0x6666666666666666666666666666666666666666";
+  it("compiles to token top-ups to the agent itself, period-capped and co-signed", () => {
+    const p = parsePolicy({
+      version: 1,
+      chainId: 84532,
+      agent: AGENT,
+      validFrom: NOW,
+      expiresAt: NOW + 7 * DAY,
+      cosigner: COSIGNER,
+      permissions: [
+        {
+          kind: "x402",
+          token: USDC_ADDRESS,
+          sellers: [SELLER],
+          perTx: "1000000",
+          perPeriod: { amount: "5000000", periodSeconds: DAY },
+        },
+      ],
+    });
+    const [c] = compilePolicy({ policy: p, delegator: ACCOUNT, environment: env });
+    const calldata = c?.delegation.caveats.find(
+      (cv) => cv.enforcer.toLowerCase() === env.caveatEnforcers.AllowedCalldataEnforcer?.toLowerCase(),
+    );
+    // The only allowed recipient is the AGENT (not the seller): the money goes to the agent just in time.
+    expect(calldata?.terms.toLowerCase()).toBe(
+      `0x${(4).toString(16).padStart(64, "0")}${AGENT.slice(2).padStart(64, "0")}`.toLowerCase(),
+    );
+    expect(enforcers(c?.delegation.caveats ?? []).filter(Boolean)).toEqual([
+      "AllowedCalldataEnforcer",
+      "ERC20PeriodTransferEnforcer",
+      "TimestampEnforcer",
+      "ValueLteEnforcer",
+    ]);
+    expect(c?.delegation.caveats).toHaveLength(5); // + the CosignerEnforcer (not in the kit's environment)
+  });
+
+  it("the schema refuses x402 without a co-signer and sellers on the denylist", () => {
+    const base = {
+      version: 1,
+      chainId: 84532,
+      agent: AGENT,
+      expiresAt: NOW + DAY,
+      permissions: [
+        {
+          kind: "x402",
+          token: USDC_ADDRESS,
+          sellers: [SELLER],
+          perTx: "1",
+          perPeriod: { amount: "5", periodSeconds: DAY },
+        },
+      ],
+    };
+    expect(() => parsePolicy(base)).toThrow(/co-signer/);
+    expect(() => parsePolicy({ ...base, cosigner: COSIGNER, forbidden: { targets: [SELLER] } })).toThrow(/forbidden/);
+  });
+});

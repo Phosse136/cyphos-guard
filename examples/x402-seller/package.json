@@ -1,0 +1,25 @@
+{
+  "name": "@cyphos-guard/x402-seller",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/seller.ts"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=../../.env src/main.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.11",
+    "@x402/core": "2.30.0",
+    "@x402/evm": "2.30.0",
+    "hono": "^4.13.19",
+    "viem": "^2.58.2"
+  },
+  "devDependencies": {
+    "@cyphos-guard/policy-service": "workspace:*",
+    "@cyphos-guard/sdk": "workspace:*"
+  }
+}

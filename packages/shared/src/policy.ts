@@ -85,6 +85,25 @@ const erc20TransferSchema = z.object({
   perPeriod: periodLimitSchema,
 });
 
+/**
+ * Pay x402 APIs (HTTP 402, "exact" scheme, EIP-3009 tokens such as USDC). The x402 payer must sign a token
+ * authorization, which only the owner's passkey can do for the smart account. So each payment is a
+ * just-in-time top-up: the account sends exactly the shortfall to the AGENT's own address (on-chain:
+ * token, recipient = agent, period cap; per-payment cap binding via the required co-signer), then the agent
+ * signs the x402 authorization to the seller. The seller allowlist is checked by the SDK and the co-signer;
+ * a compromised agent key could redirect at most what the on-chain caps allow.
+ */
+const x402Schema = z.object({
+  kind: z.literal("x402"),
+  token: addressSchema,
+  /** x402 `payTo` addresses the agent may pay (sellers). Others escalate to the owner. */
+  sellers: z.array(addressSchema).min(1),
+  /** Required: binding on-chain via the co-signer (policy.cosigner must be set). */
+  perTx: amountSchema,
+  /** Required: the on-chain safety floor for all top-ups together. */
+  perPeriod: periodLimitSchema,
+});
+
 const contractCallSchema = z.object({
   kind: z.literal("contractCall"),
   /** Exactly one target per permission (avoids the targets × methods cross-product). */
@@ -110,6 +129,7 @@ export const permissionSchema = z.discriminatedUnion("kind", [
   nativeTransferSchema,
   erc20TransferSchema,
   contractCallSchema,
+  x402Schema,
 ]);
 
 export const tokenSchema = z.union([z.literal("native"), addressSchema]);
@@ -154,12 +174,21 @@ export const policySchema = z
     }
     const forbidden = new Set(p.forbidden.targets);
     p.permissions.forEach((perm, i) => {
+      if (perm.kind === "x402" && !p.cosigner) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["permissions", i],
+          message: "x402 permissions require a co-signer (it binds the per-payment cap and the seller check)",
+        });
+      }
       const touched =
         perm.kind === "contractCall"
           ? [perm.target]
           : perm.kind === "erc20Transfer"
             ? [perm.token, ...perm.recipients]
-            : perm.recipients;
+            : perm.kind === "x402"
+              ? [perm.token, ...perm.sellers]
+              : perm.recipients;
       for (const addr of touched) {
         if (forbidden.has(addr)) {
           ctx.addIssue({
@@ -200,6 +229,14 @@ export const ENFORCEMENT = {
     how: "SDK pre-check → escalation; BINDING on-chain via CosignerEnforcer when policy.cosigner is set",
   },
   "erc20Transfer.perPeriod": { where: "onchain", how: "ERC20PeriodTransferEnforcer" },
+  "x402.token": { where: "onchain", how: "ERC20PeriodTransferEnforcer (top-up: token.transfer to the agent only)" },
+  "x402.topUpRecipient": { where: "onchain", how: "AllowedCalldataEnforcer @ offset 4 (= the agent's address)" },
+  "x402.perTx": { where: "onchain", how: "CosignerEnforcer (required for x402)" },
+  "x402.perPeriod": { where: "onchain", how: "ERC20PeriodTransferEnforcer" },
+  "x402.sellers": {
+    where: "offchain",
+    how: "SDK + co-signer check the x402 payTo; the final agent → seller hop is signed by the agent alone",
+  },
   "contractCall.target": { where: "onchain", how: "AllowedTargetsEnforcer" },
   "contractCall.functions": { where: "onchain", how: "AllowedMethodsEnforcer" },
   "contractCall.args[eq, static types]": { where: "onchain", how: "AllowedCalldataEnforcer" },

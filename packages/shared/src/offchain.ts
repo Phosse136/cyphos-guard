@@ -19,11 +19,27 @@ import {
 import { decodeErc20Transfer } from "./escalation.ts";
 import type { Permission } from "./policy.ts";
 
+/** What an x402 top-up pays for: the seller and the amount it asked for. */
+export type X402Context = { payTo: `0x${string}`; amount: bigint; resource: string };
+
 /** Returns a human-readable violation, or null if the execution passes all off-chain rules of `permission`. */
 export function offchainCheck(
   permission: Permission,
   exec: { to: `0x${string}`; value: bigint; data: Hex },
+  context: { x402?: X402Context } = {},
 ): string | null {
+  if (permission.kind === "x402") {
+    // On-chain already pins token, recipient (= agent) and the period cap. Here: it must be a top-up FOR an
+    // x402 payment to an allowed seller, no larger than that payment and the per-payment cap.
+    const t = decodeErc20Transfer(exec.data);
+    if (!t) return "not a token transfer";
+    const x = context.x402;
+    if (!x) return "x402 top-up without x402 payment details";
+    if (!permission.sellers.some((s) => isAddressEqual(s, x.payTo))) return `x402 seller ${x.payTo} is not allowed`;
+    if (x.amount > permission.perTx) return `x402 payment ${x.amount} exceeds per-payment limit ${permission.perTx}`;
+    if (t.amount > x.amount) return `top-up ${t.amount} exceeds the x402 payment ${x.amount}`;
+    return null;
+  }
   if (permission.kind === "erc20Transfer") {
     const t = decodeErc20Transfer(exec.data);
     if (t && permission.perTx !== undefined && t.amount > permission.perTx) {

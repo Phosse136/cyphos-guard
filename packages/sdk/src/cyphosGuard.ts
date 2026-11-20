@@ -24,6 +24,7 @@ import {
   parsePolicy,
   type RequestStatus,
   SUPPORTED_CHAIN_IDS,
+  type X402Context,
 } from "@cyphos-guard/shared";
 import type { Delegation, MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
 import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
@@ -33,6 +34,8 @@ import {
   createPublicClient,
   createWalletClient,
   custom,
+  encodeFunctionData,
+  erc20Abi,
   type Hex,
   http,
   type LocalAccount,
@@ -52,6 +55,17 @@ import {
   PolicyServiceError,
   PolicyViolation,
 } from "./errors.ts";
+import {
+  decodeX402Header,
+  encodeX402Header,
+  type PaymentRequired,
+  type PaymentRequirements,
+  type SettlementResponse,
+  selectRequirement,
+  signExactEip3009,
+  X402_HEADERS,
+  X402Error,
+} from "./x402.ts";
 
 export type Logger = {
   debug?: (msg: string, data?: Record<string, unknown>) => void;
@@ -88,9 +102,22 @@ export type CyphosGuardOptions = {
 export type ExecuteInput = Execution & {
   /** Shown to the owner if escalated. Treated as untrusted text. */
   reason: string;
+  /** Internal: set by payX402 for top-ups, so the off-chain rules and the co-signer can check the seller. */
+  x402?: X402Context;
 };
 
 export type WaitOptions = { timeoutMs?: number; pollMs?: number };
+export type X402Result = {
+  /** The final HTTP response (the paid resource on success). */
+  response: Response;
+  /** True when the server answered 2xx and its facilitator reported a successful settlement. */
+  paid: boolean;
+  /** Set when a payment was attempted. */
+  payment?: { payTo: Address; asset: Address; amount: bigint; resource: string };
+  settlement?: SettlementResponse;
+  /** The account → agent top-up, if the agent's own balance didn't cover the payment. */
+  topUp?: ExecutionResult;
+};
 
 export type ExecutionResult = {
   status: "executed";
@@ -99,6 +126,9 @@ export type ExecutionResult = {
   grantId?: string;
   requestId?: string;
 };
+
+const x402Wire = (x?: X402Context) =>
+  x ? { x402: { payTo: x.payTo, amount: x.amount.toString(), resource: x.resource } } : {};
 
 export function createCyphosGuard(opts: CyphosGuardOptions) {
   const chain: Chain = opts.chain ?? baseSepolia;
@@ -246,7 +276,9 @@ export function createCyphosGuard(opts: CyphosGuardOptions) {
         const policy = parsePolicy(grant.policy);
         for (const [i, delegation] of grant.delegations.entries()) {
           const permission = policy.permissions[i];
-          const offchain = permission ? offchainCheck(permission, exec) : "unknown permission";
+          const offchain = permission
+            ? offchainCheck(permission, exec, input.x402 ? { x402: input.x402 } : {})
+            : "unknown permission";
           if (offchain) {
             violations.push(offchain);
             continue;
@@ -266,6 +298,7 @@ export function createCyphosGuard(opts: CyphosGuardOptions) {
                 to: exec.to,
                 value: exec.value.toString(),
                 data: exec.data,
+                ...x402Wire(input.x402),
               },
             );
             if (cs.status !== 200) {
@@ -301,6 +334,7 @@ export function createCyphosGuard(opts: CyphosGuardOptions) {
           value: exec.value.toString(),
           data: exec.data,
           reason: input.reason,
+          ...x402Wire(input.x402),
         },
       );
       if (res.status !== 201) {
@@ -328,6 +362,93 @@ export function createCyphosGuard(opts: CyphosGuardOptions) {
         if (req.status !== "pending" || Date.now() >= until) return finishApproval(req);
         await new Promise((r) => setTimeout(r, pollMs));
       }
+    },
+
+    /**
+     * Fetch an x402-paywalled URL and pay it within the owner's x402 permission (HTTP 402, exact scheme,
+     * EIP-3009 token). The agent's own balance is used first; any shortfall is topped up from the account
+     * (within limits, or as an approval request, like execute()). Then the agent signs the payment.
+     * Throws PolicyViolation / ApprovalPending (unless `wait`) / X402Error. `init.body` must be re-sendable
+     * (a string, not a stream): the request is sent twice.
+     */
+    async payX402(
+      url: string,
+      init: RequestInit = {},
+      { reason, maxAmount, wait }: { reason: string; maxAmount?: bigint; wait?: boolean | WaitOptions },
+    ): Promise<X402Result> {
+      const agent = needAgent("payX402");
+      const first = await fetch(url, init);
+      if (first.status !== 402) return { response: first, paid: false };
+      const header = first.headers.get(X402_HEADERS.required);
+      if (!header) throw new X402Error(`402 without a ${X402_HEADERS.required} header (only x402 v2 is supported)`);
+      const required = decodeX402Header<PaymentRequired>(header);
+
+      const permissions = (await pw.getGrants()).flatMap((g) =>
+        parsePolicy(g.policy).permissions.filter((p) => p.kind === "x402"),
+      );
+      const choice: PaymentRequirements | null = selectRequirement(required, {
+        chainId,
+        tokens: permissions.map((p) => p.token),
+        sellers: permissions.flatMap((p) => p.sellers),
+      });
+      if (!choice) {
+        throw new X402Error(
+          `no payable option: need scheme "exact" (EIP-3009) on eip155:${chainId} in a token of an x402 permission`,
+        );
+      }
+      const amount = BigInt(choice.amount);
+      if (maxAmount !== undefined && amount > maxAmount) {
+        throw new X402Error(`the API asks ${amount}, more than maxAmount ${maxAmount}`);
+      }
+      const payment = { payTo: choice.payTo, asset: choice.asset, amount, resource: required.resource?.url ?? url };
+
+      // Just-in-time: only the shortfall leaves the account (leftovers from a failed attempt are reused).
+      const held = await publicClient.readContract({
+        address: choice.asset,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [agent.address],
+      });
+      let topUp: ExecutionResult | undefined;
+      if (held < amount) {
+        topUp = await pw.execute(
+          {
+            to: choice.asset,
+            data: encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [agent.address, amount - held] }),
+            reason: `x402 payment to ${choice.payTo} for ${payment.resource}: ${reason}`,
+            x402: { payTo: choice.payTo, amount, resource: payment.resource },
+          },
+          { wait },
+        );
+      }
+
+      const signed = await signExactEip3009(agent, choice, chainId);
+      const headers = new Headers(init.headers);
+      headers.set(
+        X402_HEADERS.signature,
+        encodeX402Header({ x402Version: 2, resource: required.resource, accepted: choice, payload: signed }),
+      );
+      const response = await fetch(url, { ...init, headers });
+      const settlementHeader = response.headers.get(X402_HEADERS.response);
+      const settlement = settlementHeader ? decodeX402Header<SettlementResponse>(settlementHeader) : undefined;
+      const paid = response.ok && settlement?.success === true;
+      if (paid && settlement?.transaction) {
+        await request("agent", "POST", "/agent/x402/paid", {
+          account: await pw.getAccount(),
+          txHash: settlement.transaction,
+          asset: choice.asset,
+          payTo: choice.payTo,
+          amount: amount.toString(),
+          resource: payment.resource,
+          reason,
+        }).catch((e) => log.warn?.("could not report x402 payment", { error: String(e) }));
+      } else if (!paid) {
+        log.warn?.("x402 payment not settled; the topped-up amount stays with the agent for the next attempt", {
+          status: response.status,
+          error: settlement?.errorReason,
+        });
+      }
+      return { response, paid, payment, ...(settlement ? { settlement } : {}), ...(topUp ? { topUp } : {}) };
     },
 
     /** Activity of this agent (agent signer) or of the whole account (owner). */

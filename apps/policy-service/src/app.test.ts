@@ -27,6 +27,7 @@ function setup(overrides: Partial<ChainAdapter> = {}, extraConfig: { setupCode?:
     verifiedRedeem: async () => null, // overridden per test
     accountHasPasskey: async () => true,
     ensureCosignerEnforcer: async () => true,
+    erc20Transferred: async () => null, // overridden per test
     ...overrides,
   };
   const store = openStore(":memory:");
@@ -533,3 +534,146 @@ describe("history endpoints", () => {
     expect(all.map((r) => r.status).sort()).toEqual(["pending", "rejected"]);
   });
 });
+
+describe("x402 (pay HTTP 402 APIs via just-in-time top-ups)", () => {
+  const TOKEN = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address;
+  const SELLER = privateKeyToAddress(generatePrivateKey());
+  const x402Grant = async (t: ReturnType<typeof setup>) => {
+    await t.owner.register();
+    await t.owner.put("/me/account", { accountAddress: ACCOUNT });
+    const policy = {
+      version: 1,
+      chainId: 84532,
+      agent: t.agent.address,
+      expiresAt: 1_800_086_400,
+      cosigner: t.cosigner.address,
+      permissions: [
+        {
+          kind: "x402",
+          token: TOKEN,
+          sellers: [SELLER],
+          perTx: "1000000",
+          perPeriod: { amount: "5000000", periodSeconds: 86_400 },
+        },
+      ],
+      escalation: { enabled: true, approvalTtlSeconds: 600, hardMax: [{ token: TOKEN, amount: "20000000" }] },
+      forbidden: { targets: [MIXER] },
+    };
+    const delegation = {
+      delegate: t.agent.address,
+      delegator: ACCOUNT,
+      authority: `0x${"f".repeat(64)}`,
+      caveats: [cosignerCaveat(t.cosigner.address)],
+      salt: "0x01",
+      signature: "0x01",
+    };
+    const res = await t.owner.post("/grants", { policy, delegations: [delegation] });
+    expect(res.status).toBe(201);
+    return (await res.json()) as { id: string };
+  };
+  const topUp = (agent: Address, amount: bigint) =>
+    encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [agent, amount] });
+
+  it("co-signs a top-up only for an allowed seller, within the per-payment cap and the payment amount", async () => {
+    const t = setup();
+    const grant = await x402Grant(t);
+    const ask = (amount: bigint, x402?: { payTo: Address; amount: string; resource: string }) =>
+      t.asAgent("POST", "/agent/cosign", {
+        account: ACCOUNT,
+        grantId: grant.id,
+        delegationIndex: 0,
+        to: TOKEN,
+        value: "0",
+        data: topUp(t.agent.address, amount),
+        ...(x402 ? { x402 } : {}),
+      });
+    const ctx = (payTo: Address, amount: string) => ({ payTo, amount, resource: "https://api.example/data" });
+    expect((await ask(500_000n, ctx(SELLER, "500000"))).status).toBe(200);
+    expect((await ask(200_000n, ctx(SELLER, "500000"))).status).toBe(200); // shortfall only
+    const refusals = [
+      await ask(500_000n), // no x402 details: a bare top-up is never co-signed
+      await ask(500_000n, ctx(SHOP, "500000")), // seller not allowed
+      await ask(2_000_000n, ctx(SELLER, "2000000")), // above per-payment cap
+      await ask(900_000n, ctx(SELLER, "500000")), // top-up larger than the payment
+    ];
+    for (const r of refusals) {
+      expect(r.status).toBe(403);
+      expect(((await r.json()) as { error: string }).error).toBe("offchain_rule");
+    }
+  });
+
+  it("refuses x402 permissions without a co-signer", async () => {
+    const t = setup();
+    await t.owner.register();
+    await t.owner.put("/me/account", { accountAddress: ACCOUNT });
+    const res = await t.owner.post("/grants", {
+      policy: {
+        version: 1,
+        chainId: 84532,
+        agent: t.agent.address,
+        expiresAt: 1_800_086_400,
+        permissions: [
+          { kind: "x402", token: TOKEN, sellers: [SELLER], perTx: "1", perPeriod: { amount: "5", periodSeconds: 60 } },
+        ],
+      },
+      delegations: [fakeDelegationFor(t.agent.address)],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("escalates a top-up for an unknown seller but denies one for a forbidden seller", async () => {
+    const t = setup();
+    await x402Grant(t);
+    const request = (payTo: Address) =>
+      t.asAgent("POST", "/agent/requests", {
+        account: ACCOUNT,
+        to: TOKEN,
+        value: "0",
+        data: topUp(t.agent.address, 3_000_000n),
+        reason: "x402 payment",
+        x402: { payTo, amount: "3000000", resource: "https://api.example/report" },
+      });
+    expect((await request(SHOP)).status).toBe(201);
+    const denied = await request(MIXER);
+    expect(denied.status).toBe(403);
+    expect(((await denied.json()) as { error: string }).error).toBe("forbidden");
+  });
+
+  it("records a settled x402 payment only if the chain shows agent → seller for exactly that amount", async () => {
+    let moved: bigint | null = 500_000n;
+    const t = setup({ erc20Transferred: async () => moved });
+    await x402Grant(t);
+    const body = {
+      account: ACCOUNT,
+      txHash: `0x${"a".repeat(64)}`,
+      asset: TOKEN,
+      payTo: SELLER,
+      amount: "500000",
+      resource: "https://api.example/data",
+      reason: "market data",
+    };
+    expect((await t.asAgent("POST", "/agent/x402/paid", body)).status).toBe(201);
+    moved = 1n;
+    expect((await t.asAgent("POST", "/agent/x402/paid", body)).status).toBe(400);
+    moved = null;
+    expect((await t.asAgent("POST", "/agent/x402/paid", body)).status).toBe(400);
+    const activity = (await (await t.owner.get("/activity")).json()) as {
+      kind: string;
+      detail: { resource?: string; payer?: string };
+    }[];
+    const paid = activity.filter((a) => a.kind === "x402_paid");
+    expect(paid).toHaveLength(1);
+    expect(paid[0]?.detail).toMatchObject({ resource: "https://api.example/data", payer: t.agent.address });
+  });
+});
+
+function fakeDelegationFor(agent: Address) {
+  return {
+    delegate: agent,
+    delegator: ACCOUNT,
+    authority: `0x${"f".repeat(64)}`,
+    caveats: [],
+    salt: "0x01",
+    signature: "0x01",
+  };
+}

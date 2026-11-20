@@ -17,6 +17,7 @@ const LABEL: Record<ActivityJSON["kind"], string> = {
   request_rejected: "You rejected",
   request_executed: "Approved payment sent",
   request_denied: "Blocked by policy",
+  x402_paid: "Paid an x402 API",
 };
 
 const GROUPS = {
@@ -29,7 +30,7 @@ const GROUPS = {
 type Group = keyof typeof GROUPS;
 const inGroup = (kind: ActivityJSON["kind"], g: Group) =>
   g === "all" ||
-  (g === "payments" && (kind === "routine_executed" || kind === "request_executed")) ||
+  (g === "payments" && (kind === "routine_executed" || kind === "request_executed" || kind === "x402_paid")) ||
   (g === "approvals" && kind.startsWith("request_") && kind !== "request_denied") ||
   (g === "blocked" && kind === "request_denied") ||
   (g === "grants" && kind.startsWith("grant_"));

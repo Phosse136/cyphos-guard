@@ -112,6 +112,17 @@ function compilePermission(
       });
     }
 
+    case "x402": {
+      // Just-in-time top-ups: token.transfer(agent, …) only, under a period cap. The co-signer (required by
+      // the schema) binds the per-payment cap and the seller check; the agent then signs the x402 payment.
+      if (!policy.cosigner) throw new CompileError("x402 permissions require a co-signer");
+      return createDelegation({
+        ...base,
+        scope: { type: ScopeType.Erc20PeriodTransfer, tokenAddress: permission.token, ...period(permission.perPeriod) },
+        caveats: [{ type: "allowedCalldata", startIndex: 4, value: pad(policy.agent, { size: 32 }) }, expiry, ...extra],
+      });
+    }
+
     case "contractCall": {
       const fns = permission.functions.map((f) => ({
         ...f,

@@ -27,6 +27,7 @@ import {
   createPublicClient,
   createWalletClient,
   decodeFunctionData,
+  erc20Abi,
   getAddress,
   type Hex,
   http,
@@ -34,6 +35,7 @@ import {
   type PublicClient,
   parseAbi,
   parseEther,
+  parseEventLogs,
   toHex,
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
@@ -59,6 +61,8 @@ export type ChainAdapter = {
    * the tx itself) and whose account it spent from (root delegator). Otherwise null.
    */
   verifiedRedeem(hash: Hex, from: Address): Promise<VerifiedRedeem | null>;
+  /** Total `token` moved from → to by the successful tx `hash` (ERC-20 Transfer logs), or null if it failed. */
+  erc20Transferred(hash: Hex, token: Address, from: Address, to: Address): Promise<bigint | null>;
   /** True if `account` is deployed and has the passkey (keyId → x,y) as a signer. */
   accountHasPasskey(account: Address, keyId: string, x: Hex, y: Hex): Promise<boolean>;
   /**
@@ -143,6 +147,15 @@ export async function createChainAdapter(opts: { rpcUrl: string; network: "fork"
       } catch {
         return null;
       }
+    },
+    async erc20Transferred(hash, token, from, to) {
+      const receipt = await client.getTransactionReceipt({ hash }).catch(() => null);
+      if (receipt?.status !== "success") return null;
+      return parseEventLogs({ abi: erc20Abi, eventName: "Transfer", logs: receipt.logs })
+        .filter(
+          (l) => isAddressEqual(l.address, token) && isAddressEqual(l.args.from, from) && isAddressEqual(l.args.to, to),
+        )
+        .reduce((sum, l) => sum + l.args.value, 0n);
     },
     ensureCosignerEnforcer: async () => !!(await client.getCode({ address: cosignerEnforcerAddress })),
     async accountHasPasskey(account, keyId, x, y) {

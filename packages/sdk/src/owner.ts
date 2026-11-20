@@ -14,6 +14,7 @@ import {
   type PublicClient,
   parseEventLogs,
   type Transport,
+  toHex,
   type WalletClient,
 } from "viem";
 import {
@@ -40,66 +41,112 @@ export async function deployAccount(
   return hash;
 }
 
-/**
- * Sign a userOp with the account's owner signer and submit it through EntryPoint.handleOps from the
- * owner's EOA. Gas is prefunded from the smart account's own balance; the owner EOA is the beneficiary.
- */
-export async function executeAsOwner(
+/** Unsigned userOp for `calls` with fixed, generous gas limits (no bundler estimation round-trip). */
+export async function buildUserOp(
   account: MetaMaskSmartAccount,
-  ownerWallet: OwnerWallet,
   publicClient: PublicClient,
   calls: { to: `0x${string}`; data?: Hex; value?: bigint }[],
-) {
-  const [nonce, callData, fees] = await Promise.all([
+): Promise<UserOperation<"0.7">> {
+  const [nonce, callData, fees, deployed] = await Promise.all([
     account.getNonce(),
     account.encodeCalls(calls),
     publicClient.estimateFeesPerGas(),
+    account.isDeployed(),
   ]);
-  const userOp: UserOperation<"0.7"> = {
+  const init = deployed ? {} : await account.getFactoryArgs();
+  return {
     sender: account.address,
     nonce,
     callData,
-    // Fixed, generous limits: the account is already deployed and validation is a single ECDSA/1271 check.
+    ...(init.factory && init.factoryData ? { factory: init.factory, factoryData: init.factoryData } : {}),
+    // Validation is one ECDSA/ERC-1271/P-256 check; deployment (first op) needs more.
     callGasLimit: 300_000n,
-    verificationGasLimit: 500_000n,
+    verificationGasLimit: deployed ? 800_000n : 2_000_000n,
     preVerificationGas: 60_000n,
     maxFeePerGas: fees.maxFeePerGas * 2n,
     maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
     signature: "0x",
   };
+}
+
+/**
+ * Submit a *signed* userOp through EntryPoint.handleOps from `submitter` (any funded EOA: the owner's
+ * recovery key, or the fork-only dev relayer). The submitter cannot alter the op: any change breaks
+ * the owner's signature. Returns the tx hash; throws if the inner call failed.
+ */
+export async function submitUserOp(userOp: UserOperation<"0.7">, submitter: OwnerWallet, publicClient: PublicClient) {
   // Revocation must work even if the smart account's ETH balance is empty (e.g. the agent spent it).
-  // So the owner EOA tops up the account's EntryPoint deposit to cover the max gas cost; the
+  // So the submitter tops up the account's EntryPoint deposit to cover the max gas cost; the
   // EntryPoint then takes no prefund from the account's balance (unused deposit stays withdrawable).
   const maxCost = (userOp.callGasLimit + userOp.verificationGasLimit + userOp.preVerificationGas) * userOp.maxFeePerGas;
   const deposit = await publicClient.readContract({
     address: entryPoint07Address,
     abi: entryPoint07Abi,
     functionName: "balanceOf",
-    args: [account.address],
+    args: [userOp.sender],
   });
   if (deposit < maxCost) {
-    const topUp = await ownerWallet.writeContract({
+    const topUp = await submitter.writeContract({
       address: entryPoint07Address,
       abi: entryPoint07Abi,
       functionName: "depositTo",
-      args: [account.address],
+      args: [userOp.sender],
       value: maxCost - deposit,
     });
     await publicClient.waitForTransactionReceipt({ hash: topUp });
   }
 
-  userOp.signature = await account.signUserOperation({ ...userOp, chainId: ownerWallet.chain.id });
-
-  const hash = await ownerWallet.writeContract({
+  const hash = await submitter.writeContract({
     address: entryPoint07Address,
     abi: entryPoint07Abi,
     functionName: "handleOps",
-    args: [[toPackedUserOperation(userOp)], ownerWallet.account.address],
+    args: [[toPackedUserOperation(userOp)], submitter.account.address],
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
   // handleOps does NOT revert when the inner call fails; the outcome is in UserOperationEvent.success.
   const [event] = parseEventLogs({ abi: entryPoint07Abi, logs: receipt.logs, eventName: "UserOperationEvent" });
-  if (receipt.status !== "success" || !event?.args.success) throw new Error(`owner userOp failed: ${hash}`);
+  if (receipt.status !== "success" || !event?.args.success) throw new Error(`userOp failed: ${hash}`);
   return hash;
+}
+
+/** Sign with the account's owner signer (EOA or passkey) and submit from `submitter`. */
+export async function executeAsOwner(
+  account: MetaMaskSmartAccount,
+  submitter: OwnerWallet,
+  publicClient: PublicClient,
+  calls: { to: `0x${string}`; data?: Hex; value?: bigint }[],
+) {
+  const userOp = await buildUserOp(account, publicClient, calls);
+  userOp.signature = await account.signUserOperation({ ...userOp, chainId: submitter.chain.id });
+  return submitUserOp(userOp, submitter, publicClient);
+}
+
+// ---------- JSON transport for userOps (bigint ⇄ hex) ----------
+const BIG_FIELDS = [
+  "nonce",
+  "callGasLimit",
+  "verificationGasLimit",
+  "preVerificationGas",
+  "maxFeePerGas",
+  "maxPriorityFeePerGas",
+] as const;
+
+export type UserOpJSON = Record<string, string>;
+
+export function userOpToJSON(op: UserOperation<"0.7">): UserOpJSON {
+  const out: UserOpJSON = {};
+  for (const [k, v] of Object.entries(op)) if (v !== undefined) out[k] = typeof v === "bigint" ? toHex(v) : String(v);
+  return out;
+}
+
+export function userOpFromJSON(json: UserOpJSON): UserOperation<"0.7"> {
+  const op: Record<string, unknown> = { ...json };
+  for (const k of BIG_FIELDS) op[k] = BigInt(json[k] ?? "0x0");
+  return op as unknown as UserOperation<"0.7">;
+}
+
+/** Hybrid DeleGator key id we use for a passkey: the credential id, hex-encoded (same string at deploy and sign). */
+export function passkeyKeyId(credentialId: string): Hex {
+  return toHex(credentialId);
 }

@@ -1,0 +1,21 @@
+{
+  "name": "@phoswallet/policy-service",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --watch src/server.ts",
+    "start": "node --env-file-if-exists=../../.env src/server.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.11",
+    "@metamask/smart-accounts-kit": "2.0.0",
+    "@phoswallet/sdk": "workspace:*",
+    "@phoswallet/shared": "workspace:*",
+    "@simplewebauthn/server": "^14.1.0",
+    "hono": "^4.13.19",
+    "viem": "^2.58.2",
+    "zod": "^4.6.7"
+  }
+}

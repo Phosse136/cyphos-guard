@@ -13,6 +13,10 @@ import { toWebAuthnAccount, type WebAuthnAccount } from "viem/account-abstractio
 
 export type SoftPasskey = {
   credentialId: string;
+  rpId: string;
+  origin: string;
+  /** Raw WebAuthn assertion for `challenge` (as navigator.credentials.get would return), for login flows. */
+  assert(challenge: Uint8Array): { authenticatorData: Buffer; clientDataJSON: Buffer; signature: Buffer };
   /** Uncompressed public key 0x04‖x‖y. */
   publicKey: Hex;
   x: bigint;
@@ -42,6 +46,16 @@ export function createSoftPasskey({ rpId = "localhost", origin = "http://localho
 
   return {
     credentialId,
+    rpId,
+    origin,
+    assert: (challenge) => {
+      const a = assertion(privateKey, credentialId, rpId, origin, challenge, ++signCount).response;
+      return {
+        authenticatorData: Buffer.from(a.authenticatorData),
+        clientDataJSON: Buffer.from(a.clientDataJSON),
+        signature: Buffer.from(a.signature),
+      };
+    },
     publicKey: pub,
     x: BigInt(`0x${xHex}`),
     y: BigInt(`0x${yHex}`),

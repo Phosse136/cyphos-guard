@@ -1,0 +1,6 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "examples/*"
+minimumReleaseAgeExclude:
+  - viem@2.58.2

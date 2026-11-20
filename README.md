@@ -54,8 +54,8 @@ is a real transaction that the chain reverted; Basescan shows which caveat enfor
 | Agent tries again after revocation                | ✘ `CannotUseADisabledDelegation()`                             | [reverted](https://sepolia.basescan.org/tx/0x3539b22250cf502d8f21a4840f770d6548a51723cf67bbbe2ef1b7abb4875125)                                                                                               |
 
 cyphos-guard's own **CosignerEnforcer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)) is deployed on Base Sepolia at
-[`0xDe95AB1D116AbF913584b6D3Bebf659D0CFfEA95`](https://sepolia.basescan.org/address/0xDe95AB1D116AbF913584b6D3Bebf659D0CFfEA95)
-([deploy tx](https://sepolia.basescan.org/tx/0x5ecd05ae046c75f422020e544aa8bbf9d9e8b154c55cd3c425bdcbdf1885c531)). It has the same address on every
+[`0x0a2f40e9789235B6ce2a23668FD3F90cef5eefbf`](https://sepolia.basescan.org/address/0x0a2f40e9789235B6ce2a23668FD3F90cef5eefbf)
+([deploy tx](https://sepolia.basescan.org/tx/0x173932c273aa54d8d1751b2a1c646ba12c7fee64e8480e7869548d3523892b47)). It has the same address on every
 chain, no owner and no upgrade path.
 
 The demo agent was also run with the real Claude model (`claude-opus-5-5`, `pnpm demo:selftest`, on a local

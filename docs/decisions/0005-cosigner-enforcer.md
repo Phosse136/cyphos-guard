@@ -59,9 +59,12 @@ CI rebuilds it and fails if `packages/contracts/generated/` differs from what th
 
 | Chain                | Address                                                                                                                         | Deploy tx                                                                                                        |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Base Sepolia (84532) | [`0xDe95AB1D116AbF913584b6D3Bebf659D0CFfEA95`](https://sepolia.basescan.org/address/0xDe95AB1D116AbF913584b6D3Bebf659D0CFfEA95) | [2026-11-20](https://sepolia.basescan.org/tx/0x5ecd05ae046c75f422020e544aa8bbf9d9e8b154c55cd3c425bdcbdf1885c531) |
+| Base Sepolia (84532) | [`0x0a2f40e9789235B6ce2a23668FD3F90cef5eefbf`](https://sepolia.basescan.org/address/0x0a2f40e9789235B6ce2a23668FD3F90cef5eefbf) | [2026-11-20](https://sepolia.basescan.org/tx/0x173932c273aa54d8d1751b2a1c646ba12c7fee64e8480e7869548d3523892b47) |
 
-Checked after deployment: `COSIGN_TYPEHASH` and `eip712Domain()` match the source. The address is the CREATE2 address
+Checked after deployment: `COSIGN_TYPEHASH` and `eip712Domain()` match the source.
+
+An earlier deployment from before the project was renamed (EIP-712 domain "phoswallet CosignerEnforcer") sits at
+[`0xDe95AB1D116AbF913584b6D3Bebf659D0CFfEA95`](https://sepolia.basescan.org/address/0xDe95AB1D116AbF913584b6D3Bebf659D0CFfEA95). It's superseded and unused, and can't be removed (contracts are immutable). The address is the CREATE2 address
 of the committed bytecode, so the deployed initcode is exactly `packages/contracts/generated/`.
 
 ## Verified

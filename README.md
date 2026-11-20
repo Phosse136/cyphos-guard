@@ -45,10 +45,10 @@ docs/decisions        ADRs
 
 ## Development
 
-Requirements: Node ≥ 24 (see `.nvmrc`), pnpm 12 (via corepack), Foundry (from Phase 1, only if contracts are needed).
+Requirements: Node ≥ 24 (see `.nvmrc`), pnpm 12, Foundry (from Phase 1, only if contracts are needed).
 
 ```sh
-corepack enable
+npm install -g pnpm@12.21.0   # Node ≥ 25 no longer bundles corepack
 pnpm install        # also enables the pre-commit secret check
 pnpm lint && pnpm typecheck && pnpm test
 cp .env.example .env

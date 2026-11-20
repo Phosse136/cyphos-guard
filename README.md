@@ -106,6 +106,15 @@ try {
 
 [SDK quickstart & API reference](packages/sdk/README.md) · [policy examples](docs/policy-examples.md)
 
+### …or from any MCP agent
+
+The [cyphos-guard MCP server](packages/mcp/README.md) gives Claude Code, Claude Desktop and other MCP clients the tools
+`get_wallet_status`, `pay`, `call_contract`, `check_approval` and `list_activity`. They're backed by the same three layers:
+
+```sh
+claude mcp add cyphos-guard -e CYPHOS_AGENT_PRIVATE_KEY=0x… -- node /path/to/cyphos-guard/packages/mcp/src/server.ts
+```
+
 ## How it works
 
 ```mermaid
@@ -220,6 +229,8 @@ corrections welcome).
 
 **Done recently**
 
+- **MCP server** ([packages/mcp](packages/mcp/README.md)). Any MCP-capable agent can pay under cyphos-guard's rules.
+
 - **Live Base Sepolia guide** ([docs/live-guide.md](docs/live-guide.md)). The full approver flow runs on live Base Sepolia.
 
 - **Co-signer enforcer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)). An optional caveat that requires a fresh
@@ -230,7 +241,6 @@ corrections welcome).
 
 - Several ERC-20 recipients per permission (`LogicalOrWrapperEnforcer`), batch approvals, web push notifications.
 - Gasless revoke through a paymaster, plus a pinned or IPFS approver build so you don't have to trust a host.
-- MCP server so any MCP-capable agent can use cyphos-guard tools.
 
 **Smart rules**
 
@@ -250,6 +260,7 @@ corrections welcome).
 apps/approver         Next.js owner app: passkey login, approvals, grants, revoke, activity
 apps/policy-service   approval queue · grant registry · activity (Hono + node:sqlite), holds no keys
 packages/contracts    CosignerEnforcer (Foundry, on Delegation Framework v1.3.0 as submodule)
+packages/mcp          MCP server (pay, check_approval, … for Claude Code / Claude Desktop)
 packages/sdk          @cyphos-guard/sdk: createCyphosGuard, policy compiler, co-signer, typed errors
 packages/shared       policy schema (zod), API types, escalation and off-chain checks
 examples/poc          Phase 1 proof of concept + passkey spike + e2e escalation flow

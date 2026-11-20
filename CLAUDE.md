@@ -38,6 +38,7 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
 - Activity is recorded from the chain (decoded redemption tx + delegator), never from agent claims.
 - Next.js bakes `rewrites()` destinations into the build: never route network targets through rewrites. The approver
   proxies `/api` and `/rpc` with route handlers that read `lib/upstream.ts` at request time.
+- MCP server (`packages/mcp`): stdout is the protocol channel, so log to stderr only. Tool results must never contain keys.
 - Services bind to localhost. The approver proxies `/api` to the policy service.
 - Flag anything that could put funds at risk, even on testnet.
 

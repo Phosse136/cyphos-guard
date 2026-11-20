@@ -281,6 +281,7 @@ export function createCyphosGuard(opts: CyphosGuardOptions) {
               txHash: r.hash,
               to: exec.to,
               value: exec.value.toString(),
+              reason: input.reason,
             }).catch((e) => log.warn?.("could not report activity", { error: String(e) }));
             log.info?.("executed within grant", { grantId: grant.id, txHash: r.hash });
             return { status: "executed", txHash: r.hash, via: "grant", grantId: grant.id };

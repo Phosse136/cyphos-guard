@@ -34,7 +34,11 @@ import { baseSepolia } from "viem/chains";
 const USDC: Address = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 const chain: Chain = baseSepolia;
 const FORK = process.env.FORK_RPC_URL || "http://127.0.0.1:8545";
-const APP = "http://localhost:3000";
+// Ports are configurable so the tests can run next to a developer's own `pnpm dev` (3000 / 8787 / 8545).
+const APP_PORT = Number(process.env.E2E_APP_PORT ?? 3000);
+const SERVICE_PORT = Number(process.env.E2E_SERVICE_PORT ?? 8787);
+const SERVICE = `http://127.0.0.1:${SERVICE_PORT}`;
+const APP = `http://localhost:${APP_PORT}`;
 const SHOTS = process.env.E2E_SCREENSHOTS ?? resolve(import.meta.dirname, "screenshots");
 const root = resolve(import.meta.dirname, "../../..");
 mkdirSync(SHOTS, { recursive: true });
@@ -61,14 +65,24 @@ const service = serve({
       cosigner: privateKeyToAccount(generatePrivateKey()), // approver grants are co-signed by default
     },
   }).fetch,
-  port: 8787,
+  port: SERVICE_PORT,
   hostname: "127.0.0.1",
 });
-const next: ChildProcess = spawn("pnpm", ["exec", "next", "start", "--hostname", "localhost", "--port", "3000"], {
-  cwd: resolve(import.meta.dirname, ".."),
-  env: { ...process.env, NETWORK: "fork", NEXT_TELEMETRY_DISABLED: "1" },
-  stdio: "ignore",
-});
+const next: ChildProcess = spawn(
+  "pnpm",
+  ["exec", "next", "start", "--hostname", "localhost", "--port", String(APP_PORT)],
+  {
+    cwd: resolve(import.meta.dirname, ".."),
+    env: {
+      ...process.env,
+      NETWORK: "fork",
+      FORK_RPC_URL: FORK,
+      POLICY_SERVICE_URL: SERVICE,
+      NEXT_TELEMETRY_DISABLED: "1",
+    },
+    stdio: "ignore",
+  },
+);
 let agentProc: ChildProcess | undefined;
 const cleanup = () => {
   agentProc?.kill();
@@ -152,7 +166,7 @@ try {
       DEMO_AGENT_PRIVATE_KEY: agentKey,
       NETWORK: "fork",
       FORK_RPC_URL: FORK,
-      POLICY_SERVICE_URL: "http://127.0.0.1:8787",
+      POLICY_SERVICE_URL: SERVICE,
     },
   });
   agentProc.stdout?.on("data", (c: Buffer) => {
@@ -176,6 +190,39 @@ try {
   await page.waitForTimeout(5500); // let the activity list poll once more
   await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }));
   await shot("demo-3-activity", 5000);
+
+  console.log("▸ full visibility: agent rights, event details, on-chain receipt, approval history");
+  await page.getByRole("button", { name: "Details" }).first().click();
+  await page.getByText("Permissions (what it may do on its own)").waitFor({ timeout: 10_000 });
+  const rights = (await page.locator("main").textContent()) ?? "";
+  check(
+    "agent details show per-payment limit, denylist, co-signer and on-chain enforcers",
+    /max 2 USDC \(binding via co-signer\)/.test(rights) &&
+      /Denylist/.test(rights) &&
+      /Enforced on-chain by: .*CosignerEnforcer/.test(rights),
+  );
+  await page
+    .getByRole("button", { name: /Approved payment sent/ })
+    .first()
+    .click();
+  await page.getByText("Agent's reason").first().waitFor({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Load on-chain details" }).first().click();
+  await page.getByText("On-chain (read from the chain)").waitFor({ timeout: 15_000 });
+  check("activity entry shows the reason, request status and the on-chain receipt", true);
+  const history = page.getByRole("button", { name: /executed/ }).last();
+  await history.scrollIntoViewIfNeeded();
+  await history.click();
+  // waitFor (not isVisible): the panel renders after the click, so an immediate visibility check races it.
+  const historyShown = await page
+    .getByText("Approval window until")
+    .last()
+    .waitFor({ timeout: 10_000 })
+    .then(
+      () => true,
+      () => false,
+    );
+  check("approval history lists the executed request", historyShown);
+  await page.screenshot({ path: resolve(SHOTS, "demo-4-details.png"), fullPage: true });
 
   console.log("▸ on-chain verification");
   const usdcOf = (a: Address) =>

@@ -1,6 +1,9 @@
 import { decodeErc20Transfer } from "@cyphos-guard/shared";
 import { type Address, formatEther, formatUnits, type Hex } from "viem";
 
+/** Circle test USDC on Base Sepolia. */
+export const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const;
+
 /** Known tokens on Base Sepolia, for human-readable amounts. Unknown tokens show raw base units. */
 const TOKENS: Record<string, { symbol: string; decimals: number }> = {
   "0x036cbd53842c5426634e7929541ec2318f3dcf7e": { symbol: "USDC", decimals: 6 },
@@ -45,3 +48,15 @@ export function describe(exec: { to: Address; value: string; data: Hex }): { tit
 }
 
 export const explorer = (fork: boolean, tx: string) => (fork ? null : `https://sepolia.basescan.org/tx/${tx}`);
+
+/** Local date and time, e.g. "20 Nov 2026, 20:14:05". */
+export const when = (unix: number) =>
+  new Date(unix * 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
+
+/** "1 day", "7 days", "12 h", "30 min". */
+export const duration = (seconds: number) =>
+  seconds % 86_400 === 0
+    ? `${seconds / 86_400} day${seconds === 86_400 ? "" : "s"}`
+    : seconds % 3600 === 0
+      ? `${seconds / 3600} h`
+      : `${Math.round(seconds / 60)} min`;

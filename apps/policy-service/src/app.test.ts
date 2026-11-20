@@ -271,14 +271,14 @@ describe("escalation queue", () => {
     });
     await t.ready();
     // The agent claims a different recipient/value; the service records what the chain says.
-    const claim = { account: ACCOUNT, txHash: `0x${"cd".repeat(32)}`, to: MIXER, value: "999" };
+    const claim = { account: ACCOUNT, txHash: `0x${"cd".repeat(32)}`, to: MIXER, value: "999", reason: "GPU credits" };
     expect((await t.asAgent("POST", "/agent/activity", claim)).status).toBe(201);
     const [entry] = (await (await t.owner.get("/activity")).json()) as {
       kind: string;
       detail: { to: string; value: string };
     }[];
     expect(entry?.kind).toBe("routine_executed");
-    expect(entry?.detail).toMatchObject({ to: SHOP, value: "123" });
+    expect(entry?.detail).toMatchObject({ to: SHOP, value: "123", reason: "GPU credits" });
     delegator = SHOP; // tx actually spent from another account
     expect((await t.asAgent("POST", "/agent/activity", { ...claim, txHash: `0x${"ef".repeat(32)}` })).status).toBe(400);
   });
@@ -487,5 +487,30 @@ describe("co-signer (ADR 0005)", () => {
     ).toBe(404);
     await t.owner.post(`/grants/${grant.id}/revoked`);
     expect((await t.asAgent("POST", "/agent/cosign", body)).status).toBe(404);
+  });
+});
+
+describe("history endpoints", () => {
+  it("pages activity backwards with limit + before", async () => {
+    const t = setup();
+    await t.ready();
+    for (let i = 0; i < 5; i++) await t.requestApproval(BigInt(i + 1));
+    const first = (await (await t.owner.get("/activity?limit=3")).json()) as { id: number }[];
+    expect(first).toHaveLength(3);
+    const last = first.at(-1)?.id ?? 0;
+    const next = (await (await t.owner.get(`/activity?limit=3&before=${last}`)).json()) as { id: number }[];
+    expect(next.length).toBeGreaterThan(0);
+    expect(next.every((a) => a.id < last)).toBe(true);
+    expect((await t.owner.get("/activity?limit=0")).status).toBe(400);
+  });
+
+  it("lists all requests regardless of status", async () => {
+    const t = setup();
+    await t.ready();
+    const a = (await (await t.requestApproval()).json()) as { id: string };
+    await t.owner.post(`/requests/${a.id}/reject`);
+    await t.requestApproval();
+    const all = (await (await t.owner.get("/requests?limit=50")).json()) as { status: string }[];
+    expect(all.map((r) => r.status).sort()).toEqual(["pending", "rejected"]);
   });
 });

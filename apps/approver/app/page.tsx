@@ -4,6 +4,7 @@ import type { MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
 import { useCallback, useEffect, useState } from "react";
 import { Activity } from "@/components/Activity";
 import { Grants } from "@/components/Grants";
+import { History } from "@/components/History";
 import { Onboarding } from "@/components/Onboarding";
 import { Requests } from "@/components/Requests";
 import { Button } from "@/components/ui";
@@ -64,6 +65,7 @@ export default function Home() {
             onChanged={() => setRefreshKey((k) => k + 1)}
           />
           <Activity fork={me.fork} refreshKey={refreshKey} />
+          <History fork={me.fork} refreshKey={refreshKey} />
         </>
       )}
     </main>

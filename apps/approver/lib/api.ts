@@ -38,14 +38,16 @@ export const api = {
     call("POST", "/auth/login/verify", { challengeId, response }),
   logout: () => call("POST", "/auth/logout"),
   linkAccount: (accountAddress: Address) => call("PUT", "/me/account", { accountAddress }),
-  requests: (status?: string) => call<ApprovalRequestJSON[]>("GET", `/requests${status ? `?status=${status}` : ""}`),
+  requests: (status?: string, limit = 200) =>
+    call<ApprovalRequestJSON[]>("GET", `/requests?limit=${limit}${status ? `&status=${status}` : ""}`),
   approve: (id: string, delegation: unknown) =>
     call<ApprovalRequestJSON>("POST", `/requests/${id}/approve`, { delegation }),
   reject: (id: string) => call<ApprovalRequestJSON>("POST", `/requests/${id}/reject`),
   grants: () => call<GrantJSON[]>("GET", "/grants"),
   createGrant: (policy: unknown, delegations: unknown[]) => call<GrantJSON>("POST", "/grants", { policy, delegations }),
   markRevoked: (id: string, txHash: Hex) => call("POST", `/grants/${id}/revoked`, { txHash }),
-  activity: () => call<ActivityJSON[]>("GET", "/activity"),
+  activity: (limit = 100, before?: number) =>
+    call<ActivityJSON[]>("GET", `/activity?limit=${limit}${before !== undefined ? `&before=${before}` : ""}`),
   cosigner: () => call<{ enabled: boolean; address: Address | null; enforcer: Address }>("GET", "/cosigner"),
   devRelay: (userOp: unknown) => call<{ txHash: Hex }>("POST", "/dev/relay", { userOp }),
   devFund: (address: Address) => call("POST", "/dev/fund", { address }),

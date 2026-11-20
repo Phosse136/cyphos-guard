@@ -376,7 +376,8 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     const account = requireAccount(c.get("owner"));
     store.requests.expire(await chain.now());
     const status = c.req.query("status");
-    return c.json(store.requests.list(account, status ? parse(requestStatusSchema, status) : undefined));
+    const limit = parse(z.coerce.number().int().min(1).max(1000).default(200), c.req.query("limit"));
+    return c.json(store.requests.list(account, status ? parse(requestStatusSchema, status) : undefined, limit));
   });
 
   app.post("/requests/:id/approve", ownerAuth, async (c) => {
@@ -432,7 +433,13 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     return c.json(store.requests.byId(req.id));
   });
 
-  app.get("/activity", ownerAuth, (c) => c.json(store.activity.list(requireAccount(c.get("owner")))));
+  /** Newest first; `limit` (≤ 1000, default 100) and `before` (an activity id) page backwards. */
+  app.get("/activity", ownerAuth, (c) => {
+    const limit = parse(z.coerce.number().int().min(1).max(1000).default(100), c.req.query("limit"));
+    const before = c.req.query("before");
+    const beforeId = before === undefined ? undefined : parse(z.coerce.number().int().positive(), before);
+    return c.json(store.activity.list(requireAccount(c.get("owner")), limit, beforeId));
+  });
 
   // ---------- agent API ----------
 
@@ -513,7 +520,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
         account: body.account,
         agent,
         kind: "request_denied",
-        detail: { code, message, to: body.to, value: body.value, data: body.data },
+        detail: { code, message, to: body.to, value: body.value, data: body.data, reason: body.reason },
         txHash: null,
         createdAt: nowS(),
       });
@@ -596,6 +603,8 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
         txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
         to: addressSchema,
         value: z.string().regex(/^\d+$/),
+        /** The agent's stated reason (untrusted text, shown to the owner as the agent's words). */
+        reason: z.string().trim().max(500).optional(),
       }),
       c.get("body"),
     );
@@ -610,7 +619,12 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
       account: body.account,
       agent,
       kind: "routine_executed",
-      detail: { to: redeemed.to, value: redeemed.value.toString(), data: redeemed.data },
+      detail: {
+        to: redeemed.to,
+        value: redeemed.value.toString(),
+        data: redeemed.data,
+        ...(body.reason ? { reason: body.reason } : {}),
+      },
       txHash: body.txHash as Hex,
       createdAt: nowS(),
     });

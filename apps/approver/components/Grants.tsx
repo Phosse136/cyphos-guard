@@ -5,13 +5,12 @@ import type { MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
 import { useCallback, useEffect, useState } from "react";
 import { formatUnits, isAddress, parseEther, parseUnits } from "viem";
 import { api } from "@/lib/api";
-import { ago, eth, short } from "@/lib/format";
+import { ago, eth, short, USDC } from "@/lib/format";
 import { ownerClient, publicClient } from "@/lib/wallet";
+import { AgentDetails } from "./AgentDetails";
 import { Button, Card, ErrorText, Field, inputClass } from "./ui";
 
 const DAY = 86_400;
-/** Circle test USDC on Base Sepolia. */
-export const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
 const EMPTY = {
   agent: "",
@@ -60,6 +59,14 @@ export function Grants({
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<Form>(EMPTY);
   const [prefilled, setPrefilled] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [cosigner, setCosigner] = useState<string | null>(null);
   const [useCosigner, setUseCosigner] = useState(true);
   useEffect(() => {
@@ -183,25 +190,31 @@ export function Grants({
         {grants.length === 0 && <li className="text-sm text-zinc-500">No agents yet.</li>}
         {grants.map((g) => {
           const p = g.policy as { expiresAt: number };
+          const open = expanded.has(g.id);
           return (
-            <li
-              key={g.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800"
-            >
-              <div className="text-sm">
-                <p className="font-mono">{short(g.agent)}</p>
-                <p className="text-xs text-zinc-500">
-                  {describeGrant(g.policy)} · granted {ago(g.createdAt)} ·{" "}
-                  {g.status === "active" ? `expires ${new Date(p.expiresAt * 1000).toLocaleDateString()}` : "revoked"}
-                </p>
+            <li key={g.id} className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm">
+                  <p className="font-mono">{short(g.agent)}</p>
+                  <p className="text-xs text-zinc-500">
+                    {describeGrant(g.policy)} · granted {ago(g.createdAt)} ·{" "}
+                    {g.status === "active" ? `expires ${new Date(p.expiresAt * 1000).toLocaleDateString()}` : "revoked"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" onClick={() => toggle(g.id)}>
+                    {open ? "Hide details" : "Details"}
+                  </Button>
+                  {g.status === "active" ? (
+                    <Button variant="danger" disabled={busy !== null} onClick={() => revoke(g)}>
+                      {busy === g.id ? "Confirm with passkey…" : "Revoke"}
+                    </Button>
+                  ) : (
+                    <span className="text-xs font-medium text-zinc-500">revoked</span>
+                  )}
+                </div>
               </div>
-              {g.status === "active" ? (
-                <Button variant="danger" disabled={busy !== null} onClick={() => revoke(g)}>
-                  {busy === g.id ? "Confirm with passkey…" : "Revoke"}
-                </Button>
-              ) : (
-                <span className="text-xs font-medium text-zinc-500">revoked</span>
-              )}
+              {open && <AgentDetails grant={g} fork={fork} />}
             </li>
           );
         })}

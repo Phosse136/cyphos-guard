@@ -225,14 +225,18 @@ export function openStore(path = ":memory:") {
         const r = one("SELECT * FROM requests WHERE id = ?", id);
         return r ? toRequest(r) : null;
       },
-      list: (account: string, status?: RequestStatus) =>
+      list: (account: string, status?: RequestStatus, limit = 200) =>
         (status
           ? all(
               "SELECT * FROM requests WHERE lower(account) = lower(?) AND status = ? ORDER BY created_at DESC",
               account,
               status,
             )
-          : all("SELECT * FROM requests WHERE lower(account) = lower(?) ORDER BY created_at DESC LIMIT 200", account)
+          : all(
+              "SELECT * FROM requests WHERE lower(account) = lower(?) ORDER BY created_at DESC LIMIT ?",
+              account,
+              limit,
+            )
         ).map(toRequest),
       /** Expire pending/approved requests whose window has passed. Returns the ids it expired. */
       expire: (now: number) => {
@@ -279,10 +283,17 @@ export function openStore(path = ":memory:") {
         all("SELECT * FROM activity WHERE lower(agent) = lower(?) ORDER BY id DESC LIMIT ?", agent, limit).map(
           toActivity,
         ),
-      list: (account: string, limit = 100) =>
-        all("SELECT * FROM activity WHERE lower(account) = lower(?) ORDER BY id DESC LIMIT ?", account, limit).map(
-          toActivity,
-        ),
+      /** Newest first. `beforeId` pages backwards (exclusive). */
+      list: (account: string, limit = 100, beforeId?: number) =>
+        (beforeId !== undefined
+          ? all(
+              "SELECT * FROM activity WHERE lower(account) = lower(?) AND id < ? ORDER BY id DESC LIMIT ?",
+              account,
+              beforeId,
+              limit,
+            )
+          : all("SELECT * FROM activity WHERE lower(account) = lower(?) ORDER BY id DESC LIMIT ?", account, limit)
+        ).map(toActivity),
     },
   };
 }

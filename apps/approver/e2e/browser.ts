@@ -22,7 +22,11 @@ import { baseSepolia } from "viem/chains";
 
 const chain: Chain = baseSepolia;
 const FORK = process.env.FORK_RPC_URL || "http://127.0.0.1:8545";
-const APP = "http://localhost:3000";
+// Ports are configurable so the tests can run next to a developer's own `pnpm dev` (3000 / 8787 / 8545).
+const APP_PORT = Number(process.env.E2E_APP_PORT ?? 3000);
+const SERVICE_PORT = Number(process.env.E2E_SERVICE_PORT ?? 8787);
+const SERVICE = `http://127.0.0.1:${SERVICE_PORT}`;
+const APP = `http://localhost:${APP_PORT}`;
 const SHOTS = process.env.E2E_SCREENSHOTS ?? resolve(import.meta.dirname, "screenshots");
 mkdirSync(SHOTS, { recursive: true });
 
@@ -50,15 +54,25 @@ const service = serve({
       cosigner: privateKeyToAccount(generatePrivateKey()), // approver grants are co-signed by default
     },
   }).fetch,
-  port: 8787,
+  port: SERVICE_PORT,
   hostname: "127.0.0.1",
 });
 
-const next: ChildProcess = spawn("pnpm", ["exec", "next", "start", "--hostname", "localhost", "--port", "3000"], {
-  cwd: resolve(import.meta.dirname, ".."),
-  env: { ...process.env, NETWORK: "fork", NEXT_TELEMETRY_DISABLED: "1" },
-  stdio: "ignore",
-});
+const next: ChildProcess = spawn(
+  "pnpm",
+  ["exec", "next", "start", "--hostname", "localhost", "--port", String(APP_PORT)],
+  {
+    cwd: resolve(import.meta.dirname, ".."),
+    env: {
+      ...process.env,
+      NETWORK: "fork",
+      FORK_RPC_URL: FORK,
+      POLICY_SERVICE_URL: SERVICE,
+      NEXT_TELEMETRY_DISABLED: "1",
+    },
+    stdio: "ignore",
+  },
+);
 const cleanup = () => {
   next.kill();
   service.close();
@@ -120,7 +134,7 @@ try {
 
   const agent = createCyphosGuard({
     accountAddress,
-    policyServiceUrl: "http://127.0.0.1:8787",
+    policyServiceUrl: SERVICE,
     publicClient,
     agent: agentKey,
   });

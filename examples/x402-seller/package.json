@@ -21,6 +21,7 @@
     "@cyphos-guard/sdk": "workspace:*"
   },
   "devDependencies": {
-    "@cyphos-guard/policy-service": "workspace:*"
+    "@cyphos-guard/policy-service": "workspace:*",
+    "@cyphos-guard/contracts": "workspace:*"
   }
 }

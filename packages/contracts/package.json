@@ -5,7 +5,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./generated/CosignerEnforcer.ts"
+    ".": "./generated/CosignerEnforcer.ts",
+    "./x402-vault": "./generated/X402Vault.ts"
   },
   "scripts": {
     "build": "forge build && node scripts/export-artifact.mjs",

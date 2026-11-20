@@ -28,6 +28,12 @@
     }
   },
   "files": {
-    "includes": ["**", "!packages/contracts/lib", "!packages/contracts/out", "!packages/contracts/cache"]
+    "includes": [
+      "**",
+      "!packages/contracts/lib",
+      "!packages/contracts/out",
+      "!packages/contracts/cache",
+      "!packages/contracts/generated"
+    ]
   }
 }

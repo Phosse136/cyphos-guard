@@ -90,6 +90,11 @@ compile to its own delegation keeps "what the owner reads" equal to "what the ch
 | `escalation.*`                                | **off-chain** | SDK + policy-service queue                                                                                         |
 | `forbidden.targets`                           | **off-chain** | never escalated (the on-chain allowlist already excludes them)                                                     |
 
+**Phase 3 update.** All three kinds compile. `erc20Transfer` needs exactly one recipient. `contractCall` `eq` pins need a
+single function and static types. Off-chain checks run in the SDK (`offchainCheck`). They stop a buggy agent, **not a compromised one**:
+an agent holding the signed delegation can redeem directly. Only on-chain rules bind it, until the co-signer enforcer exists.
+One active grant per agent (period counters are per delegation, so overlapping grants would stack caps).
+
 **Invariant:** off-chain checks only ever _narrow_ what the on-chain delegation allows. They can refuse or
 escalate, never widen. If phoswallet's services are down or compromised, the worst case is the on-chain caps.
 

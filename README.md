@@ -2,7 +2,7 @@
 
 **Fireblocks-grade guardrails for AI agents, for indie devs and small teams. Open source, self-serve, cheap.**
 
-> Status: Phase 2 (escalation and approval app). Testnet only (Base Sepolia). Not for real funds.
+> Status: Phase 3 (SDK). Phase 4 (demo agent) next. Testnet only (Base Sepolia). Not for real funds.
 
 AI agents increasingly need to spend money on-chain: pay for APIs, swap, rebalance. Today you either hand the agent
 a private key (full risk) or approve every transaction yourself (and the agent is pointless).
@@ -58,6 +58,21 @@ It's self-checking: it exits non-zero if anything that must be rejected gets thr
 How the pieces fit: [ADR 0003: owner actions without a bundler](docs/decisions/0003-owner-actions-without-bundler.md) ·
 [passkey path (Phase 2)](docs/passkey-path.md)
 
+## Use the SDK (Phase 3)
+
+```ts
+const pw = createPhoswallet({ accountAddress, policyServiceUrl, agent: privateKeyToAccount(AGENT_KEY) });
+try {
+  await pw.execute({ to: shop, value: parseEther("0.0005"), reason: "API usage" }); // within limits: just pays
+} catch (e) {
+  if (e instanceof ApprovalPending)
+    await pw.waitForApproval(e.request.id); // above: owner approves with passkey
+  else if (e instanceof PolicyViolation) console.log("not allowed:", e.reason); // forbidden: never happens
+}
+```
+
+[SDK quickstart and API reference](packages/sdk/README.md) · [policy examples](docs/policy-examples.md)
+
 ## Try the approval app (Phase 2)
 
 ```sh
@@ -77,6 +92,7 @@ Automated checks:
 ```sh
 pnpm e2e            # HTTP-level escalation flow on a fork (software passkey)
 pnpm e2e:browser    # the same through the UI in Chromium with a virtual WebAuthn authenticator
+pnpm test:fork      # SDK integration tests against a Base Sepolia fork
 ```
 
 How it fits together, and what the server can and can't do:

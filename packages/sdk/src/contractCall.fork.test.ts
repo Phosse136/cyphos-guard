@@ -18,7 +18,7 @@ import {
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount, privateKeyToAddress } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { compilePolicy } from "./compile.ts";
 import { encodeRedeem, revertReason } from "./delegations.ts";
 import { deployAccount } from "./owner.ts";
@@ -33,6 +33,7 @@ const OTHER = privateKeyToAddress(generatePrivateKey());
 const owner = privateKeyToAccount(generatePrivateKey());
 const agent = privateKeyToAccount(generatePrivateKey());
 let client: PublicClient;
+let anvil: Awaited<ReturnType<typeof ensureFork>>;
 let delegation: Parameters<typeof encodeRedeem>[0];
 
 const attempt = async (to: `0x${string}`, data: `0x${string}`, value = 0n) => {
@@ -51,7 +52,7 @@ const approve = (spender: `0x${string}`, amount = 10n ** 6n) =>
   encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [spender, amount] });
 
 beforeAll(async () => {
-  await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
+  anvil = await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
   client = createPublicClient({ chain, transport: http(FORK) });
   for (const a of [owner.address, agent.address]) {
     await client.request({ method: "anvil_setBalance" as never, params: [a, toHex(parseEther("1"))] as never });
@@ -82,6 +83,11 @@ beforeAll(async () => {
   const [c] = compilePolicy({ policy, delegator: account.address, environment: env, now });
   if (!c) throw new Error("nothing compiled");
   delegation = { ...c.delegation, signature: await account.signDelegation({ delegation: c.delegation }) };
+});
+
+// vitest workers exit without firing process "exit" hooks, so stop the fork we started explicitly.
+afterAll(() => {
+  anvil?.kill();
 });
 
 describe("contractCall permission on a real contract (fork)", () => {

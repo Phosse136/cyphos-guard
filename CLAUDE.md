@@ -29,6 +29,9 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
 - The approver builds what the passkey signs from the raw fields it displays, client-side. Never sign server-built data.
 - Hybrid passkey `keyId` must be the same string at deploy and sign time (`passkeyKeyId()`).
 - Dev-only endpoints (`/dev/relay`, `/dev/fund`) must stay gated on a real anvil node.
+- Off-chain rules (ERC-20 per-tx, non-eq args) do NOT bind a compromised agent. Never sell them as security; keep critical rules on-chain.
+- Writes must go through the same node as reads (SDK `writeTransport`). Never let a client fall back to a default RPC.
+- One active grant per (account, agent): re-grant = revoke on-chain first.
 - Services bind to localhost. The approver proxies `/api` to the policy service.
 - Flag anything that could put funds at risk, even on testnet.
 
@@ -42,7 +45,7 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
 ## Commands
 
 - `pnpm install` · `pnpm lint` · `pnpm format` · `pnpm typecheck` · `pnpm test` · `pnpm check-secrets`
-- `pnpm poc` (Phase 1) · `pnpm dev` (fork + service + approver) · `pnpm e2e` · `pnpm e2e:browser` · `pnpm --filter @phoswallet/poc spike:passkey`
+- `pnpm poc` (Phase 1) · `pnpm dev` (fork + service + approver) · `pnpm e2e` · `pnpm e2e:browser` · `pnpm test:fork` · `pnpm --filter @phoswallet/poc spike:passkey`
 - Node ≥ 24 (Vitest 5 needs ≥ 22.12), pnpm 12, TypeScript 7, Biome 2, Vitest 5, zod 4, viem 2, Foundry 1.10 (anvil for local forks), gitleaks.
 - Local fork: `anvil --fork-url https://sepolia.base.org` has the MetaMask v1.3.0 contracts and the RIP-7212 precompile (verified).
 

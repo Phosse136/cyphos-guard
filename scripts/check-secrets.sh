@@ -14,7 +14,7 @@ PATTERNS=(
   '["'"'"']([a-z]{3,8} ){11,23}[a-z]{3,8}["'"'"']'                                           # 12-24 word phrase in quotes
 )
 # Markdown may contain explorer tx hashes; lockfiles contain hashes.
-SKIP_RE='(\.md$|pnpm-lock\.yaml$|^scripts/check-secrets\.sh$)'
+SKIP_RE='(\.md$|\.(png|gif|jpe?g|webp|ico|pdf)$|pnpm-lock\.yaml$|^scripts/check-secrets\.sh$)' # images: gitleaks still scans them
 
 if [[ "${1:-}" == "--all" ]]; then
   mapfile -t files < <(git ls-files)

@@ -1,5 +1,5 @@
 /**
- * phoswallet policy schema, v1.
+ * cyphos-guard policy schema, v1.
  *
  * A policy is what an owner grants an agent. It is a *list of permissions*; each permission compiles
  * to exactly one MetaMask delegation (see docs/decisions/0001 + 0002). One-delegation-per-permission
@@ -119,7 +119,7 @@ export const escalationSchema = z.object({
   enabled: z.boolean().default(true),
   /** How long an approval request (and the one-shot delegation it produces) stays valid. */
   approvalTtlSeconds: z.number().int().min(60).max(86_400).default(900),
-  /** Above these amounts phoswallet denies outright and doesn't even ask the owner. */
+  /** Above these amounts cyphos-guard denies outright and doesn't even ask the owner. */
   hardMax: z.array(z.object({ token: tokenSchema, amount: amountSchema })).default([]),
 });
 
@@ -180,7 +180,7 @@ export type Permission = z.output<typeof permissionSchema>;
 
 /**
  * Where each rule is enforced. "onchain" = MetaMask Delegation Framework caveat enforcer (hard floor,
- * holds even if phoswallet is down or compromised). "offchain" = SDK/policy-service check that can
+ * holds even if cyphos-guard is down or compromised). "offchain" = SDK/policy-service check that can
  * only *refuse or escalate*, never widen what's on-chain.
  */
 export const ENFORCEMENT = {

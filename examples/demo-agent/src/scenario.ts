@@ -6,14 +6,14 @@
  *   INV-1043  4.00 USDC  Inference API, annual prepay    → big: above 2 USDC/payment → owner approves with passkey
  *   INV-1044  0.0003 ETH "DataHarvest" dataset access    → forbidden: vendor is on the owner's denylist
  *
- * The agent has no idea which vendor is denylisted: it tries to pay, and phoswallet blocks it.
+ * The agent has no idea which vendor is denylisted: it tries to pay, and cyphos-guard blocks it.
  * Addresses are derived from fixed labels so invoices and the grant match across runs.
  */
-import type { PolicyInput } from "@phoswallet/shared";
+import type { PolicyInput } from "@cyphos-guard/shared";
 import { type Address, keccak256, parseEther, parseUnits, toHex } from "viem";
 import { privateKeyToAddress } from "viem/accounts";
 
-const demoAddress = (label: string): Address => privateKeyToAddress(keccak256(toHex(`phoswallet-demo:${label}`)));
+const demoAddress = (label: string): Address => privateKeyToAddress(keccak256(toHex(`cyphos-guard-demo:${label}`)));
 
 export const USDC: Address = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"; // Circle test USDC, Base Sepolia
 export const VENDORS = {

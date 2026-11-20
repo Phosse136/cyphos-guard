@@ -2,6 +2,8 @@
  * Browser-side wallet logic. Everything that needs the owner's authority happens HERE, signed by the
  * passkey via navigator.credentials.get: the server never sees a key and never constructs what we sign.
  */
+
+import { buildUserOp, createCyphosGuard, userOpToJSON } from "@cyphos-guard/sdk";
 import {
   type Delegation,
   getSmartAccountsEnvironment,
@@ -9,7 +11,6 @@ import {
   type MetaMaskSmartAccount,
   toMetaMaskSmartAccount,
 } from "@metamask/smart-accounts-kit";
-import { buildUserOp, createPhoswallet, userOpToJSON } from "@phoswallet/sdk";
 import {
   type Address,
   type Chain,
@@ -97,7 +98,7 @@ export async function sendOwnerCalls(
 
 /** Owner-side SDK client for the linked account. Session cookie rides along via same-origin /api. */
 export function ownerClient(account: MetaMaskSmartAccount, fork: boolean) {
-  return createPhoswallet({
+  return createCyphosGuard({
     accountAddress: account.address,
     policyServiceUrl: `${window.location.origin}/api`,
     publicClient: publicClient(),

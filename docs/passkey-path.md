@@ -17,7 +17,7 @@ Nothing else in the flow changes when a passkey is added. This is the plan, with
 1. **Register** (approver app, browser): `navigator.credentials.create` via viem `createWebAuthnCredential`
    → public key (x, y) + credential id. RP ID = approver domain.
 2. **Deploy** with `deployParams: [recoveryEoa, [keyId], [x], [y]]`. The EOA is the recovery owner held by the
-   user, never by phoswallet. Alternatively add a passkey to an existing account via `HybridDeleGator.addKey`
+   user, never by cyphos-guard. Alternatively add a passkey to an existing account via `HybridDeleGator.addKey`
    (an owner userOp, ADR 0003).
 3. **Grant / approve**: build the delegation server-side (`compilePolicy`, or a one-shot approval delegation:
    `ExactExecution` + `LimitedCalls(1)` + short `Timestamp`), sign it in the browser with

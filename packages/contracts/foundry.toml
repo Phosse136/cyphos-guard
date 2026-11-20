@@ -1,4 +1,4 @@
-# phoswallet contracts. Compiled with the same compiler settings as MetaMask Delegation Framework v1.3.0
+# cyphos-guard contracts. Compiled with the same compiler settings as MetaMask Delegation Framework v1.3.0
 # (the version deployed on Base Sepolia), so our enforcer plugs into the deployed DelegationManager.
 [profile.default]
 src = "src"

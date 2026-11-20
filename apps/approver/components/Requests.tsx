@@ -1,7 +1,7 @@
 "use client";
 
+import type { ApprovalRequestJSON } from "@cyphos-guard/shared";
 import type { MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
-import type { ApprovalRequestJSON } from "@phoswallet/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { ago, describe, short } from "@/lib/format";
@@ -27,7 +27,7 @@ export function Requests({
     if (!list) return;
     setPending(list);
     // In-app notification: title badge + optional browser notification for new requests.
-    document.title = list.length ? `(${list.length}) phoswallet approver` : "phoswallet approver";
+    document.title = list.length ? `(${list.length}) cyphos-guard approver` : "cyphos-guard approver";
     for (const r of list) {
       if (!seen.current.has(r.id) && seen.current.size > 0 && Notification?.permission === "granted") {
         new Notification("Agent needs approval", { body: describe(r).title });

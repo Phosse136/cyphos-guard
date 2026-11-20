@@ -1,5 +1,5 @@
 {
-  "name": "@phoswallet/approver",
+  "name": "@cyphos-guard/approver",
   "version": "0.0.0",
   "license": "Apache-2.0",
   "private": true,
@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "@metamask/smart-accounts-kit": "2.0.0",
-    "@phoswallet/sdk": "workspace:*",
-    "@phoswallet/shared": "workspace:*",
+    "@cyphos-guard/sdk": "workspace:*",
+    "@cyphos-guard/shared": "workspace:*",
     "@simplewebauthn/browser": "^14.0.0",
     "next": "^16.4.6",
     "react": "^19.3.1",
@@ -29,8 +29,8 @@
     "@types/react-dom": "^19",
     "tailwindcss": "^4.3.5",
     "playwright-core": "1.65.1",
-    "@phoswallet/policy-service": "workspace:*",
+    "@cyphos-guard/policy-service": "workspace:*",
     "@hono/node-server": "^2.1.11",
-    "@phoswallet/demo-agent": "workspace:*"
+    "@cyphos-guard/demo-agent": "workspace:*"
   }
 }

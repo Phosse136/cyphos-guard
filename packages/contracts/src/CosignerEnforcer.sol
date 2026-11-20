@@ -43,7 +43,7 @@ contract CosignerEnforcer is CaveatEnforcer, EIP712 {
         address indexed delegationManager, bytes32 indexed delegationHash, address indexed cosigner, bytes32 digest
     );
 
-    constructor() EIP712("phoswallet CosignerEnforcer", "1") { }
+    constructor() EIP712("cyphos-guard CosignerEnforcer", "1") { }
 
     function beforeHook(
         bytes calldata _terms,

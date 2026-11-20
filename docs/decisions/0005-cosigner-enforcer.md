@@ -23,7 +23,7 @@ in with `cosigner: <address>`; the compiler then adds the caveat to every grant 
 - `args` = `abi.encode(salt, deadline, signature)`, supplied by the agent at redemption. In Delegation Framework v1.3.0
   a caveat's hash covers `(enforcer, terms)` but **not** `args` (`EncoderLib._getCaveatPacketHash`, verified in source).
   So the agent can attach a cosignature without the owner signing again.
-- The cosignature is EIP-712 (domain: `phoswallet CosignerEnforcer` v1, chain id, enforcer address) over
+- The cosignature is EIP-712 (domain: `cyphos-guard CosignerEnforcer` v1, chain id, enforcer address) over
   `Cosign(delegationManager, delegationHash, redeemer, executionHash, salt, deadline)`. It binds the exact call, the
   agent, the delegation, the DelegationManager and the chain.
 - **Single use:** `usedCosignatures[msg.sender][digest]`, keyed by the calling DelegationManager like the framework's own

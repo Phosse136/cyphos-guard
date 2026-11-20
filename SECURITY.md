@@ -1,7 +1,7 @@
 # Security
 
-phoswallet is **experimental and testnet-only**. Do not use it with real funds. It has not been audited. The
-MetaMask Delegation Framework contracts it builds on have been; phoswallet's own `CosignerEnforcer` has not.
+cyphos-guard is **experimental and testnet-only**. Do not use it with real funds. It has not been audited. The
+MetaMask Delegation Framework contracts it builds on have been; cyphos-guard's own `CosignerEnforcer` has not.
 
 ## Reporting a vulnerability
 
@@ -11,14 +11,14 @@ acknowledge within a few days.
 
 ## Threat model in one page
 
-**What protects the owner's funds** (holds even if phoswallet's servers are down or compromised):
+**What protects the owner's funds** (holds even if cyphos-guard's servers are down or compromised):
 
 - **On-chain caveats** on every delegation: recipients/targets, function selectors, `eq` argument pins, per-period
   and per-tx caps, expiry, zero-value defaults. Enforced by the MetaMask Delegation Framework.
 - **One-shot approvals** signed by the owner's passkey: exact call (`ExactExecution`), usable once
   (`LimitedCalls(1)`), short-lived (`Timestamp`). A leaked approval can't be replayed or widened.
 - **Revocation** is an on-chain call from the owner's account (passkey via a bundler, or the recovery EOA). It
-  doesn't need phoswallet.
+  doesn't need cyphos-guard.
 
 **What a compromised policy service could do:** delay or withhold requests and approvals, refuse to escalate,
 show stale activity. **It cannot** move funds, widen a grant, forge an approval (passkey signatures are verified

@@ -1,5 +1,5 @@
 {
-  "name": "@phoswallet/poc",
+  "name": "@cyphos-guard/poc",
   "version": "0.0.0",
   "license": "Apache-2.0",
   "private": true,
@@ -14,10 +14,10 @@
   },
   "dependencies": {
     "@metamask/smart-accounts-kit": "2.0.0",
-    "@phoswallet/sdk": "workspace:*",
-    "@phoswallet/shared": "workspace:*",
+    "@cyphos-guard/sdk": "workspace:*",
+    "@cyphos-guard/shared": "workspace:*",
     "viem": "^2.58.2",
-    "@phoswallet/policy-service": "workspace:*",
+    "@cyphos-guard/policy-service": "workspace:*",
     "@hono/node-server": "^2.1.11"
   }
 }

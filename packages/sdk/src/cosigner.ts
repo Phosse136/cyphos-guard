@@ -6,10 +6,11 @@
  * The enforcer is deployed with the standard CREATE2 deployer, so it has the same address on every chain
  * and fork: anyone can deploy it, nobody owns it.
  */
+
+import { cosignerEnforcerBytecode } from "@cyphos-guard/contracts";
 import type { Delegation } from "@metamask/smart-accounts-kit";
 import { createExecution } from "@metamask/smart-accounts-kit";
 import { encodeSingleExecution, hashDelegation } from "@metamask/smart-accounts-kit/utils";
-import { cosignerEnforcerBytecode } from "@phoswallet/contracts";
 import {
   type Account,
   type Address,
@@ -29,7 +30,7 @@ import type { Execution } from "./delegations.ts";
 
 /** Arachnid's deterministic deployment proxy (present on Base Sepolia, Sepolia and anvil forks of them). */
 export const CREATE2_DEPLOYER: Address = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
-export const COSIGNER_ENFORCER_SALT: Hex = keccak256(toHex("phoswallet:CosignerEnforcer:v1"));
+export const COSIGNER_ENFORCER_SALT: Hex = keccak256(toHex("cyphos-guard:CosignerEnforcer:v1"));
 
 /** Address of the CosignerEnforcer (deterministic: depends only on the compiled bytecode and salt). */
 export const cosignerEnforcerAddress: Address = getContractAddress({
@@ -79,7 +80,7 @@ export function cosignTypedData(r: CosignRequest) {
   );
   return {
     domain: {
-      name: "phoswallet CosignerEnforcer",
+      name: "cyphos-guard CosignerEnforcer",
       version: "1",
       chainId: r.chainId,
       verifyingContract: cosignerEnforcerAddress,

@@ -1,12 +1,12 @@
-# Contributing to phoswallet
+# Contributing to cyphos-guard
 
-Thanks for helping. phoswallet moves (test) money on behalf of AI agents, so the bar is "boring and verifiable".
+Thanks for helping. cyphos-guard moves (test) money on behalf of AI agents, so the bar is "boring and verifiable".
 
 ## Ground rules
 
 - **Testnet only.** Base Sepolia (84532) and Sepolia (11155111). No mainnet chain ids, RPCs or addresses anywhere:
   code, tests, docs examples. The policy schema rejects mainnet ids; keep it that way.
-- **Non-custodial.** phoswallet services never hold a key that can move funds, and off-chain checks may only
+- **Non-custodial.** cyphos-guard services never hold a key that can move funds, and off-chain checks may only
   refuse or escalate, never widen what the on-chain delegation allows.
 - **No secrets in git.** `.env` is ignored; every variable goes in `.env.example`. The pre-commit hook
   (`scripts/check-secrets.sh` + gitleaks) must stay on. Don't use `--no-verify`.
@@ -47,7 +47,7 @@ Fork tests start anvil themselves if nothing listens on `127.0.0.1:8545`.
 
 ## Where things are
 
-`packages/shared` (policy schema, API types) · `packages/sdk` (compiler, `createPhoswallet`, typed errors) ·
+`packages/shared` (policy schema, API types) · `packages/sdk` (compiler, `createCyphosGuard`, typed errors) ·
 `apps/policy-service` (Hono + SQLite) · `apps/approver` (Next.js) · `examples/poc`, `examples/demo-agent` ·
 `docs/decisions` (ADRs).
 

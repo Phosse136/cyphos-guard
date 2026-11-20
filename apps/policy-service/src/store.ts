@@ -12,7 +12,7 @@ import type {
   GrantJSON,
   RequestStatus,
   SignedDelegationJSON,
-} from "@phoswallet/shared";
+} from "@cyphos-guard/shared";
 import type { Address, Hex } from "viem";
 
 export type Owner = {

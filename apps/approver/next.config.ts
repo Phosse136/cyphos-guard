@@ -8,7 +8,7 @@ const rpc =
 
 const config: NextConfig = {
   // Workspace packages ship TypeScript sources.
-  transpilePackages: ["@phoswallet/sdk", "@phoswallet/shared"],
+  transpilePackages: ["@cyphos-guard/sdk", "@cyphos-guard/shared"],
   // Type checking runs via `pnpm typecheck` (tsc), not inside `next build`.
   typescript: { ignoreBuildErrors: true },
   // Same-origin proxying: the session cookie stays first-party and the browser never needs CORS.

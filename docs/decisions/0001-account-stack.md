@@ -5,12 +5,12 @@
 
 ## Context
 
-phoswallet needs a maintained smart-account stack that provides:
+cyphos-guard needs a maintained smart-account stack that provides:
 
 1. A passkey (WebAuthn P-256) owner.
 2. Scoped, revocable permissions for an agent key, with on-chain hard caps: per-tx and **per-period**
    value limits, target/function/argument restrictions, and expiry.
-3. Owner-side revocation that works without phoswallet.
+3. Owner-side revocation that works without cyphos-guard.
 4. Base Sepolia support.
 5. A clean path to an off-chain co-signer that can **block but never move funds**.
 
@@ -97,10 +97,10 @@ Reasons, in order of weight:
 - **ERC-20 per-tx caps have no direct enforcer** (`ERC20TransferAmount` is a lifetime total). The on-chain floor is
   the period cap. The per-tx cap is an off-chain escalation threshold.
 - **"Forbidden" means forbidden for the agent.** The owner is sovereign and can sign anything with their passkey.
-  phoswallet won't route a forbidden action into an approval request, but it can't stop the owner. This is
+  cyphos-guard won't route a forbidden action into an approval request, but it can't stop the owner. This is
   intended (non-custodial).
 - **Passkeys are bound to an RP ID (domain).** Losing the approver domain makes the passkey unusable for signing
-  through our app. Mitigation: Hybrid's EOA owner is the recovery key, held by the user and never by phoswallet.
+  through our app. Mitigation: Hybrid's EOA owner is the recovery key, held by the user and never by cyphos-guard.
 - The delegator account must be **deployed** before redemption. The PoC deploys it explicitly.
 
 ## Open risks to retire with spikes

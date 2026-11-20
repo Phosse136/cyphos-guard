@@ -1,18 +1,17 @@
 /**
- * The phoswallet SDK entry point.
+ * The cyphos-guard SDK entry point.
  *
- *   const pw = createPhoswallet({ accountAddress, policyServiceUrl, agent })   // agent side
+ *   const pw = createCyphosGuard({ accountAddress, policyServiceUrl, agent })   // agent side
  *   const result = await pw.execute({ to, value, reason })                     // auto-escalates
  *
- *   const pw = createPhoswallet({ accountAddress, policyServiceUrl, owner })   // owner side (approver app)
+ *   const pw = createCyphosGuard({ accountAddress, policyServiceUrl, owner })   // owner side (approver app)
  *   const grant = await pw.grantAgent({ policy })
  *   await pw.revoke(grant.id)
  *
  * Agent methods need `agent` (the agent's local key). Owner methods need `owner`: the owner's smart
  * account (passkey signer) plus a way to submit owner userOps, and a fetch that carries the session cookie.
  */
-import type { Delegation, MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
-import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
+
 import {
   type ActivityJSON,
   AGENT_HEADERS,
@@ -25,7 +24,9 @@ import {
   parsePolicy,
   type RequestStatus,
   SUPPORTED_CHAIN_IDS,
-} from "@phoswallet/shared";
+} from "@cyphos-guard/shared";
+import type { Delegation, MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
+import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
 import {
   type Address,
   type Chain,
@@ -67,7 +68,7 @@ export type OwnerConfig = {
   fetch?: typeof fetch;
 };
 
-export type PhoswalletOptions = {
+export type CyphosGuardOptions = {
   /**
    * The owner's smart account. Optional: owner clients use `owner.account.address`; agent clients
    * resolve it from their (single) active grant, so an agent only needs its key and the service URL.
@@ -99,10 +100,10 @@ export type ExecutionResult = {
   requestId?: string;
 };
 
-export function createPhoswallet(opts: PhoswalletOptions) {
+export function createCyphosGuard(opts: CyphosGuardOptions) {
   const chain: Chain = opts.chain ?? baseSepolia;
   if (chain.id !== SUPPORTED_CHAIN_IDS.baseSepolia && chain.id !== SUPPORTED_CHAIN_IDS.sepolia) {
-    throw new Error(`chain ${chain.id} is not supported; phoswallet is testnet-only (Base Sepolia, Sepolia)`);
+    throw new Error(`chain ${chain.id} is not supported; cyphos-guard is testnet-only (Base Sepolia, Sepolia)`);
   }
   const chainId = chain.id === sepolia.id ? sepolia.id : baseSepolia.id;
   const environment = getSmartAccountsEnvironment(chainId);
@@ -407,4 +408,4 @@ function jsonSafe(v: unknown): unknown {
   return JSON.parse(JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? x.toString() : x)));
 }
 
-export type Phoswallet = ReturnType<typeof createPhoswallet>;
+export type CyphosGuard = ReturnType<typeof createCyphosGuard>;

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ActivityJSON } from "@phoswallet/shared";
+import type { ActivityJSON } from "@cyphos-guard/shared";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { ago, describe, explorer, short } from "@/lib/format";

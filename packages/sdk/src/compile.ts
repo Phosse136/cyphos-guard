@@ -6,6 +6,8 @@
  * Anything that can't be expressed on-chain exactly is either rejected here (CompileError) or left to
  * the off-chain pre-check (offchainCheck), never silently dropped.
  */
+
+import type { Permission, Policy } from "@cyphos-guard/shared";
 import {
   type Caveats,
   createDelegation,
@@ -13,7 +15,6 @@ import {
   ScopeType,
   type SmartAccountsEnvironment,
 } from "@metamask/smart-accounts-kit";
-import type { Permission, Policy } from "@phoswallet/shared";
 import {
   type AbiFunction,
   type Address,

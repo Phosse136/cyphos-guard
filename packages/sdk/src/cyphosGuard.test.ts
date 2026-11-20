@@ -2,6 +2,7 @@ import type { PublicClient } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { mainnet } from "viem/chains";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createCyphosGuard } from "./cyphosGuard.ts";
 import {
   ApprovalExpired,
   ApprovalPending,
@@ -10,7 +11,6 @@ import {
   PolicyServiceError,
   PolicyViolation,
 } from "./errors.ts";
-import { createPhoswallet } from "./phoswallet.ts";
 
 const ACCOUNT = "0x4444444444444444444444444444444444444444";
 const SHOP = "0x2222222222222222222222222222222222222222";
@@ -41,7 +41,7 @@ function mockFetch(handler: (url: string, init: RequestInit) => { status: number
   return fn;
 }
 const agentPw = () =>
-  createPhoswallet({
+  createCyphosGuard({
     accountAddress: ACCOUNT,
     policyServiceUrl: "http://svc",
     publicClient: fakeClient,
@@ -51,11 +51,11 @@ const agentPw = () =>
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("createPhoswallet", () => {
+describe("createCyphosGuard", () => {
   it("refuses mainnet", () => {
-    expect(() => createPhoswallet({ accountAddress: ACCOUNT, policyServiceUrl: "http://svc", chain: mainnet })).toThrow(
-      /testnet-only/,
-    );
+    expect(() =>
+      createCyphosGuard({ accountAddress: ACCOUNT, policyServiceUrl: "http://svc", chain: mainnet }),
+    ).toThrow(/testnet-only/);
   });
 
   it("signs agent requests (headers present, fresh nonce per request)", async () => {
@@ -63,7 +63,7 @@ describe("createPhoswallet", () => {
     const pw = agentPw();
     await pw.getGrants();
     await pw.getGrants();
-    const nonces = f.mock.calls.map((c) => (c[1]?.headers as Record<string, string> | undefined)?.["x-phos-nonce"]);
+    const nonces = f.mock.calls.map((c) => (c[1]?.headers as Record<string, string> | undefined)?.["x-cyphos-nonce"]);
     expect(nonces[0]).toMatch(/^[0-9a-f]{32}$/);
     expect(nonces[0]).not.toBe(nonces[1]);
   });

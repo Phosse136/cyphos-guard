@@ -1,5 +1,5 @@
 /**
- * phoswallet Phase 1 PoC: scoped, revocable agent permissions on a MetaMask Hybrid smart account.
+ * cyphos-guard Phase 1 PoC: scoped, revocable agent permissions on a MetaMask Hybrid smart account.
  *
  *   NETWORK=fork (default)  local anvil fork of Base Sepolia, spawned automatically, no faucet needed
  *   NETWORK=live            real Base Sepolia; the owner EOA needs ~0.003 test ETH
@@ -7,9 +7,16 @@
  * The script is self-checking: if any step that must be rejected goes through, it exits non-zero.
  */
 import { type ChildProcess, spawn } from "node:child_process";
+import {
+  compilePolicy,
+  deployAccount,
+  encodeRedeem,
+  executeAsOwner,
+  revertReason,
+  revokeCall,
+} from "@cyphos-guard/sdk";
+import { parsePolicy } from "@cyphos-guard/shared";
 import { getSmartAccountsEnvironment, Implementation, toMetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
-import { compilePolicy, deployAccount, encodeRedeem, executeAsOwner, revertReason, revokeCall } from "@phoswallet/sdk";
-import { parsePolicy } from "@phoswallet/shared";
 import {
   type Address,
   type Chain,
@@ -95,7 +102,7 @@ async function main() {
   const agentWallet = createWalletClient({ account: agent, chain, transport: http(RPC) });
   const environment = getSmartAccountsEnvironment(baseSepolia.id);
 
-  console.log(`phoswallet PoC on ${NETWORK === "fork" ? "a local fork of" : ""} Base Sepolia (${RPC})`);
+  console.log(`cyphos-guard PoC on ${NETWORK === "fork" ? "a local fork of" : ""} Base Sepolia (${RPC})`);
   info(`owner EOA   ${owner.address}`);
   info(`agent EOA   ${agent.address}`);
   info(`shop        ${shop}  (allowed recipient)`);
@@ -125,7 +132,7 @@ async function main() {
     client: publicClient,
     implementation: Implementation.Hybrid,
     deployParams: [owner.address, [], [], []],
-    deploySalt: keccak256(toHex("phoswallet-poc-v1")),
+    deploySalt: keccak256(toHex("cyphos-guard-poc-v1")),
     signer: { account: owner },
   });
   const deployHash = await deployAccount(account, ownerWallet, publicClient);
@@ -247,7 +254,7 @@ async function main() {
     info(`shop balance: ${await shopBalance()} ETH`);
   }
 
-  // 4. Revoke. Owner-only, on-chain, works without phoswallet.
+  // 4. Revoke. Owner-only, on-chain, works without cyphos-guard.
   step("4. Owner revokes the grant (DelegationManager.disableDelegation via the smart account)");
   const revokeHash = await executeAsOwner(account, ownerWallet, publicClient, [revokeCall(environment, delegation)]);
   ok(`revoked  tx ${link(revokeHash)}`);

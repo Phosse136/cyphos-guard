@@ -1,26 +1,27 @@
 /**
  * End-to-end on a local fork through the public SDK: a passkey-only owner and an agent, both using
- * createPhoswallet(), talking to the real policy service. Exercises all three layers, the typed errors,
+ * createCyphosGuard(), talking to the real policy service. Exercises all three layers, the typed errors,
  * ERC-20 (real Base Sepolia test USDC) and grant replacement.
  */
-import { serve } from "@hono/node-server";
-import { Implementation, toMetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
-import { createApp } from "@phoswallet/policy-service/app";
-import { createChainAdapter } from "@phoswallet/policy-service/chain";
-import { openStore } from "@phoswallet/policy-service/store";
-import { registrationResponse } from "@phoswallet/policy-service/testing";
+
+import { createApp } from "@cyphos-guard/policy-service/app";
+import { createChainAdapter } from "@cyphos-guard/policy-service/chain";
+import { openStore } from "@cyphos-guard/policy-service/store";
+import { registrationResponse } from "@cyphos-guard/policy-service/testing";
 import {
   ApprovalPending,
   ApprovalRejected,
   buildUserOp,
-  createPhoswallet,
+  createCyphosGuard,
   encodeRedeem,
   PolicyViolation,
   revertReason,
   userOpToJSON,
-} from "@phoswallet/sdk";
-import { createSoftPasskey, ensureFork, fundUsdc, USDC } from "@phoswallet/sdk/testing";
-import type { PolicyInput } from "@phoswallet/shared";
+} from "@cyphos-guard/sdk";
+import { createSoftPasskey, ensureFork, fundUsdc, USDC } from "@cyphos-guard/sdk/testing";
+import type { PolicyInput } from "@cyphos-guard/shared";
+import { serve } from "@hono/node-server";
+import { Implementation, toMetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
 import {
   type Address,
   type Chain,
@@ -53,7 +54,7 @@ const app = createApp({
   chain: adapter,
   config: {
     rpId: "localhost",
-    rpName: "phoswallet",
+    rpName: "cyphos-guard",
     origins: [ORIGIN],
     sessionTtlSeconds: 3600,
     secureCookies: false,
@@ -134,7 +135,7 @@ const linked = await ownerFetch(`${SERVICE}/me/account`, {
 });
 check("passkey-only account deployed, funded (ETH + test USDC) and linked", linked.status === 200, account.address);
 
-const owner = createPhoswallet({
+const owner = createCyphosGuard({
   accountAddress: account.address,
   policyServiceUrl: SERVICE,
   publicClient,
@@ -171,7 +172,7 @@ const policy = (dailyEth: string): PolicyInput => ({
 const grant = await owner.grantAgent({ policy: policy("0.001") });
 check("grant registered (2 passkey-signed delegations, no gas)", grant.delegations.length === 2);
 
-const agent = createPhoswallet({
+const agent = createCyphosGuard({
   accountAddress: account.address,
   policyServiceUrl: SERVICE,
   publicClient,

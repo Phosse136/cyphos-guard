@@ -1,5 +1,5 @@
 {
-  "name": "@phoswallet/policy-service",
+  "name": "@cyphos-guard/policy-service",
   "version": "0.0.0",
   "license": "Apache-2.0",
   "private": true,
@@ -12,8 +12,8 @@
   "dependencies": {
     "@hono/node-server": "^2.1.11",
     "@metamask/smart-accounts-kit": "2.0.0",
-    "@phoswallet/sdk": "workspace:*",
-    "@phoswallet/shared": "workspace:*",
+    "@cyphos-guard/sdk": "workspace:*",
+    "@cyphos-guard/shared": "workspace:*",
     "@simplewebauthn/server": "^14.1.0",
     "hono": "^4.13.19",
     "viem": "^2.58.2",

@@ -1,4 +1,4 @@
-import type { ActivityJSON, ApprovalRequestJSON, GrantJSON } from "@phoswallet/shared";
+import type { ActivityJSON, ApprovalRequestJSON, GrantJSON } from "@cyphos-guard/shared";
 import type { Address, Hex } from "viem";
 
 export type Me = {

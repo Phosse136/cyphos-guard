@@ -3,7 +3,7 @@
  * (`pnpm dev`) and your grant. You approve the big invoice in the approver app with your passkey.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import { createPhoswallet, PolicyViolation } from "@phoswallet/sdk";
+import { createCyphosGuard, PolicyViolation } from "@cyphos-guard/sdk";
 import { type Chain, createPublicClient, http, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
@@ -29,7 +29,7 @@ const rpcUrl = live
   : (process.env.FORK_RPC_URL ?? "http://127.0.0.1:8545");
 const chain: Chain = baseSepolia;
 const publicClient: PublicClient = createPublicClient({ chain, transport: http(rpcUrl) });
-const pw = createPhoswallet({
+const pw = createCyphosGuard({
   policyServiceUrl: process.env.POLICY_SERVICE_URL ?? `http://127.0.0.1:${process.env.POLICY_SERVICE_PORT ?? 8787}`,
   publicClient,
   agent: privateKeyToAccount(key),

@@ -3,8 +3,8 @@
  * sends via @simplewebauthn/browser), plus an agent-signed fetch. Used by unit tests and e2e scripts.
  */
 import { createHash } from "node:crypto";
-import type { SoftPasskey } from "@phoswallet/sdk/testing";
-import { AGENT_HEADERS, agentAuthMessage } from "@phoswallet/shared";
+import type { SoftPasskey } from "@cyphos-guard/sdk/testing";
+import { AGENT_HEADERS, agentAuthMessage } from "@cyphos-guard/shared";
 import { isoCBOR } from "@simplewebauthn/server/helpers";
 import type { LocalAccount } from "viem";
 

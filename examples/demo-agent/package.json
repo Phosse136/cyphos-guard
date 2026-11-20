@@ -1,5 +1,5 @@
 {
-  "name": "@phoswallet/demo-agent",
+  "name": "@cyphos-guard/demo-agent",
   "version": "0.0.0",
   "license": "Apache-2.0",
   "private": true,
@@ -12,11 +12,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.11.0",
-    "@phoswallet/sdk": "workspace:*",
-    "@phoswallet/shared": "workspace:*",
+    "@cyphos-guard/sdk": "workspace:*",
+    "@cyphos-guard/shared": "workspace:*",
     "viem": "^2.58.2",
     "zod": "^4.6.7",
-    "@phoswallet/policy-service": "workspace:*",
+    "@cyphos-guard/policy-service": "workspace:*",
     "@hono/node-server": "^2.1.11",
     "@metamask/smart-accounts-kit": "2.0.0"
   },

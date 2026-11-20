@@ -1,11 +1,11 @@
-# phoswallet
+# cyphos-guard
 
 **Guardrails and human approval for AI agents that spend crypto. Open source, self-hosted, testnet-first.**
 
 Give an agent a budget it can't exceed, get a passkey prompt when it wants more, and make some things impossible.
 All of it is enforced by your smart account, not by a server you have to trust.
 
-![phoswallet demo: grant an agent, approve a big payment with a passkey, see a forbidden payment blocked](docs/assets/demo.gif)
+![cyphos-guard demo: grant an agent, approve a big payment with a passkey, see a forbidden payment blocked](docs/assets/demo.gif)
 
 > **Status:** working MVP on Base Sepolia (and local forks of it). **Testnet only. Not audited. Do not use with real funds.**
 
@@ -53,7 +53,7 @@ is a real transaction that the chain reverted; Basescan shows which caveat enfor
 | Owner revokes the grant                           | ✔ executed                                                     | [tx](https://sepolia.basescan.org/tx/0x4005499051f8fd8977a3ba6c511ed4c3ca387ae6fc3e7fbcaeacfe822ccb17e2)                                                                                                     |
 | Agent tries again after revocation                | ✘ `CannotUseADisabledDelegation()`                             | [reverted](https://sepolia.basescan.org/tx/0x3539b22250cf502d8f21a4840f770d6548a51723cf67bbbe2ef1b7abb4875125)                                                                                               |
 
-phoswallet's own **CosignerEnforcer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)) is deployed on Base Sepolia at
+cyphos-guard's own **CosignerEnforcer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)) is deployed on Base Sepolia at
 [`0xDe95AB1D116AbF913584b6D3Bebf659D0CFfEA95`](https://sepolia.basescan.org/address/0xDe95AB1D116AbF913584b6D3Bebf659D0CFfEA95)
 ([deploy tx](https://sepolia.basescan.org/tx/0x5ecd05ae046c75f422020e544aa8bbf9d9e8b154c55cd3c425bdcbdf1885c531)). It has the same address on every
 chain, no owner and no upgrade path.
@@ -65,9 +65,9 @@ invoice, and was blocked when it tried to pay the denylisted vendor. On-chain ba
 ## Use it from your agent
 
 ```ts
-import { createPhoswallet, ApprovalPending, PolicyViolation } from "@phoswallet/sdk";
+import { createCyphosGuard, ApprovalPending, PolicyViolation } from "@cyphos-guard/sdk";
 
-const pw = createPhoswallet({ policyServiceUrl, agent: privateKeyToAccount(AGENT_KEY) });
+const pw = createCyphosGuard({ policyServiceUrl, agent: privateKeyToAccount(AGENT_KEY) });
 
 try {
   const { txHash } = await pw.execute({ to: vendor, value: parseEther("0.0005"), reason: "GPU credits" });
@@ -90,7 +90,7 @@ flowchart LR
     A["Approver app<br/>passkey (WebAuthn)"]
   end
   subgraph Agent["Agent process"]
-    G["AI agent + @phoswallet/sdk<br/>own EOA key"]
+    G["AI agent + @cyphos-guard/sdk<br/>own EOA key"]
   end
   subgraph PS["policy-service (self-hosted)"]
     Q["approval queue · grants · activity<br/>holds no keys"]
@@ -121,7 +121,7 @@ flowchart LR
   that call, usable once, valid for minutes. It can't be replayed or widened.
 - **Hybrid enforcement.** Hard caps live on-chain. The policy service only refuses or escalates: it holds no key that
   can move funds, can't widen a grant, and isn't needed to revoke.
-- **Optional co-signer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)). phoswallet's own `CosignerEnforcer` makes
+- **Optional co-signer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)). cyphos-guard's own `CosignerEnforcer` makes
   the rules the chain can't express (ERC-20 per-payment caps, range checks) binding: each redemption needs a fresh
   co-signature for that exact call, and the service only co-signs within policy. The co-signer can only block.
 
@@ -135,12 +135,12 @@ Design records: [account stack](docs/decisions/0001-account-stack.md) ·
 | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | ![Pending approval: Pay 4 USDC, with the agent's reason](docs/assets/demo-2-pending-approval.png) | ![Activity: paid within limits, approved, blocked by policy](docs/assets/demo-3-activity.png) |
 
-## Why phoswallet
+## Why cyphos-guard
 
-phoswallet builds on the same primitive as MetaMask's Advanced Permissions, the Delegation Framework, and adds
+cyphos-guard builds on the same primitive as MetaMask's Advanced Permissions, the Delegation Framework, and adds
 the parts an agent operator needs around it.
 
-|                         | **phoswallet**                                                                           | **MetaMask Advanced Permissions** (ERC-7715)                                     | **Fireblocks Agent Wallets**                                                  |
+|                         | **cyphos-guard**                                                                         | **MetaMask Advanced Permissions** (ERC-7715)                                     | **Fireblocks Agent Wallets**                                                  |
 | ----------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Built for               | Indie devs and small teams running their own agents                                      | Dapps and agents requesting permissions from MetaMask users                      | Fintechs and payment providers issuing wallets to their end users             |
 | Owner's side            | A browser and a passkey                                                                  | MetaMask extension (v13.23+) and an account upgraded to a MetaMask smart account | Wallets issued by the fintech on the Fireblocks platform (powered by Dynamic) |
@@ -169,7 +169,7 @@ corrections welcome).
 - Live Base Sepolia guide (faucets, bundler, explorer links end to end).
 - Several ERC-20 recipients per permission (`LogicalOrWrapperEnforcer`), batch approvals, web push notifications.
 - Gasless revoke through a paymaster, plus a pinned or IPFS approver build so you don't have to trust a host.
-- MCP server so any MCP-capable agent can use phoswallet tools.
+- MCP server so any MCP-capable agent can use cyphos-guard tools.
 
 **Smart rules**
 
@@ -189,7 +189,7 @@ corrections welcome).
 apps/approver         Next.js owner app: passkey login, approvals, grants, revoke, activity
 apps/policy-service   approval queue · grant registry · activity (Hono + node:sqlite), holds no keys
 packages/contracts    CosignerEnforcer (Foundry, on Delegation Framework v1.3.0 as submodule)
-packages/sdk          @phoswallet/sdk: createPhoswallet, policy compiler, co-signer, typed errors
+packages/sdk          @cyphos-guard/sdk: createCyphosGuard, policy compiler, co-signer, typed errors
 packages/shared       policy schema (zod), API types, escalation and off-chain checks
 examples/poc          Phase 1 proof of concept + passkey spike + e2e escalation flow
 examples/demo-agent   Claude accounts-payable agent (Messages API tool runner)

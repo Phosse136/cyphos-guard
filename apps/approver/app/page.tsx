@@ -35,7 +35,7 @@ export default function Home() {
     <main className="mx-auto max-w-3xl space-y-5 px-4 py-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">phoswallet</h1>
+          <h1 className="text-xl font-bold">cyphos-guard</h1>
           <p className="text-sm text-zinc-500">
             Guardrails for your AI agents · Base Sepolia{me?.fork ? " (local fork)" : ""} · testnet only
           </p>

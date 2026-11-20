@@ -2,13 +2,7 @@
  * Everything the policy service needs from the chain, behind one interface (mocked in unit tests).
  * The service never trusts client claims about on-chain state; it reads the chain itself.
  */
-import {
-  type Delegation,
-  getSmartAccountsEnvironment,
-  type SmartAccountsEnvironment,
-} from "@metamask/smart-accounts-kit";
-import { DelegationManager, HybridDeleGator } from "@metamask/smart-accounts-kit/contracts";
-import { decodeDelegations, hashDelegation } from "@metamask/smart-accounts-kit/utils";
+
 import {
   cosignerEnforcerAddress,
   deployCosignerEnforcer,
@@ -18,8 +12,15 @@ import {
   submitUserOp,
   type UserOpJSON,
   userOpFromJSON,
-} from "@phoswallet/sdk";
-import { fundUsdc } from "@phoswallet/sdk/testing";
+} from "@cyphos-guard/sdk";
+import { fundUsdc } from "@cyphos-guard/sdk/testing";
+import {
+  type Delegation,
+  getSmartAccountsEnvironment,
+  type SmartAccountsEnvironment,
+} from "@metamask/smart-accounts-kit";
+import { DelegationManager, HybridDeleGator } from "@metamask/smart-accounts-kit/contracts";
+import { decodeDelegations, hashDelegation } from "@metamask/smart-accounts-kit/utils";
 import {
   type Address,
   type Chain,
@@ -76,7 +77,7 @@ export async function createChainAdapter(opts: { rpcUrl: string; network: "fork"
   const client: PublicClient = createPublicClient({ chain, transport: http(opts.rpcUrl) });
   const chainId = await client.getChainId();
   if (chainId !== baseSepolia.id)
-    throw new Error(`RPC is chain ${chainId}; phoswallet only runs on Base Sepolia (84532)`);
+    throw new Error(`RPC is chain ${chainId}; cyphos-guard only runs on Base Sepolia (84532)`);
   const environment = getSmartAccountsEnvironment(chainId);
 
   let isFork = false;

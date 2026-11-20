@@ -13,7 +13,7 @@ a userOp. ADR 0001 assumed a hosted bundler (Pimlico) for these owner-side actio
 During Phase 1 we found that:
 
 - A hosted bundler can't see a local anvil fork. We'd need two code paths, or a bundler running locally.
-- "The owner can always revoke without phoswallet" shouldn't depend on any third-party service either.
+- "The owner can always revoke without cyphos-guard" shouldn't depend on any third-party service either.
 - **AA21 didn't pay prefund**: on the first fork run, revocation failed because the smart account's
   balance was too low to prefund gas. An owner must be able to revoke even when the account is empty.
 

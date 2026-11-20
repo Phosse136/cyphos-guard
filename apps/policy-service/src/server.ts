@@ -28,7 +28,7 @@ const app = createApp({
   chain,
   config: {
     rpId: process.env.WEBAUTHN_RP_ID ?? new URL(origin).hostname,
-    rpName: "phoswallet",
+    rpName: "cyphos-guard",
     origins: [origin],
     sessionTtlSeconds: 8 * 3600,
     secureCookies: origin.startsWith("https://"),

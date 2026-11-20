@@ -5,7 +5,7 @@
  *   c) sign a userOp (revoke) that the EntryPoint accepts?
  * Runs on a local fork with a software authenticator (same bytes a real authenticator produces).
  */
-import { getSmartAccountsEnvironment, Implementation, toMetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
+
 import {
   buildApprovalDelegation,
   deployAccount,
@@ -13,8 +13,9 @@ import {
   executeAsOwner,
   revertReason,
   revokeCall,
-} from "@phoswallet/sdk";
-import { createSoftPasskey, ensureFork } from "@phoswallet/sdk/testing";
+} from "@cyphos-guard/sdk";
+import { createSoftPasskey, ensureFork } from "@cyphos-guard/sdk/testing";
+import { getSmartAccountsEnvironment, Implementation, toMetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
 import {
   type Chain,
   createPublicClient,

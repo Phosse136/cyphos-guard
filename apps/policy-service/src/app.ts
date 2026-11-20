@@ -1,5 +1,5 @@
 /**
- * phoswallet policy service: approval queue + grant registry + activity log.
+ * cyphos-guard policy service: approval queue + grant registry + activity log.
  *
  * Trust model (see docs/decisions/0004-approval-flow.md):
  * - Holds no keys that can move funds. Approvals are signed by the owner's passkey in the browser;
@@ -8,7 +8,6 @@
  * - The owner authenticates with a passkey (WebAuthn), getting an HttpOnly session cookie.
  */
 import { createHash, randomBytes } from "node:crypto";
-import type { Delegation } from "@metamask/smart-accounts-kit";
 import {
   checkApprovalDelegation,
   cosignerEnforcerAddress,
@@ -16,7 +15,7 @@ import {
   delegationCosigner,
   passkeyKeyId,
   type UserOpJSON,
-} from "@phoswallet/sdk";
+} from "@cyphos-guard/sdk";
 import {
   AGENT_AUTH_MAX_SKEW_SECONDS,
   AGENT_HEADERS,
@@ -29,7 +28,8 @@ import {
   parsePolicy,
   policySchema,
   requestStatusSchema,
-} from "@phoswallet/shared";
+} from "@cyphos-guard/shared";
+import type { Delegation } from "@metamask/smart-accounts-kit";
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -61,7 +61,7 @@ export type AppConfig = {
 
 type Env = { Variables: { owner: Owner; agent: Address; body: unknown } };
 
-const SESSION_COOKIE = "phos_session";
+const SESSION_COOKIE = "cyphos_session";
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 const nowS = () => Math.floor(Date.now() / 1000);
 

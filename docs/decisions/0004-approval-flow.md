@@ -52,7 +52,7 @@ sign another. Mitigation for now: self-host. Later: a pinned/IPFS build or a wal
   32-byte tokens, stored hashed, in an HttpOnly + SameSite=Strict cookie. The approver proxies `/api` so the cookie is
   first-party. When linking a smart account, the service checks **on-chain** that the account has this passkey as a
   signer (`HybridDeleGator.getKey`).
-- **Agent:** every request carries `x-phos-agent/timestamp/nonce/signature`: EIP-191 over
+- **Agent:** every request carries `x-cyphos-agent/timestamp/nonce/signature`: EIP-191 over
   `method, path, timestamp, nonce, sha256(body)`, a ±5 min window, and signatures remembered against replay. The nonce
   exists because ECDSA is deterministic: identical requests in the same second would otherwise collide.
 - `no_grant` denials are not written to the named account's activity log. Otherwise any agent could spam any owner.

@@ -3,8 +3,9 @@
  * The agent may only call approve(spender = ROUTER, amount): other spenders, other functions and
  * attached ETH must be rejected ON-CHAIN (not just by the SDK).
  */
+
+import { parsePolicy } from "@cyphos-guard/shared";
 import { getSmartAccountsEnvironment, Implementation, toMetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
-import { parsePolicy } from "@phoswallet/shared";
 import {
   type Chain,
   createPublicClient,

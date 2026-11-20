@@ -4,18 +4,18 @@
  *   terminal: `demo:agent` (here with --fake-model: scripted Messages API, not Claude)
  *   approver: INV-1043 appears → click Approve (virtual WebAuthn authenticator)
  *   verify: vendor balances on-chain; transcript + screenshots saved for the docs / video.
- * Requires `pnpm --filter @phoswallet/approver build` first.
+ * Requires `pnpm --filter @cyphos-guard/approver build` first.
  */
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
+import { prefillLink } from "@cyphos-guard/demo-agent/setup";
+import { createApp } from "@cyphos-guard/policy-service/app";
+import { createChainAdapter } from "@cyphos-guard/policy-service/chain";
+import { openStore } from "@cyphos-guard/policy-service/store";
+import { ensureFork } from "@cyphos-guard/sdk/testing";
 import { serve } from "@hono/node-server";
-import { prefillLink } from "@phoswallet/demo-agent/setup";
-import { createApp } from "@phoswallet/policy-service/app";
-import { createChainAdapter } from "@phoswallet/policy-service/chain";
-import { openStore } from "@phoswallet/policy-service/store";
-import { ensureFork } from "@phoswallet/sdk/testing";
 import { chromium } from "playwright-core";
 import {
   type Address,
@@ -54,7 +54,7 @@ const service = serve({
     chain: adapter,
     config: {
       rpId: "localhost",
-      rpName: "phoswallet",
+      rpName: "cyphos-guard",
       origins: [APP],
       sessionTtlSeconds: 3600,
       secureCookies: false,
@@ -180,7 +180,7 @@ try {
   console.log("▸ on-chain verification");
   const usdcOf = (a: Address) =>
     publicClient.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [a] });
-  const { VENDORS } = await import("@phoswallet/demo-agent/scenario");
+  const { VENDORS } = await import("@cyphos-guard/demo-agent/scenario");
   check("Inference API got 1.20 + 4.00 USDC", (await usdcOf(VENDORS.inferenceApi)) === parseUnits("5.2", 6));
   check(
     "GPU market got 0.0005 ETH",

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Records the interactive demo in Chromium (scripted model, virtual passkey) and turns it into
-# docs/assets/demo.gif. Needs ffmpeg and a prior `pnpm --filter @phoswallet/approver build`.
+# docs/assets/demo.gif. Needs ffmpeg and a prior `pnpm --filter @cyphos-guard/approver build`.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-E2E_VIDEO_DIR="$work" E2E_SCREENSHOTS="$root/docs/assets" pnpm --dir "$root" --filter @phoswallet/approver e2e:demo
+E2E_VIDEO_DIR="$work" E2E_SCREENSHOTS="$root/docs/assets" pnpm --dir "$root" --filter @cyphos-guard/approver e2e:demo
 video="$(ls "$work"/*.webm | head -1)"
 # 2x speed, 8 fps, 760 px wide, palette-optimised GIF
 ffmpeg -loglevel error -y -i "$video" -vf "setpts=0.5*PTS,fps=8,scale=760:-1:flags=lanczos,palettegen=stats_mode=diff" "$work/palette.png"

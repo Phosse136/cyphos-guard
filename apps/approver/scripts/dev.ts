@@ -5,7 +5,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { ensureFork } from "@phoswallet/sdk/testing";
+import { ensureFork } from "@cyphos-guard/sdk/testing";
 import { generatePrivateKey } from "viem/accounts";
 
 const network = process.env.NETWORK ?? "fork";

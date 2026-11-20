@@ -66,7 +66,7 @@ export function Onboarding({ me, onChange }: { me: Me; onChange: () => void }) {
   return (
     <Card title="Create your smart account">
       <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-        A MetaMask Hybrid smart account on Base Sepolia, owned by your passkey. phoswallet never holds a key to it.
+        A MetaMask Hybrid smart account on Base Sepolia, owned by your passkey. cyphos-guard never holds a key to it.
       </p>
       <Field
         label="Recovery address (recommended)"

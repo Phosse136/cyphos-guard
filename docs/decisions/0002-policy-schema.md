@@ -68,7 +68,7 @@ compile to its own delegation keeps "what the owner reads" equal to "what the ch
    goes to the queue. On approval, the owner's passkey signs a **one-shot delegation** (`ExactExecution` +
    `LimitedCalls(1)` + `Timestamp(now + approvalTtlSeconds)`). The agent redeems it.
 3. **Forbidden**: the action touches `forbidden.targets` or exceeds `hardMax` → denied. On-chain, the agent can't
-   reach anything outside its allowlists anyway. Off-chain, phoswallet refuses to create an approval request.
+   reach anything outside its allowlists anyway. Off-chain, cyphos-guard refuses to create an approval request.
 
 ## Enforcement mapping
 
@@ -97,7 +97,7 @@ an agent holding the signed delegation can redeem directly. Only on-chain rules 
 One active grant per agent (period counters are per delegation, so overlapping grants would stack caps).
 
 **Invariant:** off-chain checks only ever _narrow_ what the on-chain delegation allows. They can refuse or
-escalate, never widen. If phoswallet's services are down or compromised, the worst case is the on-chain caps.
+escalate, never widen. If cyphos-guard's services are down or compromised, the worst case is the on-chain caps.
 
 ## Deliberately not in v1
 

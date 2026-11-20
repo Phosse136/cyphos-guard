@@ -59,7 +59,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:fork
       - run: pnpm poc
-      - run: pnpm --filter @phoswallet/poc spike:passkey
+      - run: pnpm --filter @cyphos-guard/poc spike:passkey
       - run: pnpm e2e
       - run: pnpm demo:selftest --fake-model
       - run: pnpm e2e:browser

@@ -3,7 +3,7 @@
  * Tools run locally, so the agent's private key never leaves this process.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import type { Phoswallet } from "@phoswallet/sdk";
+import type { CyphosGuard } from "@cyphos-guard/sdk";
 import type { PublicClient } from "viem";
 import { createTools, type ToolEvent } from "./tools.ts";
 
@@ -20,7 +20,7 @@ How to work:
 - Finish with a short summary: one line per invoice with its outcome and transaction hash if paid.`;
 
 export type RunAgentOptions = {
-  pw: Phoswallet;
+  pw: CyphosGuard;
   publicClient: PublicClient;
   client?: Anthropic;
   onEvent?: (e: ToolEvent) => void;

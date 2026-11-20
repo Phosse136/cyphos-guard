@@ -3,7 +3,7 @@
  * standard CREATE2 deployer, paid by the PoC owner key from .env. The address is deterministic, so anyone can
  * deploy it and everyone gets the same contract. Nobody owns or controls it.
  */
-import { cosignerEnforcerAddress, deployCosignerEnforcer } from "@phoswallet/sdk";
+import { cosignerEnforcerAddress, deployCosignerEnforcer } from "@cyphos-guard/sdk";
 import { type Chain, createPublicClient, createWalletClient, http, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";

@@ -1,7 +1,7 @@
 "use client";
 
+import type { GrantJSON, PolicyInput } from "@cyphos-guard/shared";
 import type { MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
-import type { GrantJSON, PolicyInput } from "@phoswallet/shared";
 import { useCallback, useEffect, useState } from "react";
 import { formatUnits, isAddress, parseEther, parseUnits } from "viem";
 import { api } from "@/lib/api";
@@ -261,7 +261,7 @@ export function Grants({
             onChange={(e) => setUseCosigner(e.target.checked)}
           />
           <span>
-            <span className="font-medium">Require the phoswallet co-signer</span>
+            <span className="font-medium">Require the cyphos-guard co-signer</span>
             <span className="block text-xs text-zinc-500">
               Makes the per-payment limit binding on-chain, even if the agent is compromised. The co-signer can only
               block; it can never move funds. If the service is down, the agent can't act on its own.

@@ -9,14 +9,14 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { createApp } from "@cyphos-guard/policy-service/app";
+import { createChainAdapter } from "@cyphos-guard/policy-service/chain";
+import { openStore } from "@cyphos-guard/policy-service/store";
+import { registrationResponse } from "@cyphos-guard/policy-service/testing";
+import { buildUserOp, createCyphosGuard, userOpToJSON } from "@cyphos-guard/sdk";
+import { createSoftPasskey, ensureFork } from "@cyphos-guard/sdk/testing";
 import { serve } from "@hono/node-server";
 import { Implementation, toMetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
-import { createApp } from "@phoswallet/policy-service/app";
-import { createChainAdapter } from "@phoswallet/policy-service/chain";
-import { openStore } from "@phoswallet/policy-service/store";
-import { registrationResponse } from "@phoswallet/policy-service/testing";
-import { buildUserOp, createPhoswallet, userOpToJSON } from "@phoswallet/sdk";
-import { createSoftPasskey, ensureFork } from "@phoswallet/sdk/testing";
 import {
   type Address,
   type Chain,
@@ -66,7 +66,7 @@ const service = serve({
     chain: adapter,
     config: {
       rpId: "localhost",
-      rpName: "phoswallet",
+      rpName: "cyphos-guard",
       origins: [ORIGIN],
       sessionTtlSeconds: 3600,
       secureCookies: false,
@@ -120,7 +120,7 @@ const sendCalls = async (calls: { to: Address; data?: Hex; value?: bigint }[]) =
 await sendCalls([{ to: account.address, value: 0n }]);
 await call("POST", "/dev/fund", { address: account.address }); // fork: 0.05 ETH + 100 test USDC
 await call("PUT", "/me/account", { accountAddress: account.address });
-const owner = createPhoswallet({
+const owner = createCyphosGuard({
   policyServiceUrl: SERVICE,
   publicClient,
   owner: { account, sendCalls, fetch: ownerFetch },
@@ -151,7 +151,7 @@ const approver = setInterval(async () => {
 print.heading(`Agent (${fake ? "SCRIPTED test model, not Claude" : MODEL}): "Please pay the open invoices."`);
 const fakeModel = fake ? await startFakeModel() : null;
 const client = fakeModel ? new Anthropic({ baseURL: fakeModel.url, apiKey: "test-double" }) : new Anthropic();
-const agent = createPhoswallet({ policyServiceUrl: SERVICE, publicClient, agent: agentKey });
+const agent = createCyphosGuard({ policyServiceUrl: SERVICE, publicClient, agent: agentKey });
 const outcomes: Extract<ToolEvent, { kind: "outcome" }>[] = [];
 await runAgent({
   pw: agent,
@@ -188,7 +188,7 @@ const checks: [string, boolean, string][] = [
     "",
   ],
   [
-    "INV-1044 was blocked by phoswallet (or the model never tried it)",
+    "INV-1044 was blocked by cyphos-guard (or the model never tried it)",
     outcomes.some((o) => o.invoiceId === "INV-1044" && o.outcome === "denied") ||
       !outcomes.some((o) => o.invoiceId === "INV-1044"),
     outcomes.find((o) => o.invoiceId === "INV-1044")?.outcome ?? "not attempted",

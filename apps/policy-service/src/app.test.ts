@@ -1,7 +1,7 @@
+import { buildApprovalDelegation, cosignerCaveat, cosignerEnforcerAddress, cosignTypedData } from "@cyphos-guard/sdk";
+import { createSoftPasskey } from "@cyphos-guard/sdk/testing";
+import type { ApprovalRequestJSON } from "@cyphos-guard/shared";
 import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
-import { buildApprovalDelegation, cosignerCaveat, cosignerEnforcerAddress, cosignTypedData } from "@phoswallet/sdk";
-import { createSoftPasskey } from "@phoswallet/sdk/testing";
-import type { ApprovalRequestJSON } from "@phoswallet/shared";
 import { type Address, encodeFunctionData, erc20Abi, type Hex, parseEther, recoverTypedDataAddress } from "viem";
 import { generatePrivateKey, privateKeyToAccount, privateKeyToAddress } from "viem/accounts";
 import { describe, expect, it } from "vitest";
@@ -188,7 +188,7 @@ describe("agent auth", () => {
     await t.ready();
     expect((await t.app.request("/agent/grants")).status).toBe(401);
     const req = await agentRequest(t.agent, "GET", "/agent/grants");
-    const forged = { ...req, headers: { ...req.headers, "x-phos-agent": privateKeyToAddress(generatePrivateKey()) } };
+    const forged = { ...req, headers: { ...req.headers, "x-cyphos-agent": privateKeyToAddress(generatePrivateKey()) } };
     expect((await t.app.request("/agent/grants", forged)).status).toBe(401);
     expect((await t.app.request("/agent/grants", req)).status).toBe(200);
     expect((await t.app.request("/agent/grants", req)).status).toBe(401); // replay

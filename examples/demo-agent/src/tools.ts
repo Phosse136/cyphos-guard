@@ -1,5 +1,5 @@
 /**
- * The agent's tools. The LLM is treated as untrusted: it can ask to pay anything, and phoswallet
+ * The agent's tools. The LLM is treated as untrusted: it can ask to pay anything, and cyphos-guard
  * decides (on-chain limits → owner approval → denylist). Tool results are plain, short strings
  * that tell the model what happened and what to do next.
  */
@@ -8,11 +8,11 @@ import {
   ApprovalExpired,
   ApprovalPending,
   ApprovalRejected,
+  type CyphosGuard,
   ExecutionFailed,
-  type Phoswallet,
   PolicyServiceError,
   PolicyViolation,
-} from "@phoswallet/sdk";
+} from "@cyphos-guard/sdk";
 import {
   encodeFunctionData,
   erc20Abi,
@@ -35,7 +35,7 @@ export type ToolEvent =
       detail: string;
     };
 
-export function createTools(pw: Phoswallet, publicClient: PublicClient, onEvent: (e: ToolEvent) => void) {
+export function createTools(pw: CyphosGuard, publicClient: PublicClient, onEvent: (e: ToolEvent) => void) {
   const pendingByRequest = new Map<string, string>(); // request id → invoice id
   // Claude may request several payments in one turn and the tool runner runs them concurrently.
   // Transactions from the agent's single EOA must not race for the same nonce, so serialize them.

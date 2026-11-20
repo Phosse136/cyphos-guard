@@ -9,9 +9,9 @@
  *   PolicyServiceError the policy service failed or was unreachable (after retries)
  *   MissingSigner     method needs an agent or owner signer that wasn't configured
  */
-import type { ApprovalRequestJSON, EscalationRefusal } from "@phoswallet/shared";
+import type { ApprovalRequestJSON, EscalationRefusal } from "@cyphos-guard/shared";
 
-export class PhoswalletError extends Error {
+export class CyphosGuardError extends Error {
   readonly code: string;
   constructor(code: string, message: string) {
     super(message);
@@ -20,7 +20,7 @@ export class PhoswalletError extends Error {
   }
 }
 
-export class PolicyViolation extends PhoswalletError {
+export class PolicyViolation extends CyphosGuardError {
   readonly reason: EscalationRefusal;
   /** Why the agent's own grant(s) didn't cover the action (enforcer revert reasons / off-chain checks). */
   readonly violations: string[];
@@ -31,7 +31,7 @@ export class PolicyViolation extends PhoswalletError {
   }
 }
 
-export class ApprovalPending extends PhoswalletError {
+export class ApprovalPending extends CyphosGuardError {
   readonly request: ApprovalRequestJSON;
   readonly violations: string[];
   constructor(request: ApprovalRequestJSON, violations: string[] = []) {
@@ -41,7 +41,7 @@ export class ApprovalPending extends PhoswalletError {
   }
 }
 
-export class ApprovalRejected extends PhoswalletError {
+export class ApprovalRejected extends CyphosGuardError {
   readonly request: ApprovalRequestJSON;
   constructor(request: ApprovalRequestJSON) {
     super("APPROVAL_REJECTED", `owner rejected request ${request.id}`);
@@ -49,7 +49,7 @@ export class ApprovalRejected extends PhoswalletError {
   }
 }
 
-export class ApprovalExpired extends PhoswalletError {
+export class ApprovalExpired extends CyphosGuardError {
   readonly request: ApprovalRequestJSON;
   constructor(request: ApprovalRequestJSON) {
     super("APPROVAL_EXPIRED", `request ${request.id} expired without being executed`);
@@ -57,7 +57,7 @@ export class ApprovalExpired extends PhoswalletError {
   }
 }
 
-export class ExecutionFailed extends PhoswalletError {
+export class ExecutionFailed extends CyphosGuardError {
   readonly reason: string;
   constructor(reason: string) {
     super("EXECUTION_FAILED", `on-chain execution failed: ${reason}`);
@@ -65,7 +65,7 @@ export class ExecutionFailed extends PhoswalletError {
   }
 }
 
-export class PolicyServiceError extends PhoswalletError {
+export class PolicyServiceError extends CyphosGuardError {
   readonly status: number | null;
   constructor(status: number | null, message: string) {
     super("POLICY_SERVICE_ERROR", message);
@@ -73,8 +73,8 @@ export class PolicyServiceError extends PhoswalletError {
   }
 }
 
-export class MissingSigner extends PhoswalletError {
+export class MissingSigner extends CyphosGuardError {
   constructor(role: "agent" | "owner", method: string) {
-    super("MISSING_SIGNER", `${method}() needs an ${role} signer; pass \`${role}\` to createPhoswallet()`);
+    super("MISSING_SIGNER", `${method}() needs an ${role} signer; pass \`${role}\` to createCyphosGuard()`);
   }
 }

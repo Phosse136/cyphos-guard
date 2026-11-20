@@ -4,17 +4,17 @@
  * grant, approval and revocation, all through the UI, with a scripted agent on the other side.
  *
  * Starts: anvil fork (if needed), policy-service (in-process, in-memory DB), `next start`.
- * Requires a prior `pnpm --filter @phoswallet/approver build`. Screenshots go to E2E_SCREENSHOTS (or ./e2e/screenshots).
+ * Requires a prior `pnpm --filter @cyphos-guard/approver build`. Screenshots go to E2E_SCREENSHOTS (or ./e2e/screenshots).
  */
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { createApp } from "@cyphos-guard/policy-service/app";
+import { createChainAdapter } from "@cyphos-guard/policy-service/chain";
+import { openStore } from "@cyphos-guard/policy-service/store";
+import { ApprovalPending, createCyphosGuard, PolicyViolation } from "@cyphos-guard/sdk";
+import { ensureFork } from "@cyphos-guard/sdk/testing";
 import { serve } from "@hono/node-server";
-import { createApp } from "@phoswallet/policy-service/app";
-import { createChainAdapter } from "@phoswallet/policy-service/chain";
-import { openStore } from "@phoswallet/policy-service/store";
-import { ApprovalPending, createPhoswallet, PolicyViolation } from "@phoswallet/sdk";
-import { ensureFork } from "@phoswallet/sdk/testing";
 import { chromium } from "playwright-core";
 import { type Address, type Chain, createPublicClient, http, type PublicClient, parseEther, toHex } from "viem";
 import { generatePrivateKey, privateKeyToAccount, privateKeyToAddress } from "viem/accounts";
@@ -43,7 +43,7 @@ const service = serve({
     chain: adapter,
     config: {
       rpId: "localhost",
-      rpName: "phoswallet",
+      rpName: "cyphos-guard",
       origins: [APP],
       sessionTtlSeconds: 3600,
       secureCookies: false,
@@ -118,7 +118,7 @@ try {
   await page.getByRole("button", { name: "Revoke" }).waitFor({ timeout: 30_000 });
   check("agent granted with a passkey-signed delegation", true);
 
-  const agent = createPhoswallet({
+  const agent = createCyphosGuard({
     accountAddress,
     policyServiceUrl: "http://127.0.0.1:8787",
     publicClient,

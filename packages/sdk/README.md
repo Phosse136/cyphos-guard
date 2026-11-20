@@ -1,4 +1,4 @@
-# @phoswallet/sdk
+# @cyphos-guard/sdk
 
 Scoped, revocable spending permissions for AI agents on a MetaMask smart account, with passkey approval
 above the limit. **Testnet only** (Base Sepolia, Sepolia).
@@ -15,10 +15,10 @@ above the limit. **Testnet only** (Base Sepolia, Sepolia).
 ### Agent side
 
 ```ts
-import { createPhoswallet, ApprovalPending, PolicyViolation } from "@phoswallet/sdk";
+import { createCyphosGuard, ApprovalPending, PolicyViolation } from "@cyphos-guard/sdk";
 import { privateKeyToAccount } from "viem/accounts";
 
-const pw = createPhoswallet({
+const pw = createCyphosGuard({
   accountAddress: "0xOwnerSmartAccount…", // the account the agent spends from
   policyServiceUrl: "http://127.0.0.1:8787",
   rpcUrl: "https://sepolia.base.org",
@@ -47,7 +47,7 @@ can't drain it through gas.
 Most owners use the approver app (`pnpm dev`). The same operations are available programmatically:
 
 ```ts
-const owner = createPhoswallet({
+const owner = createCyphosGuard({
   accountAddress: account.address,
   policyServiceUrl: "/api",
   owner: {
@@ -89,7 +89,7 @@ await owner.revoke(grant.id);      // passkey prompt; disables the delegations o
 
 ## Errors
 
-All extend `PhoswalletError` (`.code`).
+All extend `CyphosGuardError` (`.code`).
 
 | Error                                        | When                                                                                   | Agent should                                              |
 | -------------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------- |

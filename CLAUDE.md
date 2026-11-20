@@ -1,4 +1,4 @@
-# CLAUDE.md: phoswallet project rules
+# CLAUDE.md: cyphos-guard project rules
 
 Guardrails + human approval for AI agents with crypto wallets. Stack decision: `docs/decisions/0001-account-stack.md`
 (MetaMask Smart Accounts Kit / Delegation Framework, Hybrid DeleGator with passkeys). Policy schema:
@@ -8,9 +8,9 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
 
 - **Testnet only.** Base Sepolia (84532) default, Ethereum Sepolia (11155111) fallback. No mainnet chain ids, RPCs,
   or deployment addresses anywhere: config, code, tests, docs examples. The policy schema rejects mainnet ids. Keep it that way.
-- **Non-custodial.** phoswallet services never hold an owner key and never gain authority to move funds. The off-chain
+- **Non-custodial.** cyphos-guard services never hold an owner key and never gain authority to move funds. The off-chain
   policy service/co-signer may only _refuse or escalate_. It must never widen on-chain permissions. The owner must
-  always be able to revoke (`DelegationManager.disableDelegation`) without phoswallet.
+  always be able to revoke (`DelegationManager.disableDelegation`) without cyphos-guard.
 - **No secrets in git.** Secrets live in `.env` (git-ignored); document every variable in `.env.example`. Test keys are
   generated locally and are throwaway. Never ask the user for a real private key or seed phrase. The pre-commit
   hook (`scripts/check-secrets.sh`, enabled via `core.hooksPath=.githooks`) must stay on. Don't bypass it with `--no-verify`.
@@ -54,7 +54,7 @@ fork/e2e/browser suites with the runner's Chrome via `CHROMIUM_PATH`). Regenerat
 ## Commands
 
 - `pnpm install` · `pnpm lint` · `pnpm format` · `pnpm typecheck` · `pnpm test` · `pnpm check-secrets`
-- `pnpm poc` (Phase 1) · `pnpm dev` (fork + service + approver) · `pnpm e2e` · `pnpm e2e:browser` · `pnpm test:fork` · `pnpm demo:setup|demo:agent|demo:selftest [--fake-model]` · `pnpm e2e:demo` · `pnpm --filter @phoswallet/poc spike:passkey`
+- `pnpm poc` (Phase 1) · `pnpm dev` (fork + service + approver) · `pnpm e2e` · `pnpm e2e:browser` · `pnpm test:fork` · `pnpm demo:setup|demo:agent|demo:selftest [--fake-model]` · `pnpm e2e:demo` · `pnpm --filter @cyphos-guard/poc spike:passkey`
 - Node ≥ 24 (Vitest 5 needs ≥ 22.12), pnpm 12, TypeScript 7, Biome 2, Vitest 5, zod 4, viem 2, Foundry 1.10 (anvil for local forks), gitleaks.
 - Local fork: `anvil --fork-url https://sepolia.base.org` has the MetaMask v1.3.0 contracts and the RIP-7212 precompile (verified).
 

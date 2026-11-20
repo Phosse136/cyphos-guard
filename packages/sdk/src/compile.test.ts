@@ -1,5 +1,5 @@
+import { parsePolicy } from "@cyphos-guard/shared";
 import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
-import { parsePolicy } from "@phoswallet/shared";
 import { describe, expect, it } from "vitest";
 import { compilePolicy } from "./compile.ts";
 

@@ -9,11 +9,11 @@ import { addressSchema } from "./policy.ts";
 // ---------- agent request authentication (EIP-191 signature over method, path, time, body hash) ----------
 
 export const AGENT_HEADERS = {
-  agent: "x-phos-agent",
-  timestamp: "x-phos-timestamp",
-  signature: "x-phos-signature",
+  agent: "x-cyphos-agent",
+  timestamp: "x-cyphos-timestamp",
+  signature: "x-cyphos-signature",
   /** Random per request, so identical requests in the same second still get distinct signatures. */
-  nonce: "x-phos-nonce",
+  nonce: "x-cyphos-nonce",
 } as const;
 
 /** Signed requests older/newer than this are rejected (replay window). */
@@ -27,7 +27,7 @@ export function agentAuthMessage(args: {
   body: string;
 }): string {
   return [
-    "phoswallet-agent-auth-v1",
+    "cyphos-guard-agent-auth-v1",
     `${args.method.toUpperCase()} ${args.path}`,
     String(args.timestamp),
     args.nonce,

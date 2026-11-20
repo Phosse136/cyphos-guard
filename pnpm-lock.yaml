@@ -190,15 +190,15 @@ importers:
 
   apps/approver:
     dependencies:
+      '@cyphos-guard/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@cyphos-guard/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@metamask/smart-accounts-kit':
         specifier: 2.0.0
         version: 2.0.0(typescript@7.0.2)(viem@2.58.2(typescript@7.0.2)(zod@4.6.7))(zod@4.6.7)
-      '@phoswallet/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@phoswallet/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@simplewebauthn/browser':
         specifier: ^14.0.0
         version: 14.0.0
@@ -215,15 +215,15 @@ importers:
         specifier: ^2.58.2
         version: 2.58.2(typescript@7.0.2)(zod@4.6.7)
     devDependencies:
+      '@cyphos-guard/demo-agent':
+        specifier: workspace:*
+        version: link:../../examples/demo-agent
+      '@cyphos-guard/policy-service':
+        specifier: workspace:*
+        version: link:../policy-service
       '@hono/node-server':
         specifier: ^2.1.11
         version: 2.1.11(hono@4.13.19)
-      '@phoswallet/demo-agent':
-        specifier: workspace:*
-        version: link:../../examples/demo-agent
-      '@phoswallet/policy-service':
-        specifier: workspace:*
-        version: link:../policy-service
       '@tailwindcss/postcss':
         specifier: ^4.3.5
         version: 4.3.5
@@ -242,18 +242,18 @@ importers:
 
   apps/policy-service:
     dependencies:
+      '@cyphos-guard/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@cyphos-guard/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@hono/node-server':
         specifier: ^2.1.11
         version: 2.1.11(hono@4.13.19)
       '@metamask/smart-accounts-kit':
         specifier: 2.0.0
         version: 2.0.0(typescript@7.0.2)(viem@2.58.2(typescript@7.0.2)(zod@4.6.7))(zod@4.6.7)
-      '@phoswallet/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@phoswallet/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@simplewebauthn/server':
         specifier: ^14.1.0
         version: 14.1.0
@@ -272,21 +272,21 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^1.11.0
         version: 1.11.0(zod@4.6.7)
+      '@cyphos-guard/policy-service':
+        specifier: workspace:*
+        version: link:../../apps/policy-service
+      '@cyphos-guard/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@cyphos-guard/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@hono/node-server':
         specifier: ^2.1.11
         version: 2.1.11(hono@4.13.19)
       '@metamask/smart-accounts-kit':
         specifier: 2.0.0
         version: 2.0.0(typescript@7.0.2)(viem@2.58.2(typescript@7.0.2)(zod@4.6.7))(zod@4.6.7)
-      '@phoswallet/policy-service':
-        specifier: workspace:*
-        version: link:../../apps/policy-service
-      '@phoswallet/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@phoswallet/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       viem:
         specifier: ^2.58.2
         version: 2.58.2(typescript@7.0.2)(zod@4.6.7)
@@ -296,21 +296,21 @@ importers:
 
   examples/poc:
     dependencies:
+      '@cyphos-guard/policy-service':
+        specifier: workspace:*
+        version: link:../../apps/policy-service
+      '@cyphos-guard/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@cyphos-guard/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@hono/node-server':
         specifier: ^2.1.11
         version: 2.1.11(hono@4.13.19)
       '@metamask/smart-accounts-kit':
         specifier: 2.0.0
         version: 2.0.0(typescript@7.0.2)(viem@2.58.2(typescript@7.0.2)(zod@4.6.7))(zod@4.6.7)
-      '@phoswallet/policy-service':
-        specifier: workspace:*
-        version: link:../../apps/policy-service
-      '@phoswallet/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@phoswallet/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       viem:
         specifier: ^2.58.2
         version: 2.58.2(typescript@7.0.2)(zod@4.6.7)
@@ -319,15 +319,15 @@ importers:
 
   packages/sdk:
     dependencies:
+      '@cyphos-guard/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@cyphos-guard/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@metamask/smart-accounts-kit':
         specifier: 2.0.0
         version: 2.0.0(typescript@7.0.2)(viem@2.58.2(typescript@7.0.2)(zod@4.6.7))(zod@4.6.7)
-      '@phoswallet/contracts':
-        specifier: workspace:*
-        version: link:../contracts
-      '@phoswallet/shared':
-        specifier: workspace:*
-        version: link:../shared
       viem:
         specifier: ^2.58.2
         version: 2.58.2(typescript@7.0.2)(zod@4.6.7)

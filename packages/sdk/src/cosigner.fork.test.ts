@@ -4,13 +4,14 @@
  * enforcer it could redeem anything within the on-chain caps; with it, every redemption needs a fresh
  * cosignature for that exact call.
  */
+
+import { parsePolicy } from "@cyphos-guard/shared";
 import {
   type Delegation,
   getSmartAccountsEnvironment,
   Implementation,
   toMetaMaskSmartAccount,
 } from "@metamask/smart-accounts-kit";
-import { parsePolicy } from "@phoswallet/shared";
 import {
   type Chain,
   createPublicClient,

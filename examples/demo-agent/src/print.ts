@@ -1,4 +1,4 @@
-/** Terminal transcript for the demo: what Claude says, which tools it calls, and what phoswallet decided. */
+/** Terminal transcript for the demo: what Claude says, which tools it calls, and what cyphos-guard decided. */
 import type { ToolEvent } from "./tools.ts";
 
 const c = {

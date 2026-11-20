@@ -1,5 +1,5 @@
 {
-  "name": "@phoswallet/sdk",
+  "name": "@cyphos-guard/sdk",
   "version": "0.0.0",
   "license": "Apache-2.0",
   "private": true,
@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "@metamask/smart-accounts-kit": "2.0.0",
-    "@phoswallet/shared": "workspace:*",
+    "@cyphos-guard/shared": "workspace:*",
     "viem": "^2.58.2",
-    "@phoswallet/contracts": "workspace:*"
+    "@cyphos-guard/contracts": "workspace:*"
   }
 }

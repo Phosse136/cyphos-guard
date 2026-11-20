@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "phoswallet approver",
+  title: "cyphos-guard approver",
   description: "Approve and revoke your AI agents' spending",
 };
 

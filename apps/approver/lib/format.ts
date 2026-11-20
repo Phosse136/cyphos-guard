@@ -1,4 +1,4 @@
-import { decodeErc20Transfer } from "@phoswallet/shared";
+import { decodeErc20Transfer } from "@cyphos-guard/shared";
 import { type Address, formatEther, formatUnits, type Hex } from "viem";
 
 /** Known tokens on Base Sepolia, for human-readable amounts. Unknown tokens show raw base units. */

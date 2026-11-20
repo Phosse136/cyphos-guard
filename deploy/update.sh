@@ -8,7 +8,11 @@ pnpm install --frozen-lockfile --offline >/dev/null
 set -a; . /etc/cyphos-guard/env; set +a
 pnpm --filter @cyphos-guard/approver build >/dev/null
 install -d -o cyphos -g cyphos apps/approver/.next/cache
-systemctl restart cyphos-guard-policy cyphos-guard-approver
+UNITS="cyphos-guard-policy cyphos-guard-approver"
+# Second instance (app.cyphosguard.com), if installed.
+[ -f /etc/systemd/system/cyphos-guard-app-policy.service ] && UNITS="$UNITS cyphos-guard-app-policy cyphos-guard-app-approver"
+systemctl restart $UNITS
 sleep 5
-systemctl is-active cyphos-guard-policy cyphos-guard-approver
+systemctl is-active $UNITS
 curl -fsS http://127.0.0.1:8887/health && echo
+[ -f /etc/systemd/system/cyphos-guard-app-policy.service ] && curl -fsS http://127.0.0.1:8888/health && echo

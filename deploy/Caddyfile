@@ -12,3 +12,17 @@ guard.cyphos.de {
 	}
 	reverse_proxy 127.0.0.1:3300
 }
+
+app.cyphosguard.com {
+	tls {
+		issuer acme {
+			disable_http_challenge
+		}
+	}
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	reverse_proxy 127.0.0.1:3301
+}

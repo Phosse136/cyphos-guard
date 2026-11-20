@@ -1,6 +1,6 @@
 # Self-hosted public instance (testnet)
 
-How https://guard.cyphos.de runs: one Linux machine behind a home router, Base Sepolia only.
+How https://app.cyphosguard.com (and the older https://guard.cyphos.de) run: one Linux machine behind a home router, Base Sepolia only.
 
 - Router forwards **only port 443** to the machine; DNS for the subdomain is kept current by the router's DynDNS.
 - **Caddy** terminates HTTPS (Let's Encrypt via TLS-ALPN-01, so port 80 need not be reachable) and proxies to
@@ -14,6 +14,11 @@ How https://guard.cyphos.de runs: one Linux machine behind a home router, Base S
 Install: clone to `/opt/cyphos-guard`, `pnpm install`, build the approver with the env loaded, copy the two
 `.service` files to `/etc/systemd/system/` and `Caddyfile` to `/etc/caddy/`, then
 `systemctl enable --now cyphos-guard-policy cyphos-guard-approver caddy`.
+
+Two instances share the build in `/opt/cyphos-guard` but have separate config, database, co-signer key and
+ports: `cyphos-guard-*` (guard.cyphos.de, 8887/3300, `/etc/cyphos-guard/env`) and `cyphos-guard-app-*`
+(app.cyphosguard.com, 8888/3301, `/etc/cyphos-guard/app.env`). A passkey is bound to its domain, so each instance has
+its own owner. `app.cyphosguard.com` is a CNAME to the DynDNS name.
 
 Update: `sudo deploy/update.sh` (pulls the latest commit from the working repo, rebuilds, restarts).
 

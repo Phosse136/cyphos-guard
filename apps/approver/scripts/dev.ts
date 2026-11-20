@@ -3,8 +3,8 @@
  * NETWORK=live skips the fork and points everything at Base Sepolia.
  */
 import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { ensureFork } from "@cyphos-guard/sdk/testing";
 import { generatePrivateKey } from "viem/accounts";
 
@@ -25,6 +25,13 @@ function ensureCosignerKey() {
 
 if (network === "fork") {
   ensureCosignerKey();
+  // Each `pnpm dev` starts a FRESH fork, so the policy service's fork database must start fresh too:
+  // otherwise it would remember a passkey, account and grants that don't exist on the new fork.
+  const db = resolve(root, ".dev/policy-fork.sqlite");
+  mkdirSync(dirname(db), { recursive: true });
+  for (const f of [db, `${db}-wal`, `${db}-shm`]) rmSync(f, { force: true });
+  process.env.POLICY_DB_PATH = db;
+  console.log("[dev]      fresh fork database (.dev/policy-fork.sqlite)");
   await ensureFork(
     process.env.FORK_RPC_URL ?? "http://127.0.0.1:8545",
     process.env.RPC_URL ?? "https://sepolia.base.org",

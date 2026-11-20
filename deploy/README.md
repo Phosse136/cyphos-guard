@@ -7,7 +7,7 @@ How https://guard.cyphos.de runs: one Linux machine behind a home router, Base S
   the approver on `127.0.0.1:3300`. The approver proxies `/api` to the policy service on `127.0.0.1:8887`.
 - Both run as the unprivileged `cyphos` user under systemd with a read-only filesystem except their data dirs.
 - Config lives in `/etc/cyphos-guard/env` (mode 640, root:cyphos), see `env.example`. It holds the co-signer key
-  (can only *block* agent redemptions, never move funds) and `OWNER_SETUP_CODE`.
+  (can only _block_ agent redemptions, never move funds) and `OWNER_SETUP_CODE`.
 - **Owner setup code:** on a public address the first visitor could otherwise register as owner. With
   `OWNER_SETUP_CODE` set, registration requires it; after the owner exists, registration is closed for good.
 

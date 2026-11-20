@@ -12,7 +12,9 @@
     "format": "biome check --write .",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run",
-    "check-secrets": "bash scripts/check-secrets.sh --all"
+    "check-secrets": "bash scripts/check-secrets.sh --all",
+    "poc": "pnpm --filter @phoswallet/poc poc",
+    "poc:keys": "pnpm --filter @phoswallet/poc keys"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

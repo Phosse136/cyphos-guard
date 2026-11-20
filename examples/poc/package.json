@@ -1,0 +1,17 @@
+{
+  "name": "@phoswallet/poc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "keys": "node --env-file-if-exists=../../.env src/keys.ts",
+    "poc": "node --env-file-if-exists=../../.env src/poc.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@metamask/smart-accounts-kit": "2.0.0",
+    "@phoswallet/sdk": "workspace:*",
+    "@phoswallet/shared": "workspace:*",
+    "viem": "^2.58.2"
+  }
+}

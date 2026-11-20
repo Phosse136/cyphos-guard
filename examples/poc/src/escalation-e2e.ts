@@ -19,7 +19,7 @@ import {
   revertReason,
   userOpToJSON,
 } from "@phoswallet/sdk";
-import { createSoftPasskey, ensureFork } from "@phoswallet/sdk/testing";
+import { createSoftPasskey, ensureFork, fundUsdc, USDC } from "@phoswallet/sdk/testing";
 import type { PolicyInput } from "@phoswallet/shared";
 import {
   type Address,
@@ -38,7 +38,6 @@ import {
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount, privateKeyToAddress } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
-import { fundUsdc, USDC } from "./usdc.ts";
 
 const chain: Chain = baseSepolia;
 const FORK = process.env.FORK_RPC_URL || "http://127.0.0.1:8545";

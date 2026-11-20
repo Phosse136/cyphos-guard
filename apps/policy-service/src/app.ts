@@ -383,7 +383,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
       account,
       agent: req.agent,
       kind: "request_approved",
-      detail: { requestId: req.id, to: req.to, value: req.value },
+      detail: { requestId: req.id, to: req.to, value: req.value, data: req.data },
       txHash: null,
       createdAt: nowS(),
     });
@@ -401,7 +401,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
       account,
       agent: req.agent,
       kind: "request_rejected",
-      detail: { requestId: req.id, to: req.to, value: req.value },
+      detail: { requestId: req.id, to: req.to, value: req.value, data: req.data },
       txHash: null,
       createdAt: nowS(),
     });
@@ -425,7 +425,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
         account: body.account,
         agent,
         kind: "request_denied",
-        detail: { code, message, to: body.to, value: body.value },
+        detail: { code, message, to: body.to, value: body.value, data: body.data },
         txHash: null,
         createdAt: nowS(),
       });
@@ -454,7 +454,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
       account: body.account,
       agent,
       kind: "request_created",
-      detail: { requestId: req.id, to: req.to, value: req.value, reason: req.reason },
+      detail: { requestId: req.id, to: req.to, value: req.value, data: req.data, reason: req.reason },
       txHash: null,
       createdAt: nowS(),
     });
@@ -476,8 +476,15 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     const agent = c.get("agent");
     const req = agentRequest(agent, c.req.param("id"));
     const { txHash } = parse(z.object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/) }), c.get("body"));
-    if (!(await chain.isSuccessfulRedeem(txHash as Hex, agent))) {
-      throw new HTTPException(400, { message: "tx is not a successful redemption by this agent" });
+    const redeemed = await chain.verifiedRedeem(txHash as Hex, agent);
+    if (
+      !redeemed ||
+      !isAddressEqual(redeemed.delegator, req.account) ||
+      !isAddressEqual(redeemed.to, req.to) ||
+      redeemed.value !== BigInt(req.value) ||
+      redeemed.data.toLowerCase() !== req.data.toLowerCase()
+    ) {
+      throw new HTTPException(400, { message: "tx is not this request's execution by this agent" });
     }
     if (!store.requests.transition(req.id, "approved", "executed", { txHash: txHash as Hex })) {
       throw new HTTPException(409, { message: `request is ${req.status}` });
@@ -486,7 +493,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
       account: req.account,
       agent,
       kind: "request_executed",
-      detail: { requestId: req.id, to: req.to, value: req.value },
+      detail: { requestId: req.id, to: req.to, value: req.value, data: req.data },
       txHash: txHash as Hex,
       createdAt: nowS(),
     });
@@ -505,14 +512,17 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
       c.get("body"),
     );
     if (store.grants.activeFor(body.account, agent).length === 0) throw new HTTPException(404, { message: "no grant" });
-    if (!(await chain.isSuccessfulRedeem(body.txHash as Hex, agent))) {
-      throw new HTTPException(400, { message: "tx is not a successful redemption by this agent" });
+    // Record what the chain says happened, not what the agent claims: decoded from the tx itself, and it
+    // must have spent from THIS account (an agent with grants on two accounts can't mislabel activity).
+    const redeemed = await chain.verifiedRedeem(body.txHash as Hex, agent);
+    if (!redeemed || !isAddressEqual(redeemed.delegator, body.account)) {
+      throw new HTTPException(400, { message: "tx is not a successful redemption by this agent from this account" });
     }
     store.activity.add({
       account: body.account,
       agent,
       kind: "routine_executed",
-      detail: { to: body.to, value: body.value },
+      detail: { to: redeemed.to, value: redeemed.value.toString(), data: redeemed.data },
       txHash: body.txHash as Hex,
       createdAt: nowS(),
     });

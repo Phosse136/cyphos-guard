@@ -67,8 +67,11 @@ export type OwnerConfig = {
 };
 
 export type PhoswalletOptions = {
-  /** The owner's smart account the agent acts for. */
-  accountAddress: Address;
+  /**
+   * The owner's smart account. Optional: owner clients use `owner.account.address`; agent clients
+   * resolve it from their (single) active grant, so an agent only needs its key and the service URL.
+   */
+  accountAddress?: Address;
   policyServiceUrl: string;
   /** Base Sepolia (default) or Sepolia. Mainnet is refused. */
   chain?: Chain;
@@ -210,11 +213,22 @@ export function createPhoswallet(opts: PhoswalletOptions) {
 
     // ================= agent =================
 
-    /** Active grants of this agent for `accountAddress`. */
+    /** Active grants of this agent (for `accountAddress` if set), or all grants of the account (owner). */
     async getGrants(): Promise<GrantJSON[]> {
       if (opts.owner && !opts.agent) return ok(await request<GrantJSON[]>("owner", "GET", "/grants"));
       const all = ok(await request<GrantJSON[]>("agent", "GET", "/agent/grants"));
-      return all.filter((g) => g.account.toLowerCase() === opts.accountAddress.toLowerCase());
+      const account = opts.accountAddress ?? opts.owner?.account.address;
+      return account ? all.filter((g) => g.account.toLowerCase() === account.toLowerCase()) : all;
+    },
+
+    /** The account this agent acts for: `accountAddress`, or the account of its single active grant. */
+    async getAccount(): Promise<Address> {
+      const known = opts.accountAddress ?? opts.owner?.account.address;
+      if (known) return known;
+      const accounts = [...new Set((await pw.getGrants()).map((g) => g.account.toLowerCase()))];
+      if (accounts.length === 0) throw new PolicyViolation("no_grant", "this agent has no active grant", []);
+      if (accounts.length > 1) throw new Error("agent has grants on several accounts; pass accountAddress");
+      return accounts[0] as Address;
     },
 
     /**
@@ -223,6 +237,7 @@ export function createPhoswallet(opts: PhoswalletOptions) {
      * ApprovalRejected / ApprovalExpired (when waiting), ExecutionFailed.
      */
     async execute(input: ExecuteInput, { wait }: { wait?: boolean | WaitOptions } = {}): Promise<ExecutionResult> {
+      const account = await pw.getAccount();
       const exec = { to: input.to, value: input.value ?? 0n, data: input.data ?? ("0x" as Hex) };
       const violations: string[] = [];
       for (const grant of await pw.getGrants()) {
@@ -237,7 +252,7 @@ export function createPhoswallet(opts: PhoswalletOptions) {
           const r = await redeem(delegation as Delegation, exec);
           if ("hash" in r) {
             await request("agent", "POST", "/agent/activity", {
-              account: opts.accountAddress,
+              account,
               txHash: r.hash,
               to: exec.to,
               value: exec.value.toString(),
@@ -255,7 +270,7 @@ export function createPhoswallet(opts: PhoswalletOptions) {
         "POST",
         "/agent/requests",
         {
-          account: opts.accountAddress,
+          account,
           to: exec.to,
           value: exec.value.toString(),
           data: exec.data,

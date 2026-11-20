@@ -8,7 +8,7 @@ import {
   type SmartAccountsEnvironment,
 } from "@metamask/smart-accounts-kit";
 import { DelegationManager, HybridDeleGator } from "@metamask/smart-accounts-kit/contracts";
-import { hashDelegation } from "@metamask/smart-accounts-kit/utils";
+import { decodeDelegations, hashDelegation } from "@metamask/smart-accounts-kit/utils";
 import {
   type Execution,
   encodeRedeem,
@@ -17,20 +17,30 @@ import {
   type UserOpJSON,
   userOpFromJSON,
 } from "@phoswallet/sdk";
+import { fundUsdc } from "@phoswallet/sdk/testing";
 import {
   type Address,
   type Chain,
   createPublicClient,
   createWalletClient,
+  decodeFunctionData,
+  getAddress,
   type Hex,
   http,
   isAddressEqual,
   type PublicClient,
+  parseAbi,
   parseEther,
   toHex,
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
+
+export type VerifiedRedeem = { delegator: Address; to: Address; value: bigint; data: Hex };
+
+const redeemAbi = parseAbi([
+  "function redeemDelegations(bytes[] _permissionContexts, bytes32[] _modes, bytes[] _executionCallDatas)",
+]);
 
 export type ChainAdapter = {
   chainId: number;
@@ -41,8 +51,11 @@ export type ChainAdapter = {
   /** eth_call the agent's redemption; null if it would succeed, else the revert reason. */
   simulateRedeem(agent: Address, delegation: Delegation, execution: Execution): Promise<string | null>;
   isDisabled(delegation: Delegation): Promise<boolean>;
-  /** True if `hash` is a successful tx sent by `from` to the DelegationManager. */
-  isSuccessfulRedeem(hash: Hex, from: Address): Promise<boolean>;
+  /**
+   * If `hash` is a successful redeemDelegations tx sent by `from`, returns what it executed (decoded from
+   * the tx itself) and whose account it spent from (root delegator). Otherwise null.
+   */
+  verifiedRedeem(hash: Hex, from: Address): Promise<VerifiedRedeem | null>;
   /** True if `account` is deployed and has the passkey (keyId → x,y) as a signer. */
   accountHasPasskey(account: Address, keyId: string, x: Hex, y: Hex): Promise<boolean>;
   /** Fork only. Submits a passkey-signed userOp via EntryPoint.handleOps from a throwaway relayer key. */
@@ -93,17 +106,35 @@ export async function createChainAdapter(opts: { rpcUrl: string; network: "fork"
         contractAddress: environment.DelegationManager,
         delegationHash: hashDelegation(delegation),
       }),
-    async isSuccessfulRedeem(hash, from) {
+    async verifiedRedeem(hash, from) {
       const [tx, receipt] = await Promise.all([
         client.getTransaction({ hash }),
         client.getTransactionReceipt({ hash }).catch(() => null),
       ]);
-      return (
-        receipt?.status === "success" &&
-        isAddressEqual(tx.from, from) &&
-        !!tx.to &&
-        isAddressEqual(tx.to, environment.DelegationManager)
-      );
+      if (
+        receipt?.status !== "success" ||
+        !isAddressEqual(tx.from, from) ||
+        !tx.to ||
+        !isAddressEqual(tx.to, environment.DelegationManager)
+      ) {
+        return null;
+      }
+      try {
+        const { args } = decodeFunctionData({ abi: redeemAbi, data: tx.input });
+        const [contexts, , executions] = args;
+        const chainOf = decodeDelegations(contexts[0] as Hex); // leaf → root
+        const root = chainOf.at(-1);
+        const exec = executions[0] as Hex; // single execution: target(20) ‖ value(32) ‖ callData
+        if (!root || !exec || exec.length < 2 + 104) return null;
+        return {
+          delegator: getAddress(root.delegator),
+          to: getAddress(`0x${exec.slice(2, 42)}`),
+          value: BigInt(`0x${exec.slice(42, 106)}`),
+          data: `0x${exec.slice(106)}` as Hex,
+        };
+      } catch {
+        return null;
+      }
     },
     async accountHasPasskey(account, keyId, x, y) {
       if (!(await client.getCode({ address: account }))) return false;
@@ -125,6 +156,7 @@ export async function createChainAdapter(opts: { rpcUrl: string; network: "fork"
     adapter.relayUserOp = (op) => submitUserOp(userOpFromJSON(op), relayerWallet, client);
     adapter.fund = async (address, ether) => {
       await setBalance(address, ether);
+      await fundUsdc(client, address, 100_000_000n); // 100 test USDC (fork only, storage write)
     };
   }
   return adapter;

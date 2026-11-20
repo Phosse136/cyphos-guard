@@ -24,7 +24,7 @@ function setup(overrides: Partial<ChainAdapter> = {}) {
     now: async () => chainTime,
     simulateRedeem: async () => null,
     isDisabled: async () => true,
-    isSuccessfulRedeem: async () => true,
+    verifiedRedeem: async () => null, // overridden per test
     accountHasPasskey: async () => true,
     ...overrides,
   };
@@ -232,7 +232,9 @@ describe("escalation queue", () => {
   });
 
   it("approve → agent sees the signed one-shot delegation → executed", async () => {
-    const t = setup();
+    const t = setup({
+      verifiedRedeem: async () => ({ delegator: ACCOUNT, to: SHOP, value: parseEther("0.5"), data: "0x" }),
+    });
     await t.ready();
     const req = (await (await t.requestApproval()).json()) as ApprovalRequestJSON;
     const approve = await t.owner.post(`/requests/${req.id}/approve`, { delegation: t.approvalFor(req) });
@@ -245,6 +247,36 @@ describe("escalation queue", () => {
 
     const done = await t.asAgent("POST", `/agent/requests/${req.id}/executed`, { txHash: `0x${"ab".repeat(32)}` });
     expect(((await done.json()) as ApprovalRequestJSON).status).toBe("executed");
+  });
+
+  it("won't mark executed if the on-chain execution differs from the request", async () => {
+    const t = setup({
+      verifiedRedeem: async () => ({ delegator: ACCOUNT, to: SHOP, value: parseEther("0.4"), data: "0x" }),
+    });
+    await t.ready();
+    const req = (await (await t.requestApproval()).json()) as ApprovalRequestJSON;
+    await t.owner.post(`/requests/${req.id}/approve`, { delegation: t.approvalFor(req) });
+    const res = await t.asAgent("POST", `/agent/requests/${req.id}/executed`, { txHash: `0x${"ab".repeat(32)}` });
+    expect(res.status).toBe(400);
+  });
+
+  it("records routine activity from the chain, and only for the account the tx spent from", async () => {
+    let delegator: Address = ACCOUNT;
+    const t = setup({
+      verifiedRedeem: async () => ({ delegator, to: SHOP, value: 123n, data: "0x" }),
+    });
+    await t.ready();
+    // The agent claims a different recipient/value; the service records what the chain says.
+    const claim = { account: ACCOUNT, txHash: `0x${"cd".repeat(32)}`, to: MIXER, value: "999" };
+    expect((await t.asAgent("POST", "/agent/activity", claim)).status).toBe(201);
+    const [entry] = (await (await t.owner.get("/activity")).json()) as {
+      kind: string;
+      detail: { to: string; value: string };
+    }[];
+    expect(entry?.kind).toBe("routine_executed");
+    expect(entry?.detail).toMatchObject({ to: SHOP, value: "123" });
+    delegator = SHOP; // tx actually spent from another account
+    expect((await t.asAgent("POST", "/agent/activity", { ...claim, txHash: `0x${"ef".repeat(32)}` })).status).toBe(400);
   });
 
   it("refuses approvals that don't match the request exactly", async () => {
@@ -290,7 +322,7 @@ describe("escalation queue", () => {
   });
 
   it("won't mark executed without a real successful redemption", async () => {
-    const t = setup({ isSuccessfulRedeem: async () => false });
+    const t = setup({ verifiedRedeem: async () => null });
     await t.ready();
     const req = (await (await t.requestApproval()).json()) as ApprovalRequestJSON;
     await t.owner.post(`/requests/${req.id}/approve`, { delegation: t.approvalFor(req) });

@@ -1,0 +1,17 @@
+{
+  "name": "@phoswallet/sdk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@metamask/smart-accounts-kit": "2.0.0",
+    "@phoswallet/shared": "workspace:*",
+    "viem": "^2.58.2"
+  }
+}

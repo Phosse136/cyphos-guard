@@ -29,7 +29,9 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
 - The approver builds what the passkey signs from the raw fields it displays, client-side. Never sign server-built data.
 - Hybrid passkey `keyId` must be the same string at deploy and sign time (`passkeyKeyId()`).
 - Dev-only endpoints (`/dev/relay`, `/dev/fund`) must stay gated on a real anvil node.
-- Off-chain rules (ERC-20 per-tx, non-eq args) do NOT bind a compromised agent. Never sell them as security; keep critical rules on-chain.
+- Off-chain rules (ERC-20 per-tx, non-eq args) do NOT bind a compromised agent unless the policy has `cosigner` (ADR 0005).
+- `packages/contracts`: Foundry on Delegation Framework v1.3.0 (submodule). After changing Solidity run `pnpm contracts:build`
+  (regenerates `generated/`, changes the CREATE2 address) and `pnpm contracts:test`. Never deploy to mainnet.
 - Writes must go through the same node as reads (SDK `writeTransport`). Never let a client fall back to a default RPC.
 - One active grant per (account, agent): re-grant = revoke on-chain first.
 - Demo agent: Claude API via the SDK tool runner (`claude-opus-5-5`, `fallbacks: "default"`). The scripted `--fake-model` is a test double; never present its output as Claude's.

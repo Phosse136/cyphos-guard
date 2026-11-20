@@ -114,13 +114,17 @@ flowchart LR
   your account through gas.
 - Above its limits, the SDK files an **approval request**. Your passkey signs a **one-shot delegation**: exactly
   that call, usable once, valid for minutes. It can't be replayed or widened.
-- **Hybrid enforcement.** Hard caps live on-chain. The policy service only refuses or escalates: it never holds keys,
-  can't widen a grant, and isn't needed to revoke.
+- **Hybrid enforcement.** Hard caps live on-chain. The policy service only refuses or escalates: it holds no key that
+  can move funds, can't widen a grant, and isn't needed to revoke.
+- **Optional co-signer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)). phoswallet's own `CosignerEnforcer` makes
+  the rules the chain can't express (ERC-20 per-payment caps, range checks) binding: each redemption needs a fresh
+  co-signature for that exact call, and the service only co-signs within policy. The co-signer can only block.
 
 Design records: [account stack](docs/decisions/0001-account-stack.md) ·
 [policy schema](docs/decisions/0002-policy-schema.md) ·
 [owner actions](docs/decisions/0003-owner-actions-without-bundler.md) ·
-[approval flow & trust model](docs/decisions/0004-approval-flow.md) · [security](SECURITY.md)
+[approval flow & trust model](docs/decisions/0004-approval-flow.md) ·
+[co-signer](docs/decisions/0005-cosigner-enforcer.md) · [security](SECURITY.md)
 
 | Pending approval (decoded locally from what will be signed)                                       | Activity after the demo run                                                                   |
 | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -149,11 +153,14 @@ corrections welcome).
 
 ## Roadmap
 
+**Done recently**
+
+- **Co-signer enforcer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)). An optional caveat that requires a fresh
+  policy-service signature per redemption. It makes ERC-20 per-payment caps and range checks on arguments binding
+  even for a compromised agent, while the co-signer still can't move funds.
+
 **Next**
 
-- **Co-signer enforcer.** A caveat that requires the policy service's signature in the caveat `args`. That makes
-  off-chain rules (ERC-20 per-payment caps, range checks on arguments) binding even for a compromised agent, while
-  the co-signer still can't move funds.
 - Live Base Sepolia guide (faucets, bundler, explorer links end to end).
 - Several ERC-20 recipients per permission (`LogicalOrWrapperEnforcer`), batch approvals, web push notifications.
 - Gasless revoke through a paymaster, plus a pinned or IPFS approver build so you don't have to trust a host.
@@ -176,7 +183,8 @@ corrections welcome).
 ```
 apps/approver         Next.js owner app: passkey login, approvals, grants, revoke, activity
 apps/policy-service   approval queue · grant registry · activity (Hono + node:sqlite), holds no keys
-packages/sdk          @phoswallet/sdk: createPhoswallet, policy compiler, typed errors
+packages/contracts    CosignerEnforcer (Foundry, on Delegation Framework v1.3.0 as submodule)
+packages/sdk          @phoswallet/sdk: createPhoswallet, policy compiler, co-signer, typed errors
 packages/shared       policy schema (zod), API types, escalation and off-chain checks
 examples/poc          Phase 1 proof of concept + passkey spike + e2e escalation flow
 examples/demo-agent   Claude accounts-payable agent (Messages API tool runner)
@@ -186,7 +194,9 @@ docs/                 ADRs, policy examples, demo script, assets
 ## Development
 
 ```sh
+git submodule update --init --recursive      # once, for packages/contracts
 pnpm lint && pnpm typecheck && pnpm test     # offline
+pnpm contracts:test                          # Foundry tests
 pnpm test:fork                               # SDK integration tests on a fork
 pnpm e2e && pnpm demo:selftest --fake-model  # end-to-end flows on a fork
 pnpm e2e:browser && pnpm e2e:demo            # approver in Chromium with a virtual passkey

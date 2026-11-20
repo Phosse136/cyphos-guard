@@ -92,7 +92,8 @@ compile to its own delegation keeps "what the owner reads" equal to "what the ch
 
 **Phase 3 update.** All three kinds compile. `erc20Transfer` needs exactly one recipient. `contractCall` `eq` pins need a
 single function and static types. Off-chain checks run in the SDK (`offchainCheck`). They stop a buggy agent, **not a compromised one**:
-an agent holding the signed delegation can redeem directly. Only on-chain rules bind it, until the co-signer enforcer exists.
+an agent holding the signed delegation can redeem directly. Only on-chain rules bind it, unless the policy names a co-signer
+(ADR 0005: `CosignerEnforcer` makes them binding).
 One active grant per agent (period counters are per delegation, so overlapping grants would stack caps).
 
 **Invariant:** off-chain checks only ever _narrow_ what the on-chain delegation allows. They can refuse or

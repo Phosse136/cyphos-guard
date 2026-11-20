@@ -20,12 +20,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history for the secret scan
+          submodules: recursive # Delegation Framework v1.3.0 for the contracts
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - uses: foundry-rs/foundry-toolchain@v1
       - run: pnpm install --frozen-lockfile
+      - run: pnpm contracts:test
+      - name: Contract artifact is up to date (and bytecode reproducible → stable CREATE2 address)
+        run: pnpm contracts:build && git diff --exit-code packages/contracts/generated
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
@@ -43,6 +48,8 @@ jobs:
       CHROMIUM_PATH: /usr/bin/google-chrome
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:

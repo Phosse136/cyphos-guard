@@ -74,7 +74,8 @@ Anything above 1 USDC/day becomes an approval request. On-chain: `ERC20PeriodTra
 ```
 
 Spender pin = on-chain (`AllowedCalldata`). The 50 USDC cap on the amount is an **off-chain** pre-check (`lte`):
-it binds a well-behaved agent only. For a hard cap, prefer an `erc20Transfer` permission over approvals.
+On its own it binds a well-behaved agent only; add `"cosigner": "0x…"` (the policy service's co-signer) to make it binding on-chain
+([ADR 0005](decisions/0005-cosigner-enforcer.md)).
 
 ## 4. Mixed + denylist, 30 days
 

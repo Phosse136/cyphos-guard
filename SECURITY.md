@@ -1,7 +1,7 @@
 # Security
 
-phoswallet is **experimental and testnet-only**. Do not use it with real funds. It has not been audited (the
-MetaMask Delegation Framework contracts it builds on have been; phoswallet adds no contracts of its own).
+phoswallet is **experimental and testnet-only**. Do not use it with real funds. It has not been audited. The
+MetaMask Delegation Framework contracts it builds on have been; phoswallet's own `CosignerEnforcer` has not.
 
 ## Reporting a vulnerability
 
@@ -26,8 +26,13 @@ on-chain) or stop revocation.
 
 **What a compromised agent could do:** spend up to its on-chain limits until revoked, and ignore off-chain rules
 (ERC-20 per-payment caps, non-`eq` argument rules), because it holds its signed delegations and can redeem
-them directly. Put anything security-critical into on-chain rules. A co-signer enforcer that makes off-chain rules
-binding is on the [roadmap](README.md#roadmap).
+them directly, **unless the grant names a co-signer**. With a co-signer
+([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)), every redemption needs a fresh co-signature that the
+service only gives within policy, so those rules bind a compromised agent too.
+
+**The co-signer key** (held by the policy service) can only block: a cosignature grants nothing on its own. If it
+leaks, off-chain rules become bypassable and the on-chain caps still hold. If the service is down, co-signed grants
+are unusable (fail-closed).
 
 **Known limitations**
 

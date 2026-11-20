@@ -3,7 +3,7 @@
 import type { ActivityJSON } from "@phoswallet/shared";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { ago, eth, explorer, short } from "@/lib/format";
+import { ago, describe, explorer, short } from "@/lib/format";
 import { Card } from "./ui";
 
 const LABEL: Record<ActivityJSON["kind"], string> = {
@@ -36,7 +36,11 @@ export function Activity({ fork, refreshKey }: { fork: boolean; refreshKey: numb
       {items.length === 0 && <p className="text-sm text-zinc-500">No activity yet.</p>}
       <ul className="divide-y divide-zinc-100 text-sm dark:divide-zinc-800">
         {items.map((a) => {
-          const d = a.detail as { value?: string; to?: string; code?: string };
+          const d = a.detail as { value?: string; to?: `0x${string}`; data?: `0x${string}`; code?: string };
+          // Decoded from the recorded call (for routine payments the service took it from the chain itself).
+          const desc =
+            d.to && d.value !== undefined ? describe({ to: d.to, value: d.value, data: d.data ?? "0x" }) : null;
+          const recipient = desc?.lines.find((l) => l.startsWith("to "))?.slice(3) ?? d.to;
           const link = a.txHash ? explorer(fork, a.txHash) : null;
           return (
             <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
@@ -44,8 +48,8 @@ export function Activity({ fork, refreshKey }: { fork: boolean; refreshKey: numb
                 <span className={a.kind === "request_denied" ? "font-medium text-red-600" : "font-medium"}>
                   {LABEL[a.kind]}
                 </span>
-                {d.value && <span className="text-zinc-500"> · {eth(d.value)}</span>}
-                {d.to && <span className="font-mono text-xs text-zinc-500"> → {short(d.to)}</span>}
+                {desc && <span className="text-zinc-500"> · {desc.title.replace(/^(Send|Pay) /, "")}</span>}
+                {recipient && <span className="font-mono text-xs text-zinc-500"> → {short(recipient)}</span>}
                 {d.code && <span className="text-xs text-zinc-500"> ({d.code})</span>}
                 {a.agent && <span className="font-mono text-xs text-zinc-400"> · agent {short(a.agent)}</span>}
               </span>

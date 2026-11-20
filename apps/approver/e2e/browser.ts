@@ -105,7 +105,7 @@ try {
     params: [agentKey.address, toHex(parseEther("1"))] as never,
   });
   await page.getByLabel("Agent address").fill(agentKey.address);
-  await page.getByLabel("Allowed recipient").fill(shop);
+  await page.getByLabel("ETH recipient").fill(shop);
   await page.getByRole("button", { name: "Grant (sign with passkey)" }).click();
   await page.getByRole("button", { name: "Revoke" }).waitFor({ timeout: 30_000 });
   check("agent granted with a passkey-signed delegation", true);

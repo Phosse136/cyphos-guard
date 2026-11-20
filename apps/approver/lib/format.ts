@@ -1,5 +1,10 @@
 import { decodeErc20Transfer } from "@phoswallet/shared";
-import { type Address, formatEther, type Hex } from "viem";
+import { type Address, formatEther, formatUnits, type Hex } from "viem";
+
+/** Known tokens on Base Sepolia, for human-readable amounts. Unknown tokens show raw base units. */
+const TOKENS: Record<string, { symbol: string; decimals: number }> = {
+  "0x036cbd53842c5426634e7929541ec2318f3dcf7e": { symbol: "USDC", decimals: 6 },
+};
 
 export const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 export const eth = (wei: string | bigint) => `${formatEther(BigInt(wei))} ETH`;
@@ -16,6 +21,17 @@ export function describe(exec: { to: Address; value: string; data: Hex }): { tit
   const value = BigInt(exec.value);
   if (exec.data === "0x") return { title: `Send ${eth(value)}`, lines: [`to ${exec.to}`] };
   const erc20 = decodeErc20Transfer(exec.data);
+  const known = TOKENS[exec.to.toLowerCase()];
+  if (erc20 && known && exec.data.startsWith("0xa9059cbb")) {
+    return {
+      title: `Pay ${formatUnits(erc20.amount, known.decimals)} ${known.symbol}`,
+      lines: [
+        `to ${erc20.recipient}`,
+        `token ${known.symbol} ${exec.to}`,
+        ...(value > 0n ? [`plus ${eth(value)}`] : []),
+      ],
+    };
+  }
   if (erc20) {
     return {
       title: `Token transfer of ${erc20.amount.toString()} base units`,

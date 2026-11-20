@@ -1,0 +1,187 @@
+/**
+ * Browser test of the INTERACTIVE demo exactly as a person runs it (fork):
+ *   approver: create passkey + account → open the demo:setup prefill link → grant with passkey
+ *   terminal: `demo:agent` (here with --fake-model: scripted Messages API, not Claude)
+ *   approver: INV-1043 appears → click Approve (virtual WebAuthn authenticator)
+ *   verify: vendor balances on-chain; transcript + screenshots saved for the docs / video.
+ * Requires `pnpm --filter @phoswallet/approver build` first.
+ */
+import { type ChildProcess, spawn } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { stripVTControlCharacters } from "node:util";
+import { serve } from "@hono/node-server";
+import { prefillLink } from "@phoswallet/demo-agent/setup";
+import { createApp } from "@phoswallet/policy-service/app";
+import { createChainAdapter } from "@phoswallet/policy-service/chain";
+import { openStore } from "@phoswallet/policy-service/store";
+import { ensureFork } from "@phoswallet/sdk/testing";
+import { chromium } from "playwright-core";
+import {
+  type Address,
+  type Chain,
+  createPublicClient,
+  erc20Abi,
+  http,
+  type PublicClient,
+  parseEther,
+  parseUnits,
+  toHex,
+} from "viem";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { baseSepolia } from "viem/chains";
+
+const USDC: Address = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+const chain: Chain = baseSepolia;
+const FORK = process.env.FORK_RPC_URL || "http://127.0.0.1:8545";
+const APP = "http://localhost:3000";
+const SHOTS = process.env.E2E_SCREENSHOTS ?? resolve(import.meta.dirname, "screenshots");
+const root = resolve(import.meta.dirname, "../../..");
+mkdirSync(SHOTS, { recursive: true });
+
+const failures: string[] = [];
+const check = (label: string, pass: boolean, detail = "") => {
+  console.log(`  ${pass ? "✔" : "✘ FAIL"} ${label}${detail ? `  (${detail})` : ""}`);
+  if (!pass) failures.push(label);
+};
+
+await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
+const service = serve({
+  fetch: createApp({
+    store: openStore(":memory:"),
+    chain: await createChainAdapter({ rpcUrl: FORK, network: "fork" }),
+    config: { rpId: "localhost", rpName: "phoswallet", origins: [APP], sessionTtlSeconds: 3600, secureCookies: false },
+  }).fetch,
+  port: 8787,
+  hostname: "127.0.0.1",
+});
+const next: ChildProcess = spawn("pnpm", ["exec", "next", "start", "--hostname", "localhost", "--port", "3000"], {
+  cwd: resolve(import.meta.dirname, ".."),
+  env: { ...process.env, NETWORK: "fork", NEXT_TELEMETRY_DISABLED: "1" },
+  stdio: "ignore",
+});
+let agentProc: ChildProcess | undefined;
+const cleanup = () => {
+  agentProc?.kill();
+  next.kill();
+  service.close();
+};
+process.on("exit", cleanup);
+for (
+  let i = 0;
+  i < 60 &&
+  !(await fetch(APP).then(
+    (r) => r.ok,
+    () => false,
+  ));
+  i++
+)
+  await new Promise((r) => setTimeout(r, 500));
+
+const browser = await chromium.launch({
+  executablePath: process.env.CHROMIUM_PATH ?? "/usr/bin/chromium",
+  args: ["--no-sandbox"],
+});
+const page = await browser.newPage({ viewport: { width: 1100, height: 1000 } });
+const cdp = await page.context().newCDPSession(page);
+await cdp.send("WebAuthn.enable");
+await cdp.send("WebAuthn.addVirtualAuthenticator", {
+  options: {
+    protocol: "ctap2",
+    transport: "internal",
+    hasResidentKey: true,
+    hasUserVerification: true,
+    isUserVerified: true,
+    automaticPresenceSimulation: true,
+  },
+});
+const shot = (name: string) => page.screenshot({ path: resolve(SHOTS, `${name}.png`), fullPage: true });
+const publicClient: PublicClient = createPublicClient({ chain, transport: http(FORK) });
+
+try {
+  console.log("▸ owner onboarding (approver)");
+  await page.goto(APP);
+  await page.getByRole("button", { name: "Create passkey" }).click();
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByText("Pending approvals").waitFor({ timeout: 60_000 });
+
+  console.log("▸ demo:setup equivalent: agent key, gas, prefill link");
+  const agentKey = generatePrivateKey();
+  const agent = privateKeyToAccount(agentKey);
+  await publicClient.request({
+    method: "anvil_setBalance" as never,
+    params: [agent.address, toHex(parseEther("0.05"))] as never,
+  });
+  await page.goto(prefillLink(agent.address, APP));
+  await page.getByText("Prefilled from a link").waitFor({ timeout: 15_000 });
+  check(
+    "prefill link filled the grant form (with a review warning)",
+    (await page.getByLabel("Agent address").inputValue()) === agent.address,
+  );
+  await shot("demo-1-grant-prefilled");
+  await page.getByRole("button", { name: "Grant (sign with passkey)" }).click();
+  await page.getByRole("button", { name: "Revoke" }).waitFor({ timeout: 30_000 });
+  check("grant signed with the passkey in the browser", true);
+
+  console.log("▸ pnpm demo:agent --fake-model (separate process, like a second terminal)");
+  let transcript = "";
+  agentProc = spawn("node", ["examples/demo-agent/src/main.ts", "--fake-model"], {
+    cwd: root,
+    env: {
+      ...process.env,
+      DEMO_AGENT_PRIVATE_KEY: agentKey,
+      NETWORK: "fork",
+      FORK_RPC_URL: FORK,
+      POLICY_SERVICE_URL: "http://127.0.0.1:8787",
+    },
+  });
+  agentProc.stdout?.on("data", (c: Buffer) => {
+    transcript += c.toString();
+  });
+  agentProc.stderr?.on("data", (c: Buffer) => {
+    transcript += c.toString();
+  });
+  const exited = new Promise<number | null>((r) => agentProc?.on("exit", r));
+
+  await page.getByText("Pay 4 USDC").waitFor({ timeout: 60_000 });
+  check("INV-1043 shows up as a pending approval, human-readable (Pay 4 USDC)", true);
+  await shot("demo-2-pending-approval");
+  await page.getByRole("button", { name: "Approve" }).click();
+  await page.getByText("Nothing waiting").waitFor({ timeout: 30_000 });
+
+  const code = await Promise.race([exited, new Promise<"timeout">((r) => setTimeout(() => r("timeout"), 90_000))]);
+  check("agent process finished cleanly", code === 0, String(code));
+  writeFileSync(resolve(SHOTS, "demo-transcript.txt"), stripVTControlCharacters(transcript));
+  await page.getByText("Approved payment sent").waitFor({ timeout: 15_000 });
+  await page.waitForTimeout(5500); // let the activity list poll once more
+  await shot("demo-3-activity");
+
+  console.log("▸ on-chain verification");
+  const usdcOf = (a: Address) =>
+    publicClient.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [a] });
+  const { VENDORS } = await import("@phoswallet/demo-agent/scenario");
+  check("Inference API got 1.20 + 4.00 USDC", (await usdcOf(VENDORS.inferenceApi)) === parseUnits("5.2", 6));
+  check(
+    "GPU market got 0.0005 ETH",
+    (await publicClient.getBalance({ address: VENDORS.gpuMarket })) === parseEther("0.0005"),
+  );
+  check(
+    "DataHarvest (forbidden) got nothing",
+    (await publicClient.getBalance({ address: VENDORS.dataHarvest })) === 0n,
+  );
+  check("transcript shows the denial", /INV-1044 blocked by policy \(forbidden\)/.test(transcript));
+} catch (e) {
+  await shot("demo-failure").catch(() => {});
+  failures.push(`exception: ${(e as Error).message.split("\n")[0]}`);
+  console.error(e);
+} finally {
+  await browser.close();
+}
+
+console.log(
+  failures.length
+    ? `\n${failures.length} demo check(s) FAILED`
+    : `\nInteractive demo e2e passed. Screenshots + transcript: ${SHOTS}`,
+);
+cleanup();
+process.exit(failures.length ? 1 : 0);

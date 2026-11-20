@@ -9,7 +9,8 @@
     "start": "NEXT_TELEMETRY_DISABLED=1 next start --hostname localhost --port 3000",
     "typecheck": "tsc -p tsconfig.json",
     "e2e:browser": "node --env-file-if-exists=../../.env e2e/browser.ts",
-    "dev:all": "node --env-file-if-exists=../../.env scripts/dev.ts"
+    "dev:all": "node --env-file-if-exists=../../.env scripts/dev.ts",
+    "e2e:demo": "node --env-file-if-exists=../../.env e2e/demo.ts"
   },
   "dependencies": {
     "@metamask/smart-accounts-kit": "2.0.0",
@@ -28,6 +29,7 @@
     "tailwindcss": "^4.3.5",
     "playwright-core": "1.65.1",
     "@phoswallet/policy-service": "workspace:*",
-    "@hono/node-server": "^2.1.11"
+    "@hono/node-server": "^2.1.11",
+    "@phoswallet/demo-agent": "workspace:*"
   }
 }

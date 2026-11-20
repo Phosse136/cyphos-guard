@@ -3,13 +3,46 @@
 import type { MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
 import type { GrantJSON, PolicyInput } from "@phoswallet/shared";
 import { useCallback, useEffect, useState } from "react";
-import { isAddress, parseEther } from "viem";
+import { formatUnits, isAddress, parseEther, parseUnits } from "viem";
 import { api } from "@/lib/api";
 import { ago, eth, short } from "@/lib/format";
 import { ownerClient, publicClient } from "@/lib/wallet";
 import { Button, Card, ErrorText, Field, inputClass } from "./ui";
 
 const DAY = 86_400;
+/** Circle test USDC on Base Sepolia. */
+export const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+
+const EMPTY = {
+  agent: "",
+  ethRecipient: "",
+  ethDaily: "0.001",
+  usdcRecipient: "",
+  usdcPerTx: "",
+  usdcDaily: "",
+  hardMaxEth: "0.01",
+  hardMaxUsdc: "",
+  days: "7",
+  forbidden: "",
+};
+type Form = typeof EMPTY;
+
+type PermissionJSON = { kind: string; token?: string; recipients?: string[]; perPeriod?: { amount: string } };
+
+function describeGrant(policy: unknown): string {
+  const p = policy as { permissions: PermissionJSON[] };
+  return p.permissions
+    .map((perm) => {
+      const to = perm.recipients?.[0] ? ` → ${short(perm.recipients[0])}` : "";
+      if (perm.kind === "nativeTransfer" && perm.perPeriod) return `${eth(perm.perPeriod.amount)}/day${to}`;
+      if (perm.kind === "erc20Transfer" && perm.perPeriod) {
+        const unit = perm.token?.toLowerCase() === USDC.toLowerCase() ? "USDC" : `token ${short(perm.token ?? "")}`;
+        return `${formatUnits(BigInt(perm.perPeriod.amount), 6)} ${unit}/day${to}`;
+      }
+      return perm.kind;
+    })
+    .join(" · ");
+}
 
 export function Grants({
   account,
@@ -25,14 +58,10 @@ export function Grants({
   const [grants, setGrants] = useState<GrantJSON[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    agent: "",
-    recipient: "",
-    daily: "0.001",
-    hardMax: "0.01",
-    days: "7",
-    forbidden: "",
-  });
+  const [form, setForm] = useState<Form>(EMPTY);
+  const [prefilled, setPrefilled] = useState(false);
+  const set = (k: keyof Form) => (e: { target: { value: string } }) =>
+    setForm((f) => ({ ...f, [k]: e.target.value.trim() }));
 
   const load = useCallback(
     () =>
@@ -47,35 +76,69 @@ export function Grants({
     load();
   }, [load, refreshKey]);
 
+  // Dev convenience for the demo: `?grant=<base64url JSON>` prefills the form. Local fork ONLY: on a real
+  // network a crafted link could prefill an attacker's agent address. The owner still reviews and signs.
+  useEffect(() => {
+    if (!fork) return;
+    const raw = new URLSearchParams(window.location.search).get("grant");
+    if (!raw) return;
+    try {
+      const data = JSON.parse(atob(raw.replace(/-/g, "+").replace(/_/g, "/"))) as Partial<Form>;
+      const clean = Object.fromEntries(
+        Object.entries(data).filter(([k, v]) => k in EMPTY && typeof v === "string"),
+      ) as Partial<Form>;
+      setForm((f) => ({ ...f, ...clean }));
+      setPrefilled(true);
+      window.history.replaceState(null, "", window.location.pathname);
+    } catch {
+      setError("could not read the prefill link");
+    }
+  }, [fork]);
+
+  const permissions = (): PolicyInput["permissions"] => {
+    const out: PolicyInput["permissions"] = [];
+    if (form.usdcRecipient) {
+      out.push({
+        kind: "erc20Transfer",
+        token: USDC,
+        recipients: [form.usdcRecipient],
+        ...(form.usdcPerTx ? { perTx: parseUnits(form.usdcPerTx, 6).toString() } : {}),
+        perPeriod: { amount: parseUnits(form.usdcDaily, 6).toString(), periodSeconds: DAY },
+      });
+    }
+    if (form.ethRecipient) {
+      out.push({
+        kind: "nativeTransfer",
+        recipients: [form.ethRecipient],
+        perPeriod: { amount: parseEther(form.ethDaily).toString(), periodSeconds: DAY },
+      });
+    }
+    return out;
+  };
+
   const grant = async () => {
     setBusy("grant");
     setError(null);
     try {
       const now = Number((await publicClient().getBlock()).timestamp);
+      const hardMax: NonNullable<PolicyInput["escalation"]>["hardMax"] = [];
+      if (form.hardMaxEth) hardMax.push({ token: "native", amount: parseEther(form.hardMaxEth).toString() });
+      if (form.hardMaxUsdc) hardMax.push({ token: USDC, amount: parseUnits(form.hardMaxUsdc, 6).toString() });
       const policyInput: PolicyInput = {
         version: 1,
         chainId: 84532, // Base Sepolia (the only chain the approver targets)
         agent: form.agent,
         validFrom: now - 60,
         expiresAt: now + Number(form.days) * DAY,
-        permissions: [
-          {
-            kind: "nativeTransfer" as const,
-            recipients: [form.recipient],
-            perPeriod: { amount: parseEther(form.daily).toString(), periodSeconds: DAY },
-          },
-        ],
-        escalation: {
-          enabled: true,
-          approvalTtlSeconds: 900,
-          hardMax: form.hardMax ? [{ token: "native" as const, amount: parseEther(form.hardMax).toString() }] : [],
-        },
+        permissions: permissions(),
+        escalation: { enabled: true, approvalTtlSeconds: 900, hardMax },
         forbidden: { targets: form.forbidden.split(/[\s,]+/).filter(Boolean) },
       };
       // SDK: validates, compiles one delegation per permission, passkey-signs each, and revokes this
       // agent's existing grant on-chain first so caps never stack.
       await ownerClient(account, fork).grantAgent({ policy: policyInput });
-      setForm((f) => ({ ...f, agent: "", recipient: "", forbidden: "" }));
+      setForm(EMPTY);
+      setPrefilled(false);
       await load();
       onChanged();
     } catch (e) {
@@ -100,14 +163,17 @@ export function Grants({
     }
   };
 
-  const valid = isAddress(form.agent) && isAddress(form.recipient) && Number(form.daily) > 0 && Number(form.days) > 0;
+  const ethOk = !form.ethRecipient || (isAddress(form.ethRecipient) && Number(form.ethDaily) > 0);
+  const usdcOk = !form.usdcRecipient || (isAddress(form.usdcRecipient) && Number(form.usdcDaily) > 0);
+  const valid =
+    isAddress(form.agent) && (form.ethRecipient || form.usdcRecipient) && ethOk && usdcOk && Number(form.days) > 0;
 
   return (
     <Card title="Agents">
       <ul className="mb-6 space-y-2">
         {grants.length === 0 && <li className="text-sm text-zinc-500">No agents yet.</li>}
         {grants.map((g) => {
-          const p = g.policy as { permissions: { perPeriod: { amount: string } }[]; expiresAt: number };
+          const p = g.policy as { expiresAt: number };
           return (
             <li
               key={g.id}
@@ -116,8 +182,8 @@ export function Grants({
               <div className="text-sm">
                 <p className="font-mono">{short(g.agent)}</p>
                 <p className="text-xs text-zinc-500">
-                  {p.permissions[0] ? `${eth(p.permissions[0].perPeriod.amount)}/day` : ""} · granted {ago(g.createdAt)}{" "}
-                  · {g.status === "active" ? `expires ${new Date(p.expiresAt * 1000).toLocaleDateString()}` : "revoked"}
+                  {describeGrant(g.policy)} · granted {ago(g.createdAt)} ·{" "}
+                  {g.status === "active" ? `expires ${new Date(p.expiresAt * 1000).toLocaleDateString()}` : "revoked"}
                 </p>
               </div>
               {g.status === "active" ? (
@@ -133,50 +199,48 @@ export function Grants({
       </ul>
 
       <h3 className="mb-3 text-sm font-semibold">Grant a new agent</h3>
+      {prefilled && (
+        <p className="mb-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          Prefilled from a link (local fork only). Check every field before signing.
+        </p>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Agent address">
-          <input
-            className={inputClass}
-            value={form.agent}
-            onChange={(e) => setForm({ ...form, agent: e.target.value.trim() })}
-            placeholder="0x…"
-          />
-        </Field>
-        <Field label="Allowed recipient">
-          <input
-            className={inputClass}
-            value={form.recipient}
-            onChange={(e) => setForm({ ...form, recipient: e.target.value.trim() })}
-            placeholder="0x…"
-          />
-        </Field>
-        <Field label="Daily limit (ETH)" hint="Enforced on-chain">
-          <input
-            className={inputClass}
-            value={form.daily}
-            onChange={(e) => setForm({ ...form, daily: e.target.value })}
-          />
-        </Field>
-        <Field label="Ask me up to (ETH)" hint="Above this: denied, never asked">
-          <input
-            className={inputClass}
-            value={form.hardMax}
-            onChange={(e) => setForm({ ...form, hardMax: e.target.value })}
-          />
+          <input className={inputClass} value={form.agent} onChange={set("agent")} placeholder="0x…" />
         </Field>
         <Field label="Valid for (days)" hint="Max 90">
-          <input
-            className={inputClass}
-            value={form.days}
-            onChange={(e) => setForm({ ...form, days: e.target.value })}
-          />
+          <input className={inputClass} value={form.days} onChange={set("days")} />
         </Field>
+
+        <Field label="USDC recipient" hint="Optional: lets the agent pay this address in USDC">
+          <input className={inputClass} value={form.usdcRecipient} onChange={set("usdcRecipient")} placeholder="0x…" />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="USDC per day" hint="On-chain">
+            <input className={inputClass} value={form.usdcDaily} onChange={set("usdcDaily")} />
+          </Field>
+          <Field label="USDC per payment" hint="Above: ask me">
+            <input className={inputClass} value={form.usdcPerTx} onChange={set("usdcPerTx")} />
+          </Field>
+        </div>
+
+        <Field label="ETH recipient" hint="Optional: lets the agent pay this address in ETH">
+          <input className={inputClass} value={form.ethRecipient} onChange={set("ethRecipient")} placeholder="0x…" />
+        </Field>
+        <Field label="ETH per day" hint="On-chain">
+          <input className={inputClass} value={form.ethDaily} onChange={set("ethDaily")} />
+        </Field>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Ask me up to (ETH)" hint="Above: denied">
+            <input className={inputClass} value={form.hardMaxEth} onChange={set("hardMaxEth")} />
+          </Field>
+          <Field label="Ask me up to (USDC)" hint="Above: denied">
+            <input className={inputClass} value={form.hardMaxUsdc} onChange={set("hardMaxUsdc")} />
+          </Field>
+        </div>
         <Field label="Forbidden addresses" hint="Comma-separated; never paid, never asked">
-          <input
-            className={inputClass}
-            value={form.forbidden}
-            onChange={(e) => setForm({ ...form, forbidden: e.target.value })}
-          />
+          <input className={inputClass} value={form.forbidden} onChange={set("forbidden")} />
         </Field>
       </div>
       <Button className="mt-4" disabled={!valid || busy !== null} onClick={grant}>

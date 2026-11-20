@@ -1,146 +1,179 @@
 # phoswallet
 
-**Fireblocks-grade guardrails for AI agents, for indie devs and small teams. Open source, self-serve, cheap.**
+**Guardrails and human approval for AI agents that spend crypto. Open source, self-hosted, testnet-first.**
 
-> Status: Phase 4 (demo agent). Phase 5 (polish) next. Testnet only (Base Sepolia). Not for real funds.
+Give an agent a budget it can't exceed, get a passkey prompt when it wants more, and make some things impossible.
+All of it is enforced by your smart account, not by a server you have to trust.
 
-AI agents increasingly need to spend money on-chain: pay for APIs, swap, rebalance. Today you either hand the agent
-a private key (full risk) or approve every transaction yourself (and the agent is pointless).
+![phoswallet demo: grant an agent, approve a big payment with a passkey, see a forbidden payment blocked](docs/assets/demo.gif)
 
-phoswallet gives an agent **scoped, revocable permissions** on your smart account, in three layers:
+> **Status:** working MVP on Base Sepolia (and local forks of it). **Testnet only. Not audited. Do not use with real funds.**
 
-| Layer              | Example                                 | What happens                                                                                               |
-| ------------------ | --------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Routine**        | Pay ≤ 1 USDC/day to the API provider    | The agent acts alone. Limits are enforced on-chain                                                         |
-| **Big or unusual** | Pay 25 USDC, or a new recipient         | You get an approval request and approve with a **passkey** (Face ID, fingerprint, YubiKey). No seed phrase |
-| **Forbidden**      | Anything touching a denylisted contract | Impossible for the agent. Never offered for approval                                                       |
+## The three layers
 
-## How it works
+| Layer              | Example                                                        | What happens                                                                                                  |
+| ------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Routine**        | Pay ≤ 2 USDC per invoice, ≤ 5 USDC a day, to your API provider | The agent pays alone. Limits are enforced **on-chain**                                                        |
+| **Big or unusual** | A 4 USDC annual-plan invoice                                   | You get an approval request and approve with your **passkey** (Face ID, fingerprint, YubiKey). No seed phrase |
+| **Forbidden**      | Paying a vendor on your denylist                               | Blocked. Never executed, never offered for approval                                                           |
 
-- Your account is a **MetaMask Hybrid smart account** (Delegation Framework, audited) owned by your passkey, with an
-  EOA recovery key you keep.
-- A grant is a set of **delegations** to the agent's key, each with on-chain caveats: per-tx and per-day limits,
-  allowed recipients/contracts/functions, expiry.
-- The agent redeems delegations with ordinary transactions. It needs no bundler and can't drain your account through gas.
-- When the agent needs more, the SDK files an approval request. You approve with your passkey, which signs a
-  **one-shot delegation** for exactly that call, valid for minutes.
-- **Hybrid enforcement:** hard caps on-chain are the safety floor. The off-chain policy service can only _block or
-  escalate_. It never holds keys and can never move funds. You can revoke on-chain without phoswallet.
+## Quick start (5 minutes, no faucet, no API keys)
 
-Design records: [ADR 0001: account stack](docs/decisions/0001-account-stack.md) ·
-[ADR 0002: policy schema](docs/decisions/0002-policy-schema.md)
-
-## Run the PoC in 5 minutes
-
-Requirements: Node ≥ 24, pnpm 12, [Foundry](https://getfoundry.sh) (for `anvil`).
+Requirements: Node ≥ 24, pnpm 12, [Foundry](https://getfoundry.sh) (for `anvil`), Chrome or Chromium.
 
 ```sh
 pnpm install
-pnpm poc            # local fork of Base Sepolia: no faucet, no API key
+pnpm poc     # proof of concept on a local Base Sepolia fork: limits, rejections, revoke, all on-chain
+pnpm dev     # fork + policy service + approver → open http://localhost:3000
 ```
 
-The script spawns an anvil fork of Base Sepolia (real MetaMask Delegation Framework contracts) and generates
-throwaway keys into `.env`. Then it:
-
-1. Deploys a Hybrid smart account for the owner and funds it.
-2. Grants the agent **max 0.001 ETH per day, only to one address, for 7 days** (one signed delegation, no gas).
-3. Agent: sends 0.0005 ✔ · sends 0.0006 more (over the daily cap) ✘ · pays a stranger ✘ · smuggles calldata ✘.
-   Rejections are broadcast anyway, so you see reverted txs with the enforcer's reason.
-4. Fast-forwards one day: the allowance resets and 0.0006 ✔ (fork only).
-5. Owner revokes on-chain. The agent's next send ✘ `CannotUseADisabledDelegation()`.
-
-It's self-checking: it exits non-zero if anything that must be rejected gets through.
-
-**On real Base Sepolia** (explorer links): `NETWORK=live pnpm poc`. The first run prints the owner address. Send it
-~0.003 test ETH from a faucet ([Coinbase](https://portal.cdp.coinbase.com/products/faucet),
-[Superchain](https://console.optimism.io/faucet)) and run again.
-
-How the pieces fit: [ADR 0003: owner actions without a bundler](docs/decisions/0003-owner-actions-without-bundler.md) ·
-[passkey path (Phase 2)](docs/passkey-path.md)
-
-## Watch an agent use it (Phase 4)
-
-A Claude accounts-payable agent pays four invoices. Two are routine (paid alone), one is big (you approve with
-your passkey) and one goes to a denylisted vendor (blocked). See [examples/demo-agent](examples/demo-agent/README.md)
-and the [demo video script](docs/demo-script.md).
+In the approver: **Create passkey → Create account → Grant a new agent**. Then let an agent use it:
 
 ```sh
-pnpm dev            # then create passkey + account at http://localhost:3000
-pnpm demo:setup     # open the printed link, grant the agent with your passkey
-pnpm demo:agent     # needs ANTHROPIC_API_KEY in .env
+pnpm demo:setup   # agent key + gas; prints a link that prefills the demo grant
+pnpm demo:agent   # a Claude agent pays four invoices (needs ANTHROPIC_API_KEY in .env)
 ```
 
-## Use the SDK (Phase 3)
+One run shows all three layers: two invoices paid alone, one approved by you with your passkey, one blocked by
+your denylist ([demo details](examples/demo-agent/README.md), [video script](docs/demo-script.md)).
+
+## Use it from your agent
 
 ```ts
-const pw = createPhoswallet({ accountAddress, policyServiceUrl, agent: privateKeyToAccount(AGENT_KEY) });
+import { createPhoswallet, ApprovalPending, PolicyViolation } from "@phoswallet/sdk";
+
+const pw = createPhoswallet({ policyServiceUrl, agent: privateKeyToAccount(AGENT_KEY) });
+
 try {
-  await pw.execute({ to: shop, value: parseEther("0.0005"), reason: "API usage" }); // within limits: just pays
+  const { txHash } = await pw.execute({ to: vendor, value: parseEther("0.0005"), reason: "GPU credits" });
 } catch (e) {
   if (e instanceof ApprovalPending)
-    await pw.waitForApproval(e.request.id); // above: owner approves with passkey
-  else if (e instanceof PolicyViolation) console.log("not allowed:", e.reason); // forbidden: never happens
+    await pw.waitForApproval(e.request.id); // owner approves with passkey
+  else if (e instanceof PolicyViolation)
+    console.log("not allowed:", e.reason); // forbidden / over_hard_max / no_grant
+  else throw e;
 }
 ```
 
-[SDK quickstart and API reference](packages/sdk/README.md) · [policy examples](docs/policy-examples.md)
+[SDK quickstart & API reference](packages/sdk/README.md) · [policy examples](docs/policy-examples.md)
 
-## Try the approval app (Phase 2)
+## How it works
 
-```sh
-pnpm dev            # local fork + policy service + approver
+```mermaid
+flowchart LR
+  subgraph Owner["Owner (browser)"]
+    A["Approver app<br/>passkey (WebAuthn)"]
+  end
+  subgraph Agent["Agent process"]
+    G["AI agent + @phoswallet/sdk<br/>own EOA key"]
+  end
+  subgraph PS["policy-service (self-hosted)"]
+    Q["approval queue · grants · activity<br/>holds no keys"]
+  end
+  subgraph Chain["Base Sepolia"]
+    DM["DelegationManager<br/>+ caveat enforcers"]
+    SA["Owner's Hybrid smart account<br/>(passkey + recovery EOA)"]
+    R["Recipients"]
+    EP["EntryPoint (ERC-4337)"]
+  end
+
+  A -- "grant: passkey-signed delegations" --> Q
+  G -- "1 · redeem delegation (plain tx, agent pays gas)" --> DM
+  DM -- "caveats pass → execute" --> SA --> R
+  G -- "2 · above limits: approval request (signed)" --> Q
+  Q -- "pending request" --> A
+  A -- "one-shot delegation: exact call, once, minutes" --> Q
+  Q -- "approved" --> G
+  A -- "revoke: passkey-signed userOp (bundler)" --> EP --> SA
 ```
 
-Open **http://localhost:3000** (use `localhost`, because the passkey is bound to that hostname):
+- Your account is a **MetaMask Hybrid smart account** owned by your passkey, with an optional recovery EOA.
+- A grant is a set of **delegations** (ERC-7710, [MetaMask Delegation Framework](https://github.com/MetaMask/delegation-framework),
+  audited). Each carries on-chain **caveats**: recipients, functions, per-tx and per-period caps, expiry.
+- The agent redeems delegations with **ordinary transactions from its own key**. No bundler, and it can't drain
+  your account through gas.
+- Above its limits, the SDK files an **approval request**. Your passkey signs a **one-shot delegation**: exactly
+  that call, usable once, valid for minutes. It can't be replayed or widened.
+- **Hybrid enforcement.** Hard caps live on-chain. The policy service only refuses or escalates: it never holds keys,
+  can't widen a grant, and isn't needed to revoke.
 
-1. **Create passkey.** It becomes the owner. No seed phrase.
-2. **Create account.** Deploys a Hybrid smart account owned by the passkey. Add a recovery address if you have one.
-3. **Grant a new agent.** Enter an agent address, an allowed recipient and a daily limit, then sign with the passkey.
-4. The agent pays within its limit on its own. When it needs more, the request appears under **Pending approvals**.
-   **Approve** signs a one-shot permission with your passkey for exactly that payment. **Revoke** cuts the agent off on-chain.
+Design records: [account stack](docs/decisions/0001-account-stack.md) ·
+[policy schema](docs/decisions/0002-policy-schema.md) ·
+[owner actions](docs/decisions/0003-owner-actions-without-bundler.md) ·
+[approval flow & trust model](docs/decisions/0004-approval-flow.md) · [security](SECURITY.md)
 
-Automated checks:
+| Pending approval (decoded locally from what will be signed)                                       | Activity after the demo run                                                                   |
+| ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| ![Pending approval: Pay 4 USDC, with the agent's reason](docs/assets/demo-2-pending-approval.png) | ![Activity: paid within limits, approved, blocked by policy](docs/assets/demo-3-activity.png) |
 
-```sh
-pnpm e2e            # HTTP-level escalation flow on a fork (software passkey)
-pnpm e2e:browser    # the same through the UI in Chromium with a virtual WebAuthn authenticator
-pnpm test:fork      # SDK integration tests against a Base Sepolia fork
-pnpm demo:selftest --fake-model   # demo scenario headless (scripted model)
-pnpm e2e:demo       # the interactive demo in Chromium (virtual passkey, scripted model)
-```
+## Why phoswallet
 
-How it fits together, and what the server can and can't do:
-[ADR 0004: escalation and approval flow](docs/decisions/0004-approval-flow.md)
+phoswallet builds on the same primitive as MetaMask's Advanced Permissions, the Delegation Framework, and adds
+the parts an agent operator needs around it.
+
+|                         | **phoswallet**                                                                           | **MetaMask Advanced Permissions** (ERC-7715)                                     | **Fireblocks Agent Wallets**                                                  |
+| ----------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Built for               | Indie devs and small teams running their own agents                                      | Dapps and agents requesting permissions from MetaMask users                      | Fintechs and payment providers issuing wallets to their end users             |
+| Owner's side            | A browser and a passkey                                                                  | MetaMask extension (v13.23+) and an account upgraded to a MetaMask smart account | Wallets issued by the fintech on the Fireblocks platform (powered by Dynamic) |
+| Custody                 | Non-custodial smart account (passkey + optional recovery EOA)                            | User's MetaMask smart account                                                    | Users keep custody via MPC key management (per Fireblocks)                    |
+| Limits                  | On-chain caveats: per-tx / per-period caps, recipients, functions, argument pins, expiry | Spending and periodic permissions granted up front in the extension              | Policy engine checks agent transactions before signing                        |
+| Above the limit         | **Live escalation**: request → passkey approval → one-shot delegation                    | Not part of ERC-7715 itself (it defines permission requests)                     | Policy-engine rules (see Fireblocks docs)                                     |
+| Forbidden actions       | Denylist + hard maximums; never escalated                                                | Whatever the granted permission excludes                                         | Policy-engine rules                                                           |
+| Open source / self-host | Yes (Apache-2.0), self-hosted service + app                                              | SDK and contracts open source; the extension is MetaMask's                       | Commercial platform                                                           |
+
+Sources: [MetaMask Advanced Permissions docs](https://docs.metamask.io/smart-accounts-kit/concepts/advanced-permissions/),
+[MetaMask support: Advanced Permissions](https://support.metamask.io/more-web3/dapps/advanced-permissions/),
+[Fireblocks agentic infrastructure](https://www.fireblocks.com/solutions/agentic-digital-asset-infrastructure),
+[Fireblocks Agentic Payments Suite](https://fireblocks.com/blog/agentic-payments-suite-psp-fintech) (checked November 2026;
+corrections welcome).
+
+## Roadmap
+
+**Next**
+
+- **Co-signer enforcer.** A caveat that requires the policy service's signature in the caveat `args`. That makes
+  off-chain rules (ERC-20 per-payment caps, range checks on arguments) binding even for a compromised agent, while
+  the co-signer still can't move funds.
+- Live Base Sepolia guide (faucets, bundler, explorer links end to end).
+- Several ERC-20 recipients per permission (`LogicalOrWrapperEnforcer`), batch approvals, web push notifications.
+- Gasless revoke through a paymaster, plus a pinned or IPFS approver build so you don't have to trust a host.
+- MCP server so any MCP-capable agent can use phoswallet tools.
+
+**Smart rules**
+
+- Swap guardrails: max slippage, allowed pools and tokens.
+- Market and protocol risk: pause on APY swings, depegs or protocol incidents.
+- Anomaly detection on agent behavior: unusual rate, new counterparties, off-hours spending, with automatic escalation.
+
+**Wider support**
+
+- Wallet-agnostic adapters behind the same policy schema (e.g. ERC-7579 smart sessions, ZeroDev Kernel).
+
+**Not planned:** a token, a DAO, or mainnet before an independent audit.
 
 ## Repo layout
 
 ```
-apps/approver         Next.js owner app: passkey approvals, activity, revoke
-apps/policy-service   approval queue API (later: block-only co-signer)
-packages/sdk          @phoswallet/sdk
-packages/shared       policy schema (zod), shared types
-packages/contracts    Foundry, only if we need a custom enforcer
-examples/poc          Phase 1 testnet scripts
-examples/demo-agent   Claude tool-calling demo agent
-docs/decisions        ADRs
+apps/approver         Next.js owner app: passkey login, approvals, grants, revoke, activity
+apps/policy-service   approval queue · grant registry · activity (Hono + node:sqlite), holds no keys
+packages/sdk          @phoswallet/sdk: createPhoswallet, policy compiler, typed errors
+packages/shared       policy schema (zod), API types, escalation and off-chain checks
+examples/poc          Phase 1 proof of concept + passkey spike + e2e escalation flow
+examples/demo-agent   Claude accounts-payable agent (Messages API tool runner)
+docs/                 ADRs, policy examples, demo script, assets
 ```
 
 ## Development
 
-Requirements: Node ≥ 24 (see `.nvmrc`), pnpm 12, Foundry (from Phase 1, only if contracts are needed).
-
 ```sh
-npm install -g pnpm@12.21.0   # Node ≥ 25 no longer bundles corepack
-pnpm install        # also enables the pre-commit secret check
-pnpm lint && pnpm typecheck && pnpm test
-cp .env.example .env
+pnpm lint && pnpm typecheck && pnpm test     # offline
+pnpm test:fork                               # SDK integration tests on a fork
+pnpm e2e && pnpm demo:selftest --fake-model  # end-to-end flows on a fork
+pnpm e2e:browser && pnpm e2e:demo            # approver in Chromium with a virtual passkey
 ```
 
-## Security
-
-Testnet only. Never put a key that has held real funds into `.env`. Commits are scanned for keys by
-`scripts/check-secrets.sh` (and gitleaks, if installed).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Commits are scanned for secrets (pre-commit hook + gitleaks).
 
 ## License
 
-To be decided in Phase 5 (MIT or Apache-2.0).
+[Apache License 2.0](LICENSE).

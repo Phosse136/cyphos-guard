@@ -44,6 +44,11 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
 - Non-obvious AA/crypto decisions get a short comment or an ADR in `docs/decisions/`.
 - If a library doesn't behave as documented: show the evidence, propose an alternative, don't hack around it.
 
+## Project status
+
+Phases 0-5 done (see README). License Apache-2.0. CI: `.github/workflows/ci.yml` (checks job offline; fork job runs
+fork/e2e/browser suites with the runner's Chrome via `CHROMIUM_PATH`). Regenerate the README GIF with `scripts/make-demo-gif.sh`.
+
 ## Commands
 
 - `pnpm install` · `pnpm lint` · `pnpm format` · `pnpm typecheck` · `pnpm test` · `pnpm check-secrets`

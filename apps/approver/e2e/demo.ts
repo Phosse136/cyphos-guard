@@ -82,7 +82,15 @@ const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH ?? "/usr/bin/chromium",
   args: ["--no-sandbox"],
 });
-const page = await browser.newPage({ viewport: { width: 1100, height: 1000 } });
+// E2E_VIDEO_DIR=<dir>: record the browser for the README GIF (see scripts/make-demo-gif.sh). Adds short
+// pauses at key moments so a viewer can follow; without it the test runs at full speed.
+const VIDEO_DIR = process.env.E2E_VIDEO_DIR;
+const context = await browser.newContext({
+  viewport: { width: 1100, height: 1000 },
+  ...(VIDEO_DIR ? { recordVideo: { dir: VIDEO_DIR, size: { width: 1100, height: 1000 } } } : {}),
+});
+const page = await context.newPage();
+const pause = (ms: number) => (VIDEO_DIR ? page.waitForTimeout(ms) : Promise.resolve());
 const cdp = await page.context().newCDPSession(page);
 await cdp.send("WebAuthn.enable");
 await cdp.send("WebAuthn.addVirtualAuthenticator", {
@@ -95,7 +103,10 @@ await cdp.send("WebAuthn.addVirtualAuthenticator", {
     automaticPresenceSimulation: true,
   },
 });
-const shot = (name: string) => page.screenshot({ path: resolve(SHOTS, `${name}.png`), fullPage: true });
+const shot = async (name: string, hold = 1800) => {
+  await page.screenshot({ path: resolve(SHOTS, `${name}.png`), fullPage: true });
+  await pause(hold);
+};
 const publicClient: PublicClient = createPublicClient({ chain, transport: http(FORK) });
 
 try {
@@ -145,7 +156,7 @@ try {
 
   await page.getByText("Pay 4 USDC").waitFor({ timeout: 60_000 });
   check("INV-1043 shows up as a pending approval, human-readable (Pay 4 USDC)", true);
-  await shot("demo-2-pending-approval");
+  await shot("demo-2-pending-approval", 5000); // the key moment: hold it in the recording
   await page.getByRole("button", { name: "Approve" }).click();
   await page.getByText("Nothing waiting").waitFor({ timeout: 30_000 });
 
@@ -154,7 +165,8 @@ try {
   writeFileSync(resolve(SHOTS, "demo-transcript.txt"), stripVTControlCharacters(transcript));
   await page.getByText("Approved payment sent").waitFor({ timeout: 15_000 });
   await page.waitForTimeout(5500); // let the activity list poll once more
-  await shot("demo-3-activity");
+  await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }));
+  await shot("demo-3-activity", 5000);
 
   console.log("▸ on-chain verification");
   const usdcOf = (a: Address) =>
@@ -175,6 +187,8 @@ try {
   failures.push(`exception: ${(e as Error).message.split("\n")[0]}`);
   console.error(e);
 } finally {
+  await context.close(); // flushes the video file
+  if (VIDEO_DIR) console.log(`  video: ${await page.video()?.path()}`);
   await browser.close();
 }
 

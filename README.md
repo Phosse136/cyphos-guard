@@ -72,6 +72,16 @@ Account [0xd7a0…bD60](https://sepolia.basescan.org/address/0xd7a053F7d2063705F
 | Expired cosignature                                        | ✘ `CosignerEnforcer:expired`                                   | [reverted](https://sepolia.basescan.org/tx/0x9cbe4bf88970cbfb55234e119422bdd943a5b2c2f006284ceec38e4b1288f902) |
 | 0.0009 ETH with a valid cosignature (over the daily cap)   | ✘ `NativeTokenPeriodTransferEnforcer:transfer-amount-exceeded` | [reverted](https://sepolia.basescan.org/tx/0xc4808b32771c1e941adda5219b2a3b2e96748d9fbbe76cfb53ceb9ec27f0437b) |
 
+**Approver app, live** (`pnpm --filter @cyphos-guard/approver e2e:live`, 2026-11-20). The real UI in Chromium with a virtual
+passkey: the passkey-only account was created through the public Pimlico bundler, then granted a co-signed 0.0005 ETH/day
+permission. Account [0x408a…cEEB](https://sepolia.basescan.org/address/0x408a4835F92C8d5fd173769a08BB4C26B584cEEB).
+
+| Step                                                                      | Result                                         | Transaction                                                                                              |
+| ------------------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Agent pays 0.0002 ETH alone (co-signed)                                   | ✔ executed                                     | [tx](https://sepolia.basescan.org/tx/0x69754a60214bd1544edce679afcc7cac6c5ac275617d2f582ab1e88dc3490059) |
+| Agent wants 0.0006 ETH (over the daily cap) → owner approves with passkey | ✔ executed after approval                      | [tx](https://sepolia.basescan.org/tx/0x48275c3c2449841416d064b660a09eb2d0eb620b8502b837ab4afd4642d3e48c) |
+| Owner clicks Revoke (passkey-signed userOp via bundler)                   | ✔ revoked; the agent's next attempt is refused | [tx](https://sepolia.basescan.org/tx/0x8ee0aa16145b38a0f260cdcc2b0e16901f67faae23296cf95290d599c900bbee) |
+
 The demo agent was also run with the real Claude model (`claude-opus-5-5`, `pnpm demo:selftest`, on a local
 Base Sepolia fork). It paid the two routine invoices alone, waited for the owner's passkey approval on the 4 USDC
 invoice, and was blocked when it tried to pay the denylisted vendor. On-chain balances confirmed each outcome.
@@ -210,13 +220,14 @@ corrections welcome).
 
 **Done recently**
 
+- **Live Base Sepolia guide** ([docs/live-guide.md](docs/live-guide.md)). The full approver flow runs on live Base Sepolia.
+
 - **Co-signer enforcer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)). An optional caveat that requires a fresh
   policy-service signature per redemption. It makes ERC-20 per-payment caps and range checks on arguments binding
   even for a compromised agent, while the co-signer still can't move funds.
 
 **Next**
 
-- Live Base Sepolia guide (faucets, bundler, explorer links end to end).
 - Several ERC-20 recipients per permission (`LogicalOrWrapperEnforcer`), batch approvals, web push notifications.
 - Gasless revoke through a paymaster, plus a pinned or IPFS approver build so you don't have to trust a host.
 - MCP server so any MCP-capable agent can use cyphos-guard tools.

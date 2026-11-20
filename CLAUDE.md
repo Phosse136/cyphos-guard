@@ -36,6 +36,8 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
 - One active grant per (account, agent): re-grant = revoke on-chain first.
 - Demo agent: Claude API via the SDK tool runner (`claude-opus-5-5`, `fallbacks: "default"`). The scripted `--fake-model` is a test double; never present its output as Claude's.
 - Activity is recorded from the chain (decoded redemption tx + delegator), never from agent claims.
+- Next.js bakes `rewrites()` destinations into the build: never route network targets through rewrites. The approver
+  proxies `/api` and `/rpc` with route handlers that read `lib/upstream.ts` at request time.
 - Services bind to localhost. The approver proxies `/api` to the policy service.
 - Flag anything that could put funds at risk, even on testnet.
 

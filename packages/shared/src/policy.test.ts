@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type PolicyInput, policySchema } from "./policy.js";
+import { type PolicyInput, policySchema } from "./policy.ts";
 
 const AGENT = "0x1111111111111111111111111111111111111111";
 const SHOP = "0x2222222222222222222222222222222222222222";

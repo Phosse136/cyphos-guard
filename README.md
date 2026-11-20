@@ -149,6 +149,42 @@ Design records: [account stack](docs/decisions/0001-account-stack.md) ·
 | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | ![Pending approval: Pay 4 USDC, with the agent's reason](docs/assets/demo-2-pending-approval.png) | ![Activity: paid within limits, approved, blocked by policy](docs/assets/demo-3-activity.png) |
 
+## What is the co-signer?
+
+The co-signer is an optional second signature that cyphos-guard adds to every payment an agent makes. Think of a
+bank that requires two signatures on a cheque, except that the second signer can only say "no", never "yes" on its own.
+
+**The problem it solves.** An agent's limits come in two kinds:
+
+- **Limits the smart contracts enforce directly**, such as "max 5 USDC per day" or "only pay this address". The
+  blockchain refuses anything outside them, whatever the agent does.
+- **Limits the contracts can't express**, such as "max 2 USDC _per payment_" for tokens, or "amount must be below X".
+  Without the co-signer only the SDK checks these, inside the agent's own program. A hacked or buggy agent could skip
+  the SDK and use its signed permission directly, and the blockchain would let the payment through.
+
+**How it fixes that**
+
+1. You grant an agent permissions with the co-signer turned on (the "Require the cyphos-guard co-signer" checkbox in
+   the approver). The permission then says that every payment also needs a fresh signature from the co-signer.
+2. Before each payment, the agent asks the cyphos-guard policy service to co-sign it.
+3. The service checks the payment against all the rules, including the ones the contracts can't express, and only
+   signs if everything is fine.
+4. The agent attaches the signature and sends the payment. cyphos-guard's own smart contract, the
+   [`CosignerEnforcer`](packages/contracts/src/CosignerEnforcer.sol), checks on-chain that the signature is genuine,
+   fresh and for exactly this payment.
+
+A hacked agent that tries to skip the rules fails on-chain because it has no valid co-signature (see the
+[live co-signer scenario](#verified-on-base-sepolia) above: `missing-cosignature`, `invalid-cosignature` and so on).
+
+**Why it's safe.** The co-signer **can only block, never move money.** Its signature alone does nothing: a payment
+still needs the agent's key and your passkey-signed permission, and every on-chain limit still applies. In the live
+test, a valid co-signature couldn't get past the daily cap. If the co-signer key were ever stolen, the worst case is
+that the extra rules stop working; your on-chain limits still hold.
+
+**The trade-off.** If the policy service is down, a co-signed agent can't make payments on its own until it's back.
+Your approvals and revocations keep working. That's why it's a checkbox: you choose between stricter safety and
+independence from the service. Design details: [ADR 0005](docs/decisions/0005-cosigner-enforcer.md).
+
 ## Why cyphos-guard
 
 cyphos-guard builds on the same primitive as MetaMask's Advanced Permissions, the Delegation Framework, and adds

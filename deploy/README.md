@@ -53,3 +53,10 @@ NOTIFY_SUMMARY_HOUR=20
 
 Messages contain the event, amounts and shortened addresses. Mention the channel in your privacy policy if other
 people use your instance.
+
+## Backups
+
+`deploy/backup.sh` (daily via `cyphos-guard-backup.timer`, 03:30) writes consistent SQLite copies and the env files
+(they hold the co-signer keys) to `/var/backups/cyphos-guard/<date>/`, root-only, 14 days kept. Install:
+`cp deploy/cyphos-guard-backup.{service,timer} /etc/systemd/system/ && systemctl enable --now cyphos-guard-backup.timer`.
+This is a local copy only: also copy the folder to another machine or storage.

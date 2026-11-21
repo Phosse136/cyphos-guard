@@ -1,0 +1,6 @@
+[Unit]
+Description=cyphos-guard daily backup (SQLite + env files)
+
+[Service]
+Type=oneshot
+ExecStart=/opt/cyphos-guard/deploy/backup.sh

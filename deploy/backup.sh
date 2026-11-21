@@ -3,7 +3,7 @@
 # and the env files (co-signer keys!). Root-only, keeps 14 days. This protects against mistakes and corruption,
 # NOT against losing the disk: copy /var/backups/cyphos-guard somewhere else too.
 set -euo pipefail
-dest=/var/backups/cyphos-guard/$(date +%Y-%m-%d_%H%M)
+dest=/var/backups/cyphos-guard/$(date +%Y-%m-%d_%H%M%S)
 umask 077
 mkdir -p "$dest"
 for db in /var/lib/cyphos-guard/policy-service.sqlite /var/lib/cyphos-guard/app/policy-service.sqlite; do

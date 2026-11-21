@@ -82,6 +82,12 @@ export type AppConfig = {
    */
   setupCode?: string;
   /**
+   * Public multi-owner instance: anyone may register a passkey (each owner only ever sees their own account),
+   * up to `maxOwners`. Absent → single-owner: the first passkey becomes the owner, then registration closes.
+   * If `setupCode` is set too, every registration needs it (an invite code).
+   */
+  openRegistration?: { maxOwners: number };
+  /**
    * Abuse protection for a public deployment (absent = off, e.g. in tests). The client IP is the first
    * X-Forwarded-For entry, which is only trustworthy because the service listens on localhost behind the
    * approver proxy and Caddy (Caddy sets the header itself and ignores client-supplied values).
@@ -256,12 +262,18 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
 
   // ---------- owner: passkey registration & login ----------
 
+  const registrationOpen = () => {
+    const n = store.owners.count();
+    return n === 0 || (config.openRegistration !== undefined && n < config.openRegistration.maxOwners);
+  };
+
   app.get("/me", async (c) => {
     const token = getCookie(c, SESSION_COOKIE);
     const ownerId = token ? store.sessions.ownerFor(sha(token), nowS()) : null;
     const owner = ownerId ? store.owners.byId(ownerId) : null;
     return c.json({
-      registrationOpen: store.owners.count() === 0,
+      registrationOpen: registrationOpen(),
+      multiOwner: Boolean(config.openRegistration),
       setupCodeRequired: Boolean(config.setupCode),
       fork: chain.isFork,
       chainId: chain.chainId,
@@ -276,8 +288,8 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
   });
 
   app.post("/auth/register/options", async (c) => {
-    // Single-owner, self-hosted MVP: the first passkey to register becomes the owner; afterwards closed.
-    if (store.owners.count() > 0) throw new HTTPException(403, { message: "registration is closed" });
+    // Single-owner by default (the first passkey becomes the owner, then closed); multi-owner with openRegistration.
+    if (!registrationOpen()) throw new HTTPException(403, { message: "registration is closed" });
     if (config.setupCode) {
       // Only a caller with the code gets a challenge; /verify needs that challenge, so it is gated too.
       const body = (await c.req.json().catch(() => ({}))) as { setupCode?: unknown };
@@ -298,7 +310,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
   });
 
   app.post("/auth/register/verify", async (c) => {
-    if (store.owners.count() > 0) throw new HTTPException(403, { message: "registration is closed" });
+    if (!registrationOpen()) throw new HTTPException(403, { message: "registration is closed" });
     const body = (await c.req.json()) as {
       challengeId: string;
       response: Parameters<typeof verifyRegistrationResponse>[0]["response"];

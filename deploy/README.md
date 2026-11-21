@@ -10,6 +10,8 @@ How https://app.cyphosguard.com runs (the setup supports a second instance too):
   (can only _block_ agent redemptions, never move funds) and `OWNER_SETUP_CODE`.
 - **Owner setup code:** on a public address the first visitor could otherwise register as owner. With
   `OWNER_SETUP_CODE` set, registration requires it; after the owner exists, registration is closed for good.
+  For a public instance where anyone may sign up, set `OPEN_REGISTRATION=1` (cap: `MAX_OWNERS`, default 1000): every
+  owner gets their own account and only ever sees their own grants, requests and activity.
 
 Install: clone to `/opt/cyphos-guard`, `pnpm install`, build the approver with the env loaded, copy the two
 `.service` files to `/etc/systemd/system/` and `Caddyfile` to `/etc/caddy/`, then

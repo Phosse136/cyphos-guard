@@ -911,3 +911,70 @@ describe("owner's own passkey transactions", () => {
     expect((await t.owner.post("/owner/tx", { txHash: HASH })).status).toBe(401);
   });
 });
+
+describe("open registration (public multi-owner instance)", () => {
+  const OTHER_ACCOUNT = "0x6666666666666666666666666666666666666666" as Address;
+  /** Registers a second passkey with its own cookie jar; returns get/post/put bound to that session. */
+  async function secondOwner(app: ReturnType<typeof setup>["app"]) {
+    const passkey = createSoftPasskey({ rpId: "localhost", origin: "http://localhost:3000" });
+    let cookie = "";
+    const req = (method: string, path: string, body?: unknown) =>
+      app.request(path, {
+        method,
+        headers: { "content-type": "application/json", cookie },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const opt = await req("POST", "/auth/register/options", {});
+    if (opt.status !== 200) return { status: opt.status, req };
+    const o = (await opt.json()) as {
+      challengeId: string;
+      options: { challenge: string };
+    };
+    const res = await req("POST", "/auth/register/verify", {
+      challengeId: o.challengeId,
+      response: registrationResponse(passkey, o.options.challenge),
+    });
+    cookie = (res.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+    return { status: res.status, req };
+  }
+
+  it("lets a second owner register, who sees and approves nothing of the first owner's", async () => {
+    // On-chain check stand-in: owner A's passkey is on ACCOUNT only, owner B's on OTHER_ACCOUNT only.
+    const ownerOf = new Map<string, string>(); // account → keyId, first passkey to link it wins
+    const t = setup(
+      {
+        accountHasPasskey: async (account, keyId) => {
+          const a = account.toLowerCase();
+          if (!ownerOf.has(a)) ownerOf.set(a, keyId);
+          return ownerOf.get(a) === keyId;
+        },
+      },
+      { openRegistration: { maxOwners: 10 } },
+    );
+    await t.ready(); // owner A: ACCOUNT, one grant
+    const pending = (await (await t.requestApproval()).json()) as ApprovalRequestJSON;
+
+    const b = await secondOwner(t.app);
+    expect(b.status).toBe(200);
+    expect(((await (await b.req("GET", "/me")).json()) as { multiOwner: boolean }).multiOwner).toBe(true);
+    // B can't take over A's account: the chain check binds it to A's passkey
+    expect((await b.req("PUT", "/me/account", { accountAddress: ACCOUNT })).status).toBe(400);
+    expect((await b.req("PUT", "/me/account", { accountAddress: OTHER_ACCOUNT })).status).toBe(200);
+    expect(await (await b.req("GET", "/grants")).json()).toEqual([]);
+    expect(await (await b.req("GET", "/requests")).json()).toEqual([]);
+    expect(await (await b.req("GET", "/activity")).json()).toEqual([]);
+    expect((await b.req("POST", `/requests/${pending.id}/approve`, {})).status).toBe(404);
+    expect((await b.req("POST", `/requests/${pending.id}/reject`, {})).status).toBe(404);
+    // A still sees its own
+    expect(((await (await t.owner.get("/requests")).json()) as unknown[]).length).toBe(1);
+  });
+
+  it("closes at maxOwners, and stays single-owner without the option", async () => {
+    const capped = setup({}, { openRegistration: { maxOwners: 1 } });
+    await capped.owner.register();
+    expect((await secondOwner(capped.app)).status).toBe(403);
+    const single = setup();
+    await single.owner.register();
+    expect((await secondOwner(single.app)).status).toBe(403);
+  });
+});

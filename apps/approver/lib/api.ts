@@ -3,6 +3,8 @@ import type { Address, Hex } from "viem";
 
 export type Me = {
   registrationOpen: boolean;
+  /** Public instance: many owners, each sees only their own account. */
+  multiOwner?: boolean;
   setupCodeRequired?: boolean;
   fork: boolean;
   chainId: number;

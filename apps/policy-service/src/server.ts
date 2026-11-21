@@ -40,6 +40,9 @@ const app = createApp({
     secureCookies: origin.startsWith("https://"),
     ...(cosigner ? { cosigner } : {}),
     ...(process.env.OWNER_SETUP_CODE ? { setupCode: process.env.OWNER_SETUP_CODE } : {}),
+    ...(process.env.OPEN_REGISTRATION === "1"
+      ? { openRegistration: { maxOwners: Number(process.env.MAX_OWNERS ?? 1000) } }
+      : {}),
     // Per client IP / agent; generous for one owner and a few agents, tight enough to stop floods.
     ...(notifier ? { onEvent: (e: Parameters<typeof notifier.notify>[0]) => void notifier.notify(e) } : {}),
     rateLimit: {
@@ -58,6 +61,8 @@ serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, () => {
     notifier && "notifications on",
   ].filter(Boolean);
   if (process.env.OWNER_SETUP_CODE && store.owners.count() === 0) extras.push("owner setup code required");
+  if (process.env.OPEN_REGISTRATION === "1")
+    extras.push(`open registration (max ${process.env.MAX_OWNERS ?? 1000} owners)`);
   console.log(`policy-service on http://127.0.0.1:${port}  (${[network, ...extras].join(", ")})`);
 });
 

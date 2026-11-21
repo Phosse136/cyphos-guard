@@ -30,7 +30,10 @@ export function Onboarding({ me, onChange }: { me: Me; onChange: () => void }) {
       <Card title="Set up your owner passkey">
         <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
           Your passkey (Face ID, fingerprint, security key) will own your smart account and approve big agent actions.
-          No seed phrase. The first passkey registered here becomes the owner.
+          No seed phrase.{" "}
+          {me.multiOwner
+            ? "Each passkey gets its own smart account; nobody else on this server can see or use it."
+            : "The first passkey registered here becomes the owner."}
         </p>
         {me.setupCodeRequired && (
           <Field
@@ -55,6 +58,21 @@ export function Onboarding({ me, onChange }: { me: Me; onChange: () => void }) {
         >
           Create passkey
         </Button>
+        {me.multiOwner && (
+          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+            Already have an account here?{" "}
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={run(async () => {
+                const { challengeId, options } = await api.loginOptions();
+                await api.loginVerify(challengeId, await startAuthentication({ optionsJSON: options }));
+              })}
+            >
+              Sign in with passkey
+            </Button>
+          </p>
+        )}
         <ErrorText error={error} />
       </Card>
     );

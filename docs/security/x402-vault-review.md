@@ -42,6 +42,14 @@ End-to-end on a Base Sepolia fork with real USDC and the official x402 facilitat
 ([vault.fork.test.ts](../../examples/x402-seller/src/vault.fork.test.ts)): listed seller settles; unlisted
 seller, over-cap and foreign signatures are refused by the facilitator's on-chain verification.
 
+## Static analysis
+
+`slither` 0.11.6 over `packages/contracts/src` (2026-11-21, library code excluded): **0 high, 0 medium**. 18 low or
+informational results, all triaged: `unused-return` on `ECDSA.tryRecover`'s third value (the error code and signer are
+checked), `reentrancy-events` in the owner-only `withdraw` (event after the transfer; no state changes after the call),
+`timestamp` on the co-signer's 5-minute deadline (intended), and naming-convention style notes. Re-run with
+`slither packages/contracts --filter-paths "lib/|test/"`.
+
 ## Findings
 
 | #   | Severity | Finding                                                                                                                                                                                                                                                                                           | Status                                                                                                                                                                                                                                                                |

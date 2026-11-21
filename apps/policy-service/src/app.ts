@@ -61,6 +61,7 @@ import {
 } from "viem";
 import { z } from "zod";
 import type { ChainAdapter } from "./chain.ts";
+import { describeOwnerOp, onlyRevokes } from "./ownerTx.ts";
 import type { Owner, Store } from "./store.ts";
 
 export type AppConfig = {
@@ -510,6 +511,41 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
       createdAt: nowS(),
     });
     return c.json({ ok: true });
+  });
+
+  /**
+   * The approver reports the owner's own passkey tx (create account, send out, recovery, vault) after it landed.
+   * Only the hash is taken from the client: the chain must show a successful userOp from this owner's account,
+   * and what it did is decoded from the tx itself. Revokes are skipped (already recorded as grant_revoked).
+   */
+  const reportedOwnerTxs = new Set<string>();
+  app.post("/owner/tx", ownerAuth, async (c) => {
+    const account = requireAccount(c.get("owner"));
+    const { txHash } = parse(
+      z.object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/) }),
+      await c.req.json().catch(() => ({})),
+    );
+    const key = `${account.toLowerCase()}:${txHash.toLowerCase()}`;
+    if (reportedOwnerTxs.has(key)) return c.json({ ok: true, duplicate: true });
+    const op = await chain.ownerOp(txHash as Hex, account);
+    if (!op) throw new HTTPException(400, { message: "tx is not a successful userOp from this account" });
+    if (reportedOwnerTxs.size > 10_000) reportedOwnerTxs.clear();
+    reportedOwnerTxs.add(key);
+    if (onlyRevokes(op, chain.environment.DelegationManager)) return c.json({ ok: true, skipped: "revoke" });
+    const summary = describeOwnerOp(op, account, chain.environment.DelegationManager);
+    if (summary.length === 0) return c.json({ ok: true, skipped: "nothing to report" });
+    recordActivity({
+      account,
+      agent: null,
+      kind: "owner_tx",
+      detail: {
+        summary,
+        calls: op.calls.map((x) => ({ to: x.to, value: x.value.toString(), data: x.data.slice(0, 2000) })),
+      },
+      txHash: txHash as Hex,
+      createdAt: nowS(),
+    });
+    return c.json({ ok: true }, 201);
   });
 
   app.get("/requests", ownerAuth, async (c) => {

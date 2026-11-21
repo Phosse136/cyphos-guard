@@ -122,7 +122,8 @@ export type ActivityJSON = {
     | "request_rejected"
     | "request_executed"
     | "request_denied"
-    | "x402_paid";
+    | "x402_paid"
+    | "owner_tx";
   detail: Record<string, unknown>;
   txHash: Hex | null;
   createdAt: number;

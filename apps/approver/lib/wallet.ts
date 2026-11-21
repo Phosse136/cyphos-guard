@@ -83,6 +83,18 @@ export async function sendOwnerCalls(
   account: MetaMaskSmartAccount,
   fork: boolean,
   calls: { to: Address; data?: Hex; value?: bigint }[],
+  { report = true }: { report?: boolean } = {},
+) {
+  const txHash = await submitOwnerCalls(account, fork, calls);
+  // Best effort: lets the service record it in Activity and notify (Telegram/Discord). Never blocks the user.
+  if (report) api.reportOwnerTx(txHash).catch(() => {});
+  return txHash;
+}
+
+async function submitOwnerCalls(
+  account: MetaMaskSmartAccount,
+  fork: boolean,
+  calls: { to: Address; data?: Hex; value?: bigint }[],
 ) {
   if (fork) {
     const op = await buildUserOp(account, publicClient(), calls);

@@ -180,8 +180,11 @@ function CreateAccount({
             const account = await newAccount(owner, recovery ? (recovery as Address) : null);
             if (me.fork) await api.devFund(account.address);
             // First userOp deploys the account (factory call) and is signed by the passkey.
-            await sendOwnerCalls(account, me.fork, [{ to: account.address, value: 0n }]);
+            const txHash = await sendOwnerCalls(account, me.fork, [{ to: account.address, value: 0n }], {
+              report: false, // reported below: the service only accepts it once the account is linked
+            });
             await api.linkAccount(account.address);
+            api.reportOwnerTx(txHash).catch(() => {});
           })}
         >
           {busy ? "Waiting for passkey…" : me.fork ? "Create account" : "2. Create account"}

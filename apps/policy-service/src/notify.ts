@@ -82,6 +82,14 @@ export function describeEvent(e: NotifyEvent): { title: string; text: string; ur
         text: `🌐 ${agent} paid an API: ${amount()}${typeof d.resource === "string" ? ` for ${d.resource.slice(0, 80)}` : ""}`,
         urgent: false,
       };
+    case "owner_tx": {
+      const lines = Array.isArray(d.summary) ? (d.summary as unknown[]).map(String).slice(0, 10) : [];
+      return {
+        title: "Owner transaction",
+        text: `👤 Owner ${short(e.account)} (passkey): ${lines.length ? lines.join("; ") : "transaction"}`,
+        urgent: false,
+      };
+    }
     default:
       return { title: e.kind, text: `ℹ️ ${e.kind}`, urgent: false };
   }

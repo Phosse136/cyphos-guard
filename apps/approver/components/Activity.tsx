@@ -18,6 +18,7 @@ const LABEL: Record<ActivityJSON["kind"], string> = {
   request_executed: "Approved payment sent",
   request_denied: "Blocked by policy",
   x402_paid: "Paid an x402 API",
+  owner_tx: "You (passkey)",
 };
 
 const GROUPS = {
@@ -26,6 +27,7 @@ const GROUPS = {
   approvals: "Approvals",
   blocked: "Blocked",
   grants: "Grants",
+  mine: "My transactions",
 } as const;
 type Group = keyof typeof GROUPS;
 const inGroup = (kind: ActivityJSON["kind"], g: Group) =>
@@ -33,7 +35,8 @@ const inGroup = (kind: ActivityJSON["kind"], g: Group) =>
   (g === "payments" && (kind === "routine_executed" || kind === "request_executed" || kind === "x402_paid")) ||
   (g === "approvals" && kind.startsWith("request_") && kind !== "request_denied") ||
   (g === "blocked" && kind === "request_denied") ||
-  (g === "grants" && kind.startsWith("grant_"));
+  (g === "grants" && kind.startsWith("grant_")) ||
+  (g === "mine" && kind === "owner_tx");
 
 const PAGE = 100;
 type Detail = {
@@ -50,6 +53,8 @@ type Detail = {
   payer?: `0x${string}`;
   /** request_created for an x402 top-up: the seller and price it pays for. */
   x402?: { payTo: `0x${string}`; amount: string; resource: string };
+  /** owner_tx: what the owner's own passkey tx did, decoded on-chain by the service. */
+  summary?: string[];
 };
 
 export function Activity({ fork, refreshKey }: { fork: boolean; refreshKey: number }) {
@@ -129,7 +134,9 @@ export function Activity({ fork, refreshKey }: { fork: boolean; refreshKey: numb
         {shown.map((a) => {
           const d = a.detail as Detail;
           const desc =
-            d.to && d.value !== undefined ? describe({ to: d.to, value: d.value, data: d.data ?? "0x" }) : null;
+            a.kind !== "owner_tx" && d.to && d.value !== undefined
+              ? describe({ to: d.to, value: d.value, data: d.data ?? "0x" })
+              : null;
           const recipient = desc?.lines.find((l) => l.startsWith("to "))?.slice(3) ?? d.to;
           const isOpen = open === a.id;
           return (
@@ -145,6 +152,7 @@ export function Activity({ fork, refreshKey }: { fork: boolean; refreshKey: numb
                     {LABEL[a.kind]}
                   </span>
                   {desc && <span className="text-zinc-500"> · {desc.title.replace(/^(Send|Pay) /, "")}</span>}
+                  {d.summary && <span className="text-zinc-500"> · {d.summary.join("; ")}</span>}
                   {recipient && <span className="font-mono text-xs text-zinc-500"> → {short(recipient)}</span>}
                   {d.code && <span className="text-xs text-zinc-500"> ({d.code})</span>}
                   {a.agent && <span className="font-mono text-xs text-zinc-400"> · agent {short(a.agent)}</span>}

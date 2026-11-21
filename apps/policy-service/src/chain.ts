@@ -41,6 +41,7 @@ import {
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
+import { decodeOwnerOp, entryPointAbi, type OwnerOp } from "./ownerTx.ts";
 
 export type VerifiedRedeem = { delegator: Address; to: Address; value: bigint; data: Hex };
 
@@ -75,6 +76,11 @@ export type ChainAdapter = {
   } | null>;
   /** Total `token` moved from → to by the successful tx `hash` (ERC-20 Transfer logs), or null if it failed. */
   erc20Transferred(hash: Hex, token: Address, from: Address, to: Address): Promise<bigint | null>;
+  /**
+   * The owner's own userOp in tx `hash`: only if it's a successful EntryPoint.handleOps tx containing a successful
+   * userOp sent by `account`. Calls are decoded from the tx input, not taken from the client.
+   */
+  ownerOp(hash: Hex, account: Address): Promise<OwnerOp | null>;
   /** True if `account` is deployed and has the passkey (keyId → x,y) as a signer. */
   accountHasPasskey(account: Address, keyId: string, x: Hex, y: Hex): Promise<boolean>;
   /**
@@ -172,6 +178,19 @@ export async function createChainAdapter(opts: { rpcUrl: string; network: "fork"
           (l) => isAddressEqual(l.address, token) && isAddressEqual(l.args.from, from) && isAddressEqual(l.args.to, to),
         )
         .reduce((sum, l) => sum + l.args.value, 0n);
+    },
+    async ownerOp(hash, account) {
+      const [tx, receipt] = await Promise.all([
+        client.getTransaction({ hash }).catch(() => null),
+        client.getTransactionReceipt({ hash }).catch(() => null),
+      ]);
+      if (!tx?.to || !receipt || receipt.status !== "success") return null;
+      if (!isAddressEqual(tx.to, environment.EntryPoint)) return null;
+      const ok = parseEventLogs({ abi: entryPointAbi, eventName: "UserOperationEvent", logs: receipt.logs }).some(
+        (l) =>
+          isAddressEqual(l.address, environment.EntryPoint) && isAddressEqual(l.args.sender, account) && l.args.success,
+      );
+      return ok ? decodeOwnerOp(tx.input, account) : null;
     },
     ensureCosignerEnforcer: async () => !!(await client.getCode({ address: cosignerEnforcerAddress })),
     async accountHasPasskey(account, keyId, x, y) {

@@ -3,11 +3,12 @@ import {
   cosignerCaveat,
   cosignerEnforcerAddress,
   cosignTypedData,
+  revokeCall,
   vaultDeployment,
 } from "@cyphos-guard/sdk";
 import { createSoftPasskey } from "@cyphos-guard/sdk/testing";
 import type { ApprovalRequestJSON } from "@cyphos-guard/shared";
-import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
+import { type Delegation, getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
 import { type Address, encodeFunctionData, erc20Abi, type Hex, parseEther, recoverTypedDataAddress } from "viem";
 import { generatePrivateKey, privateKeyToAccount, privateKeyToAddress } from "viem/accounts";
 import { describe, expect, it } from "vitest";
@@ -35,6 +36,7 @@ function setup(overrides: Partial<ChainAdapter> = {}, extraConfig: Partial<AppCo
     ensureCosignerEnforcer: async () => true,
     erc20Transferred: async () => null, // overridden per test
     readX402Vault: async () => null, // overridden per test
+    ownerOp: async () => null, // overridden per test
     ...overrides,
   };
   const store = openStore(":memory:");
@@ -850,5 +852,62 @@ describe("event hook (operator notifications)", () => {
     );
     await broken.ready(); // the grant (which records activity → hook throws) still returns 201
     expect((await broken.requestApproval()).status).toBe(201); // and so does the next request
+  });
+});
+
+describe("owner's own passkey transactions", () => {
+  const HASH = `0x${"b".repeat(64)}`;
+  it("records and notifies only what the chain shows for this account; dedups; skips pure revokes", async () => {
+    const seen: { kind: string; detail?: unknown; txHash?: string | null }[] = [];
+    let op: Awaited<ReturnType<ChainAdapter["ownerOp"]>> = null;
+    let asked: string | undefined;
+    const t = setup(
+      {
+        ownerOp: async (_h, account) => {
+          asked = account;
+          return op;
+        },
+      },
+      { onEvent: (e) => seen.push(e) },
+    );
+    await t.owner.register();
+    expect((await t.owner.post("/owner/tx", { txHash: HASH })).status).toBe(409); // no linked account
+    await t.owner.put("/me/account", { accountAddress: ACCOUNT });
+    expect((await t.owner.post("/owner/tx", { txHash: "0x12" })).status).toBe(400);
+    expect((await t.owner.post("/owner/tx", { txHash: HASH })).status).toBe(400); // chain: not a userOp of ours
+    expect(asked).toBe(ACCOUNT); // the account comes from the session, never from the body
+
+    op = { created: false, calls: [{ to: SHOP, value: parseEther("0.01"), data: "0x" }] };
+    expect((await t.owner.post("/owner/tx", { txHash: HASH, account: MIXER })).status).toBe(201);
+    expect((await (await t.owner.post("/owner/tx", { txHash: HASH })).json()) as object).toMatchObject({
+      duplicate: true,
+    });
+    const owned = seen.filter((e) => e.kind === "owner_tx");
+    expect(owned).toHaveLength(1);
+    expect(owned[0]).toMatchObject({
+      txHash: HASH,
+      detail: { summary: [expect.stringMatching(/^sent 0\.01 ETH → /)] },
+    });
+
+    const revoke = revokeCall(env, {
+      delegate: SHOP,
+      delegator: ACCOUNT,
+      authority: `0x${"0".repeat(64)}`,
+      caveats: [],
+      salt: 1n,
+      signature: "0x",
+    } as unknown as Delegation).data;
+    op = { created: false, calls: [{ to: env.DelegationManager, value: 0n, data: revoke }] };
+    expect((await (await t.owner.post("/owner/tx", { txHash: `0x${"c".repeat(64)}` })).json()) as object).toMatchObject(
+      {
+        skipped: "revoke",
+      },
+    );
+    expect(seen.filter((e) => e.kind === "owner_tx")).toHaveLength(1);
+  });
+
+  it("needs an owner session", async () => {
+    const t = setup();
+    expect((await t.owner.post("/owner/tx", { txHash: HASH })).status).toBe(401);
   });
 });

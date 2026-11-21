@@ -270,6 +270,28 @@ try {
   check("the account's on-chain owner is now the new recovery address", owner === rescuer, owner);
   check("the warning is gone", !(await page.getByText("No recovery address: if you lose this passkey").isVisible()));
 
+  console.log("▸ own passkey transactions are reported (decoded on-chain by the service, then notified)");
+  let ownerLines: string[] = [];
+  for (let i = 0; i < 20 && ownerLines.length < 3; i++) {
+    if (i) await page.waitForTimeout(500);
+    ownerLines = await page.evaluate(async () => {
+      const list = (await (await fetch("/api/activity?limit=200")).json()) as {
+        kind: string;
+        detail: { summary?: string[] };
+      }[];
+      return list.filter((a) => a.kind === "owner_tx").flatMap((a) => a.detail.summary ?? []);
+    });
+  }
+  check("activity has the account creation", ownerLines.includes("created the account"), ownerLines.join(" | "));
+  check(
+    "activity has the send-out (1.5 USDC)",
+    ownerLines.some((l) => l.startsWith("sent 1.5 USDC → ")),
+  );
+  check(
+    "activity has the recovery change",
+    ownerLines.some((l) => l.startsWith("changed the recovery address → ")),
+  );
+
   console.log("▸ on-chain verification");
   check(
     "Inference API got 1.20 + 4.00 USDC",

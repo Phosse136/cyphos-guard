@@ -51,6 +51,8 @@ export const api = {
   activity: (limit = 100, before?: number) =>
     call<ActivityJSON[]>("GET", `/activity?limit=${limit}${before !== undefined ? `&before=${before}` : ""}`),
   cosigner: () => call<{ enabled: boolean; address: Address | null; enforcer: Address }>("GET", "/cosigner"),
+  /** After an own passkey tx landed: the service verifies it on-chain and notifies the operator. */
+  reportOwnerTx: (txHash: Hex) => call("POST", "/owner/tx", { txHash }),
   devRelay: (userOp: unknown) => call<{ txHash: Hex }>("POST", "/dev/relay", { userOp }),
   devFund: (address: Address) => call("POST", "/dev/fund", { address }),
 };

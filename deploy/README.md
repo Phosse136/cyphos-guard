@@ -60,3 +60,13 @@ people use your instance.
 (they hold the co-signer keys) to `/var/backups/cyphos-guard/<date>/`, root-only, 14 days kept. Install:
 `cp deploy/cyphos-guard-backup.{service,timer} /etc/systemd/system/ && systemctl enable --now cyphos-guard-backup.timer`.
 This is a local copy only: also copy the folder to another machine or storage.
+
+## Log retention (privacy)
+
+Caddy keeps no access log; client IPs only appear in occasional error messages in the system journal. Cap the journal
+at 14 days so the privacy policy can say so:
+
+```bash
+sudo install -D -m 644 deploy/journald-retention.conf /etc/systemd/journald.conf.d/10-retention.conf
+sudo systemctl restart systemd-journald
+```

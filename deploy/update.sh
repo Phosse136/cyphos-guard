@@ -4,7 +4,8 @@ set -euo pipefail
 SRC=${1:-/home/PHILCLAUDE/cyphos-guard}
 cd /opt/cyphos-guard
 git pull -q --ff-only "$SRC" main
-pnpm install --frozen-lockfile --offline >/dev/null
+# Offline first (reuses the local store); falls back to the registry for packages the cache lacks.
+pnpm install --frozen-lockfile --offline >/dev/null 2>&1 || pnpm install --frozen-lockfile >/dev/null
 set -a; . /etc/cyphos-guard/env; set +a
 pnpm --filter @cyphos-guard/approver build >/dev/null
 install -d -o cyphos -g cyphos apps/approver/.next/cache

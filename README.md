@@ -103,6 +103,17 @@ no service, no passkey, no bundler. The wallet signed the UserOperation and subm
 ([tx](https://sepolia.basescan.org/tx/0x16b461ccbdf1e9416fa1ee1c1434d8ba5e44a787fe72f73771e570053b91e9a4): 14.8 USDC
 and the remaining ETH to the recovery address; the account is now empty).
 
+**x402 with a vault, live** (2026-11-21, `pnpm --filter @cyphos-guard/x402-seller buy`). The agent paid an x402 API
+(the [demo seller](examples/x402-seller/src/main.ts), settled by the public x402.org testnet facilitator) from the
+owner's account [0x13fE…127A](https://sepolia.basescan.org/address/0x13fED70ad7b46E2c14bc418b7E7D32565bDf127A) through
+its X402Vault [0x6563…8Fc0](https://sepolia.basescan.org/address/0x6563dDa8a8d1Daee0aCE8d17E460DbD01C548Fc0), created at
+grant time. Afterwards vault and agent held 0 USDC: only the price moved, just in time.
+
+| API call                | Result                                          | Transaction                                                                                              |
+| ----------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Market data · 0.50 USDC | ✔ paid alone (within limits)                    | [tx](https://sepolia.basescan.org/tx/0x91c3ea9ceaae852df8cb492c4ea68da6afa423fe5c398309b8a1f087c77ea692) |
+| Deep report · 3 USDC    | ✔ approved with a passkey on a phone, then paid | [tx](https://sepolia.basescan.org/tx/0x076c13d962f42b4b5d17fdb467d58c7b200e4998d9354783afd464dd37644ffc) |
+
 ## Use it from your agent
 
 ### Create the agent's key

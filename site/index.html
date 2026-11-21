@@ -132,6 +132,7 @@
       <a href="#features">Features</a>
       <a href="#security">Security</a>
       <a href="#developers">Developers</a>
+      <a href="https://github.com/Phosse136/cyphos-guard">GitHub</a>
       <a class="btn btn-primary" href="https://app.cyphosguard.com">Open app</a>
     </nav>
   </div>
@@ -146,7 +147,7 @@
         <p class="lead">Give your agent a budget it can't exceed. Approve big payments with a passkey. Make some things impossible. Enforced by your own smart account, not by a server you have to trust.</p>
         <div class="ctas">
           <a class="btn btn-primary" href="https://app.cyphosguard.com">Open the app</a>
-          <a class="btn btn-ghost" href="#layers">See how it works</a>
+          <a class="btn btn-ghost" href="https://github.com/Phosse136/cyphos-guard">View on GitHub</a>
         </div>
         <p class="fine">Testnet only · not audited · don't use with real funds yet.</p>
       </div>
@@ -283,13 +284,16 @@
   <span class="s">"https://api.example/report"</span>, {},
   { reason: <span class="s">"weekly market report"</span> });</pre>
         <pre><span class="c"># create the agent's own key (never leaves your machine)</span>
-pnpm cli agent new --env agent.env
+npx @cyphos-guard/cli agent new --env agent.env
 
 <span class="c"># give Claude the tools: pay, fetch_paid_api, check_approval…</span>
 claude mcp add cyphos-guard \
   -e CYPHOS_AGENT_PRIVATE_KEY=0x… \
-  -- node packages/mcp/src/server.ts</pre>
+  -e NETWORK=live \
+  -e CYPHOS_POLICY_SERVICE_URL=https://app.cyphosguard.com/api \
+  -- npx -y @cyphos-guard/mcp</pre>
       </div>
+      <p class="sub" style="margin-top:20px">Open source (Apache-2.0): <a href="https://github.com/Phosse136/cyphos-guard">github.com/Phosse136/cyphos-guard</a> · npm: <a href="https://www.npmjs.com/package/@cyphos-guard/sdk">@cyphos-guard/sdk</a>, <a href="https://www.npmjs.com/package/@cyphos-guard/mcp">@cyphos-guard/mcp</a></p>
     </div>
   </section>
 
@@ -318,7 +322,7 @@ claude mcp add cyphos-guard \
 <footer class="site">
   <div class="wrap">
     <span>© 2026 cyphos-guard</span>
-    <span><a href="recover/">Recover wallet</a> · <a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a> · <a href="https://app.cyphosguard.com">App</a></span>
+    <span><a href="https://github.com/Phosse136/cyphos-guard">GitHub</a> · <a href="recover/">Recover wallet</a> · <a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a> · <a href="https://app.cyphosguard.com">App</a></span>
   </div>
 </footer>
 

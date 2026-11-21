@@ -116,16 +116,24 @@ grant time. Afterwards vault and agent held 0 USDC: only the price moved, just i
 
 ## Use it from your agent
 
+The packages are on npm (Node ≥ 22.18, Base Sepolia testnet only):
+
+```sh
+npm i @cyphos-guard/sdk viem        # SDK for your agent
+npx @cyphos-guard/cli agent new     # create the agent's key (see below)
+npx -y @cyphos-guard/mcp            # MCP server for Claude & co. (see below)
+```
+
 ### Create the agent's key
 
 The agent has its own key pair. The agent's developer creates it where the agent runs and gives the **owner only the
 address**. cyphos-guard never sees the key, and the key holds no owner funds (just a little gas):
 
 ```sh
-pnpm cli agent new --env agent.env --approver https://your-approver.example
+npx @cyphos-guard/cli agent new --env agent.env --approver https://your-approver.example
 #   Agent address  0x9520…0b01      ← give this to the owner, who grants it limits with their passkey
 #   Private key    stored in agent.env as CYPHOS_AGENT_PRIVATE_KEY (mode 600, never printed)
-pnpm cli agent show --env agent.env   # address + gas balance
+npx @cyphos-guard/cli agent show --env agent.env   # address + gas balance
 ```
 
 It refuses to overwrite an existing key (`--force` replaces it and prints the old address) and warns if the file is in
@@ -158,8 +166,11 @@ The [cyphos-guard MCP server](packages/mcp/README.md) gives Claude Code, Claude 
 backed by the same three layers:
 
 ```sh
-claude mcp add cyphos-guard -e CYPHOS_AGENT_PRIVATE_KEY=0x… -- node /path/to/cyphos-guard/packages/mcp/src/server.ts
+claude mcp add cyphos-guard -e CYPHOS_AGENT_PRIVATE_KEY=0x… -e NETWORK=live \
+  -e CYPHOS_POLICY_SERVICE_URL=https://app.cyphosguard.com/api -- npx -y @cyphos-guard/mcp
 ```
+
+Also listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.Phosse136/cyphos-guard`.
 
 ### …and pay x402 APIs
 

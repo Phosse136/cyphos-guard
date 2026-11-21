@@ -1,0 +1,49 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Phosse136/cyphos-guard",
+  "description": "Spending guardrails for AI agents: on-chain limits, passkey approval above them. Testnet.",
+  "repository": {
+    "url": "https://github.com/Phosse136/cyphos-guard",
+    "source": "github",
+    "subfolder": "packages/mcp"
+  },
+  "websiteUrl": "https://cyphosguard.com",
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@cyphos-guard/mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "CYPHOS_AGENT_PRIVATE_KEY",
+          "description": "The agent's own throwaway testnet key (create one with: npx @cyphos-guard/cli agent new). Holds gas only.",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "CYPHOS_POLICY_SERVICE_URL",
+          "description": "Policy service URL, e.g. https://app.cyphosguard.com/api (default http://127.0.0.1:8787)",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "NETWORK",
+          "description": "live = Base Sepolia, fork = local fork (default fork)",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "RPC_URL",
+          "description": "Base Sepolia RPC for NETWORK=live (default https://sepolia.base.org)",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

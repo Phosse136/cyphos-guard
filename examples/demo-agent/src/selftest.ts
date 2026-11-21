@@ -41,6 +41,9 @@ import { createPrinter } from "./print.ts";
 import { demoPolicy, USDC, VENDORS } from "./scenario.ts";
 import type { ToolEvent } from "./tools.ts";
 
+// The MetaMask Smart Accounts Kit sends usage analytics unless Do-Not-Track is set; cyphos-guard opts out.
+process.env.DO_NOT_TRACK ??= "1";
+
 const fake = process.argv.includes("--fake-model");
 if (!fake && !process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
   console.error(

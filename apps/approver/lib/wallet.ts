@@ -3,6 +3,7 @@
  * passkey via navigator.credentials.get: the server never sees a key and never constructs what we sign.
  */
 
+import "./noTelemetry";
 import { buildUserOp, createCyphosGuard, userOpToJSON } from "@cyphos-guard/sdk";
 import {
   type Delegation,

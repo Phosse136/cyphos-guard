@@ -16,6 +16,9 @@ import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import { createCyphosGuardMcpServer } from "./tools.ts";
 
+// The MetaMask Smart Accounts Kit sends usage analytics unless Do-Not-Track is set; cyphos-guard opts out.
+process.env.DO_NOT_TRACK ??= "1";
+
 const key = process.env.CYPHOS_AGENT_PRIVATE_KEY;
 if (!key || !/^0x[0-9a-fA-F]{64}$/.test(key)) {
   console.error("cyphos-guard MCP: set CYPHOS_AGENT_PRIVATE_KEY (0x + 64 hex) to the agent's throwaway testnet key");

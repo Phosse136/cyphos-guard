@@ -93,7 +93,12 @@ const MAX_PENDING_CHALLENGES = 10_000;
 
 type Env = { Variables: { owner: Owner; agent: Address; body: unknown } };
 
-const SESSION_COOKIE = "cyphos_session";
+/**
+ * Session cookie. On HTTPS it carries the __Host- prefix: the browser then refuses any version of it set with a
+ * Domain attribute or from another (sub)domain, so e.g. a compromised website on the parent domain can't plant a
+ * session cookie for the app ("cookie tossing").
+ */
+const sessionCookieName = (secure: boolean) => (secure ? "__Host-cyphos_session" : "cyphos_session");
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 const nowS = () => Math.floor(Date.now() / 1000);
 const toX402 = (x?: z.output<typeof x402ContextSchema>): X402Context | undefined =>
@@ -101,6 +106,7 @@ const toX402 = (x?: z.output<typeof x402ContextSchema>): X402Context | undefined
 
 export function createApp({ store, chain, config }: { store: Store; chain: ChainAdapter; config: AppConfig }) {
   const app = new Hono<Env>();
+  const SESSION_COOKIE = sessionCookieName(config.secureCookies);
   const limits = config.rateLimit;
   const limiter = limits ? createRateLimiter() : null;
   const tooMany = (retryAfterSeconds: number) =>

@@ -13,6 +13,9 @@ import { privateKeyToAddress } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import { AgentKeyExists, DEFAULT_VAR, newAgent, readAgentKey } from "./agent.ts";
 
+// The MetaMask Smart Accounts Kit sends usage analytics unless Do-Not-Track is set; cyphos-guard opts out.
+process.env.DO_NOT_TRACK ??= "1";
+
 const USAGE = `Usage:
   cyphos-guard agent new   [--env .env] [--var ${DEFAULT_VAR}] [--approver URL] [--force]
   cyphos-guard agent show  [--env .env] [--var ${DEFAULT_VAR}] [--rpc URL]`;

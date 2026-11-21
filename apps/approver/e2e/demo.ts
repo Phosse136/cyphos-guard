@@ -113,6 +113,11 @@ const context = await browser.newContext({
   ...(VIDEO_DIR ? { recordVideo: { dir: VIDEO_DIR, size: { width: 1100, height: 1000 } } } : {}),
 });
 const page = await context.newPage();
+// The Content Security Policy must never block anything the app needs: collect every violation the browser reports.
+const cspViolations: string[] = [];
+page.on("console", (m) => {
+  if (/Content Security Policy|Refused to (connect|load|execute|apply)/i.test(m.text())) cspViolations.push(m.text());
+});
 const pause = (ms: number) => (VIDEO_DIR ? page.waitForTimeout(ms) : Promise.resolve());
 const cdp = await page.context().newCDPSession(page);
 await cdp.send("WebAuthn.enable");
@@ -260,6 +265,7 @@ try {
     (await publicClient.getBalance({ address: VENDORS.dataHarvest })) === start.harvest,
   );
   check("transcript shows the denial", /INV-1044 blocked by policy \(forbidden\)/.test(transcript));
+  check("no Content Security Policy violations", cspViolations.length === 0, cspViolations[0]?.slice(0, 160) ?? "");
 } catch (e) {
   await shot("demo-failure").catch(() => {});
   failures.push(`exception: ${(e as Error).message.split("\n")[0]}`);

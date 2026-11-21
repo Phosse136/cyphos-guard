@@ -6,3 +6,7 @@ minimumReleaseAgeExclude:
   - viem@2.58.2
   - "@hono/node-server@2.1.11"
   - "@anthropic-ai/sdk@1.11.0"
+overrides:
+  # GHSA-w5hq-g745-h8pq (moderate): pulled in by @metamask/utils (^9, used only for temp-file names in its Node fs
+  # helper, which cyphos-guard never calls). Not exploitable here; overridden so audits stay clean.
+  "uuid@<11.1.1": "11.1.1"

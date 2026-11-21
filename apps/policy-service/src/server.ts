@@ -4,6 +4,9 @@ import { createApp } from "./app.ts";
 import { createChainAdapter } from "./chain.ts";
 import { openStore } from "./store.ts";
 
+// The MetaMask Smart Accounts Kit sends usage analytics unless Do-Not-Track is set; cyphos-guard opts out.
+process.env.DO_NOT_TRACK ??= "1";
+
 const network = (process.env.NETWORK ?? "fork") as "fork" | "live";
 const rpcUrl =
   network === "fork"

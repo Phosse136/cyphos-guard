@@ -11,6 +11,9 @@ import { MODEL, runAgent } from "./agent.ts";
 import { startFakeModel } from "./fakeModel.ts";
 import { createPrinter } from "./print.ts";
 
+// The MetaMask Smart Accounts Kit sends usage analytics unless Do-Not-Track is set; cyphos-guard opts out.
+process.env.DO_NOT_TRACK ??= "1";
+
 const key = process.env.DEMO_AGENT_PRIVATE_KEY as `0x${string}` | undefined;
 if (!key) {
   console.error("No demo agent key. Run `pnpm demo:setup` first.");

@@ -8,6 +8,9 @@ import { type Chain, createPublicClient, formatUnits, http, type PublicClient } 
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 
+// The MetaMask Smart Accounts Kit sends usage analytics unless Do-Not-Track is set; cyphos-guard opts out.
+process.env.DO_NOT_TRACK ??= "1";
+
 const chain: Chain = baseSepolia;
 const rpcUrl = process.env.RPC_URL ?? "https://sepolia.base.org";
 const publicClient: PublicClient = createPublicClient({ chain, transport: http(rpcUrl) });

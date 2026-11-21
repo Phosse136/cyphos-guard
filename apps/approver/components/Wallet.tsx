@@ -36,6 +36,10 @@ export function Wallet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [newRecovery, setNewRecovery] = useState("");
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const address = account.address;
 
   const load = useCallback(async () => {
@@ -53,7 +57,7 @@ export function Wallet({
     const t = setInterval(() => load().catch(() => {}), 10_000);
     return () => clearInterval(t);
   }, [load, refreshKey]);
-  useEffect(() => {
+  const loadRecovery = useCallback(() => {
     publicClient()
       .readContract({ address, abi: parseAbi(["function owner() view returns (address)"]), functionName: "owner" })
       .then((o) => {
@@ -63,6 +67,35 @@ export function Wallet({
       })
       .catch(() => setRecovery(null));
   }, [address]);
+  useEffect(() => {
+    loadRecovery();
+  }, [loadRecovery]);
+
+  /** The account's EOA owner = the recovery address (it can control the account without the passkey or this app). */
+  const setRecoveryAddress = async () => {
+    setRecoveryBusy(true);
+    setRecoveryError(null);
+    try {
+      const data = encodeFunctionData({
+        abi: parseAbi(["function transferOwnership(address newOwner)"]),
+        functionName: "transferOwnership",
+        args: [newRecovery as Address],
+      });
+      await sendOwnerCalls(account, fork, [{ to: address, data }]);
+      setNewRecovery("");
+      setRecoveryOpen(false);
+      loadRecovery();
+    } catch (e) {
+      setRecoveryError((e as Error).message);
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+  const newRecoveryOk =
+    isAddress(newRecovery) &&
+    newRecovery.toLowerCase() !== zeroAddress &&
+    newRecovery.toLowerCase() !== address.toLowerCase() &&
+    newRecovery.toLowerCase() !== recovery?.toLowerCase();
 
   const send = async () => {
     setBusy(true);
@@ -131,6 +164,42 @@ export function Wallet({
             ["Recovery address", recovery ?? "none (passkey only)"],
           ]}
         />
+      </div>
+      {!recovery && (
+        <p className="mt-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          No recovery address: if you lose this passkey, nobody can move these funds, and the recovery page can't help.
+          Add a wallet you control (e.g. MetaMask) as a backup.
+        </p>
+      )}
+      <div className="mt-3">
+        {!recoveryOpen ? (
+          <Button variant="ghost" onClick={() => setRecoveryOpen(true)}>
+            {recovery ? "Change recovery address" : "Add recovery address"}
+          </Button>
+        ) : (
+          <div className="space-y-2">
+            <Field
+              label="New recovery address"
+              hint="This address gets FULL control of the account (it can withdraw everything without your passkey). Only use a wallet you own."
+            >
+              <input
+                className={inputClass}
+                value={newRecovery}
+                onChange={(e) => setNewRecovery(e.target.value.trim())}
+                placeholder="0x…"
+              />
+            </Field>
+            <div className="flex gap-2">
+              <Button disabled={recoveryBusy || !newRecoveryOk} onClick={setRecoveryAddress}>
+                {recoveryBusy ? "Confirm with passkey…" : "Set recovery address (sign with passkey)"}
+              </Button>
+              <Button variant="ghost" onClick={() => setRecoveryOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+            <ErrorText error={recoveryError} />
+          </div>
+        )}
       </div>
 
       {open && (

@@ -24,6 +24,7 @@ import {
   erc20Abi,
   http,
   type PublicClient,
+  parseAbi,
   parseEther,
   parseUnits,
   toHex,
@@ -250,6 +251,24 @@ try {
   await page.getByRole("button", { name: "Send (sign with passkey)" }).click();
   await page.getByText("Sent.").waitFor({ timeout: 30_000 });
   check("send funds out moved 1.5 USDC (passkey-signed)", (await usdcOf(payee)) === parseUnits("1.5", 6));
+
+  console.log("▸ recovery address: warning for passkey-only accounts, add one with the passkey");
+  check(
+    "passkey-only account shows the no-recovery warning",
+    await page.getByText("No recovery address: if you lose this passkey").isVisible(),
+  );
+  const rescuer = privateKeyToAccount(generatePrivateKey()).address;
+  await page.getByRole("button", { name: "Add recovery address" }).click();
+  await page.getByLabel(/^New recovery address/).fill(rescuer);
+  await page.getByRole("button", { name: "Set recovery address (sign with passkey)" }).click();
+  await page.getByText("Change recovery address").waitFor({ timeout: 30_000 });
+  const owner = await publicClient.readContract({
+    address: accountAddress as Address,
+    abi: parseAbi(["function owner() view returns (address)"]),
+    functionName: "owner",
+  });
+  check("the account's on-chain owner is now the new recovery address", owner === rescuer, owner);
+  check("the warning is gone", !(await page.getByText("No recovery address: if you lose this passkey").isVisible()));
 
   console.log("▸ on-chain verification");
   check(

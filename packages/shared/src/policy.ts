@@ -107,6 +107,14 @@ const x402Schema = z.object({
   perPeriod: periodLimitSchema,
   /** The agent's X402Vault (set by the SDK when it deploys the vault at grant time). */
   vault: addressSchema.optional(),
+  /**
+   * The vault's CREATE2 salt. With it, anyone can recompute the vault address from this policy, which proves the
+   * vault is the X402Vault code with exactly these sellers, owner, agent, token and cap.
+   */
+  vaultSalt: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{64}$/)
+    .optional(),
 });
 
 const contractCallSchema = z.object({

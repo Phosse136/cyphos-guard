@@ -489,26 +489,41 @@ export function createCyphosGuard(opts: CyphosGuardOptions) {
       // account before signing, so its address can go into the policy and the top-up delegation.
       const parsedRequest = parsePolicy(requested);
       const vaultCalls: { to: Address; data: Hex }[] = [];
+      const vaultAddresses: Address[] = [];
       const input: PolicyInput = {
         ...requested,
         permissions: requested.permissions.map((perm, i) => {
           const parsed = parsedRequest.permissions[i];
           if (perm.kind !== "x402" || parsed?.kind !== "x402" || parsed.vault) return perm;
+          const salt = randomVaultSalt();
           const d = vaultDeployment({
             owner: owner.account.address,
             agent: parsedRequest.agent,
             token: parsed.token,
             maxPerPayment: x402VaultCap(parsedRequest, parsed),
             sellers: parsed.sellers,
-            salt: randomVaultSalt(),
+            salt,
           });
           vaultCalls.push(d.call);
-          return { ...perm, vault: d.address };
+          vaultAddresses.push(d.address);
+          return { ...perm, vault: d.address, vaultSalt: salt };
         }),
       };
       if (vaultCalls.length) {
-        await owner.sendCalls(vaultCalls);
-        log.info?.("x402 vault(s) deployed", { count: vaultCalls.length });
+        // Idempotent: the CREATE2 address commits to the exact code and arguments, so a vault already at that
+        // address (e.g. someone front-ran the deployment with the same calldata) is exactly the one we want.
+        const deployed = async () =>
+          (await Promise.all(vaultAddresses.map((a) => publicClient.getCode({ address: a })))).every(
+            (c) => !!c && c !== "0x",
+          );
+        if (!(await deployed())) {
+          try {
+            await owner.sendCalls(vaultCalls);
+          } catch (e) {
+            if (!(await deployed())) throw e;
+          }
+        }
+        log.info?.("x402 vault(s) ready", { vaults: vaultAddresses });
       }
       const policy = parsePolicy(input);
       if (policy.chainId !== chainId) throw new Error(`policy is for chain ${policy.chainId}, client is ${chainId}`);

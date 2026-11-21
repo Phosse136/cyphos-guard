@@ -190,7 +190,8 @@ Verified against the official x402 server and facilitator (`@x402/core` / `@x402
 with real USDC: vault deployment at grant time, routine payment, escalation with approval, unlisted seller refused before
 any money moves, and the vault refusing unlisted sellers, over-cap amounts and foreign signatures even when asked
 directly ([integration test](examples/x402-seller/src/x402.fork.test.ts),
-[vault test](examples/x402-seller/src/vault.fork.test.ts)). **The vault contract is new and not audited.**
+[vault test](examples/x402-seller/src/vault.fork.test.ts)). **The vault contract is new and not audited**; see the
+[internal security review](docs/security/x402-vault-review.md).
 
 ## How it works
 

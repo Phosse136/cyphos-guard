@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   decodeX402Header,
   encodeX402Header,
+  MAX_AUTHORIZATION_SECONDS,
   type PaymentRequired,
   type PaymentRequirements,
   selectRequirement,
@@ -84,5 +85,14 @@ describe("x402 client", () => {
         signature: payload.signature,
       }),
     ).toBe(true);
+  });
+
+  it("caps the authorization's validity, whatever timeout the seller asks for", async () => {
+    const agent = privateKeyToAccount(generatePrivateKey());
+    const now = Math.floor(Date.now() / 1000);
+    const greedy = await signExactEip3009(agent, req({ maxTimeoutSeconds: 30 * 86_400 }), 84532);
+    expect(Number(greedy.authorization.validBefore) - now).toBeLessThanOrEqual(MAX_AUTHORIZATION_SECONDS + 2);
+    const normal = await signExactEip3009(agent, req({ maxTimeoutSeconds: 60 }), 84532);
+    expect(Number(normal.authorization.validBefore) - now).toBeLessThanOrEqual(62);
   });
 });

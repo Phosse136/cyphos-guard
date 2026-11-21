@@ -1,4 +1,10 @@
-import { buildApprovalDelegation, cosignerCaveat, cosignerEnforcerAddress, cosignTypedData } from "@cyphos-guard/sdk";
+import {
+  buildApprovalDelegation,
+  cosignerCaveat,
+  cosignerEnforcerAddress,
+  cosignTypedData,
+  vaultDeployment,
+} from "@cyphos-guard/sdk";
 import { createSoftPasskey } from "@cyphos-guard/sdk/testing";
 import type { ApprovalRequestJSON } from "@cyphos-guard/shared";
 import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
@@ -682,8 +688,12 @@ function fakeDelegationFor(agent: Address) {
 describe("x402 vaults", () => {
   const TOKEN = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address;
   const SELLER = privateKeyToAddress(generatePrivateKey());
-  const VAULT = privateKeyToAddress(generatePrivateKey());
-  const vaultGrant = (t: ReturnType<typeof setup>) =>
+  const SALT = `0x${"5a".repeat(32)}` as Hex;
+  /** The vault address the policy describes (owner, agent, token, cap = hard max, sellers, salt). */
+  const vaultFor = (agent: Address, sellers = [SELLER], cap = 20_000_000n) =>
+    vaultDeployment({ owner: ACCOUNT, agent, token: TOKEN, maxPerPayment: cap, sellers, salt: SALT }).address;
+  let VAULT: Address;
+  const vaultGrant = (t: ReturnType<typeof setup>, vault = vaultFor(t.agent.address), vaultSalt: Hex | null = SALT) =>
     t.owner.post("/grants", {
       policy: {
         version: 1,
@@ -697,7 +707,8 @@ describe("x402 vaults", () => {
             sellers: [SELLER],
             perTx: "1000000",
             perPeriod: { amount: "5000000", periodSeconds: 86_400 },
-            vault: VAULT,
+            vault,
+            ...(vaultSalt ? { vaultSalt } : {}),
           },
         ],
         escalation: { enabled: true, approvalTtlSeconds: 600, hardMax: [{ token: TOKEN, amount: "20000000" }] },
@@ -734,11 +745,23 @@ describe("x402 vaults", () => {
     expect((await vaultGrant(missing)).status).toBe(400);
   });
 
+  it("refuses a vault whose address doesn't follow from the policy (look-alike or extra sellers)", async () => {
+    let t: ReturnType<typeof setup>;
+    t = setup({ readX402Vault: async () => good(t) }); // on-chain reads would all look fine
+    await ready(t);
+    const extraSeller = vaultFor(t.agent.address, [SELLER, MIXER]); // same contract, one more seller listed
+    expect((await vaultGrant(t, extraSeller)).status).toBe(400);
+    expect((await vaultGrant(t, privateKeyToAddress(generatePrivateKey()))).status).toBe(400); // arbitrary contract
+    expect((await vaultGrant(t, vaultFor(t.agent.address), null)).status).toBe(400); // no salt: can't prove it
+    expect((await vaultGrant(t)).status).toBe(201);
+  });
+
   it("records payments from the agent's vault, but not from some other payer", async () => {
     let t: ReturnType<typeof setup>;
     t = setup({ readX402Vault: async () => good(t), erc20Transferred: async () => 500_000n });
     await ready(t);
     expect((await vaultGrant(t)).status).toBe(201);
+    VAULT = vaultFor(t.agent.address);
     const body = (payer: Address) => ({
       account: ACCOUNT,
       txHash: `0x${"b".repeat(64)}`,

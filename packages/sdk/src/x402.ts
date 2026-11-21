@@ -46,6 +46,9 @@ export type SettlementResponse = {
   [k: string]: unknown;
 };
 
+/** Longest validity of a signed x402 authorization, whatever the seller asks for. */
+export const MAX_AUTHORIZATION_SECONDS = 600;
+
 export class X402Error extends Error {
   override name = "X402Error";
 }
@@ -117,7 +120,9 @@ export async function signExactEip3009(
     to: getAddress(req.payTo),
     value: req.amount,
     validAfter: "0",
-    validBefore: String(now + req.maxTimeoutSeconds),
+    // The seller picks maxTimeoutSeconds; cap it so a seller can't hold a signed authorization for days and cash
+    // it after reporting failure (and after the agent paid again).
+    validBefore: String(now + Math.min(req.maxTimeoutSeconds, MAX_AUTHORIZATION_SECONDS)),
     nonce: toHex(crypto.getRandomValues(new Uint8Array(32))),
   };
   const signature = await signer.signTypedData({

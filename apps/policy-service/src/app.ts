@@ -15,6 +15,7 @@ import {
   delegationCosigner,
   passkeyKeyId,
   type UserOpJSON,
+  vaultDeployment,
 } from "@cyphos-guard/sdk";
 import {
   AGENT_AUTH_MAX_SKEW_SECONDS,
@@ -356,6 +357,21 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     // approver shows the owner the truth about where top-ups go and what the vault allows).
     for (const perm of policy.permissions) {
       if (perm.kind !== "x402" || !perm.vault) continue;
+      // The CREATE2 address commits to the X402Vault code and its constructor arguments: recomputing it from the
+      // policy proves the vault lists exactly these sellers (not more) and is the real contract, not a look-alike.
+      const expected =
+        perm.vaultSalt &&
+        vaultDeployment({
+          owner: account,
+          agent: policy.agent,
+          token: perm.token,
+          maxPerPayment: x402VaultCap(policy, perm),
+          sellers: perm.sellers,
+          salt: perm.vaultSalt as Hex,
+        }).address;
+      if (!expected || !isAddressEqual(expected, perm.vault)) {
+        throw new HTTPException(400, { message: `x402 vault ${perm.vault} is not the vault this policy describes` });
+      }
       const v = await chain.readX402Vault(perm.vault, perm.sellers);
       if (
         !v ||

@@ -234,6 +234,18 @@ try {
   check("approval history lists the executed request", historyShown);
   await page.screenshot({ path: resolve(SHOTS, "demo-4-details.png"), fullPage: true });
 
+  console.log("▸ wallet card: full address, balances, send funds out with the passkey");
+  const main = (await page.locator("main").textContent()) ?? "";
+  const accountAddress = main.match(/Your wallet.*?(0x[0-9a-fA-F]{40})/s)?.[1];
+  check("wallet card shows the full account address", Boolean(accountAddress), accountAddress ?? "not found");
+  const payee = privateKeyToAccount(generatePrivateKey()).address;
+  await page.getByRole("button", { name: "Send funds out" }).click();
+  await page.getByLabel("Send to", { exact: true }).fill(payee);
+  await page.getByLabel("Amount", { exact: true }).fill("1.5");
+  await page.getByRole("button", { name: "Send (sign with passkey)" }).click();
+  await page.getByText("Sent.").waitFor({ timeout: 30_000 });
+  check("send funds out moved 1.5 USDC (passkey-signed)", (await usdcOf(payee)) === parseUnits("1.5", 6));
+
   console.log("▸ on-chain verification");
   check(
     "Inference API got 1.20 + 4.00 USDC",

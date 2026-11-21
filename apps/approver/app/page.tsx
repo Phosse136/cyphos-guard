@@ -8,6 +8,7 @@ import { History } from "@/components/History";
 import { Onboarding } from "@/components/Onboarding";
 import { Requests } from "@/components/Requests";
 import { Button } from "@/components/ui";
+import { Wallet } from "@/components/Wallet";
 import { api, type Me } from "@/lib/api";
 import { short } from "@/lib/format";
 import { linkedAccount } from "@/lib/wallet";
@@ -57,6 +58,7 @@ export default function Home() {
       {me && !account && <Onboarding me={me} onChange={refresh} />}
       {me && account && (
         <>
+          <Wallet account={account} fork={me.fork} refreshKey={refreshKey} />
           <Requests account={account} fork={me.fork} onDecided={() => setRefreshKey((k) => k + 1)} />
           <Grants
             account={account}

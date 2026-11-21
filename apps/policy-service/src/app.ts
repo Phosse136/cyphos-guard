@@ -22,9 +22,12 @@ import {
   AGENT_HEADERS,
   addressSchema,
   agentAuthMessage,
+  clientIp,
   createApprovalRequestSchema,
+  createRateLimiter,
   delegationSchema,
   escalationDecision,
+  type Limit,
   offchainCheck,
   parsePolicy,
   policySchema,
@@ -42,6 +45,7 @@ import {
 } from "@simplewebauthn/server";
 import { cose, decodeCredentialPublicKey } from "@simplewebauthn/server/helpers";
 import { Hono, type MiddlewareHandler } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import {
@@ -76,7 +80,16 @@ export type AppConfig = {
    * stranger cannot claim the instance before the owner does. Absent → the first passkey becomes the owner.
    */
   setupCode?: string;
+  /**
+   * Abuse protection for a public deployment (absent = off, e.g. in tests). The client IP is the first
+   * X-Forwarded-For entry, which is only trustworthy because the service listens on localhost behind the
+   * approver proxy and Caddy (Caddy sets the header itself and ignores client-supplied values).
+   */
+  rateLimit?: { perIp: Limit; auth: Limit; agent: Limit; maxBodyBytes: number };
 };
+
+/** Pending passkey challenges kept at most (each expires after 5 minutes). */
+const MAX_PENDING_CHALLENGES = 10_000;
 
 type Env = { Variables: { owner: Owner; agent: Address; body: unknown } };
 
@@ -88,6 +101,34 @@ const toX402 = (x?: z.output<typeof x402ContextSchema>): X402Context | undefined
 
 export function createApp({ store, chain, config }: { store: Store; chain: ChainAdapter; config: AppConfig }) {
   const app = new Hono<Env>();
+  const limits = config.rateLimit;
+  const limiter = limits ? createRateLimiter() : null;
+  const tooMany = (retryAfterSeconds: number) =>
+    new HTTPException(429, {
+      res: new Response(JSON.stringify({ error: "rate_limited", message: "too many requests, slow down" }), {
+        status: 429,
+        headers: { "content-type": "application/json", "retry-after": String(retryAfterSeconds) },
+      }),
+    });
+  if (limits && limiter) {
+    app.use(
+      "*",
+      bodyLimit({
+        maxSize: limits.maxBodyBytes,
+        onError: (c) => c.json({ error: "payload_too_large", message: "request body too large" }, 413),
+      }),
+    );
+    app.use("*", async (c, next) => {
+      const ip = clientIp(c.req.header("x-forwarded-for"));
+      const perIp = limiter.take(`ip:${ip}`, limits.perIp);
+      if (!perIp.ok) throw tooMany(perIp.retryAfterSeconds);
+      if (c.req.path.startsWith("/auth/")) {
+        const auth = limiter.take(`auth:${ip}`, limits.auth);
+        if (!auth.ok) throw tooMany(auth.retryAfterSeconds);
+      }
+      await next();
+    });
+  }
   const challenges = new Map<string, { challenge: string; kind: "register" | "login"; exp: number }>();
   const seenAgentSigs = new Map<string, number>();
 
@@ -99,8 +140,11 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
   };
   const newChallengeId = (challenge: string, kind: "register" | "login") => {
     const id = randomBytes(16).toString("hex");
-    challenges.set(id, { challenge, kind, exp: nowS() + 300 });
     for (const [k, v] of challenges) if (v.exp < nowS()) challenges.delete(k);
+    if (challenges.size >= MAX_PENDING_CHALLENGES) {
+      throw new HTTPException(503, { message: "too many pending sign-ins, try again in a few minutes" });
+    }
+    challenges.set(id, { challenge, kind, exp: nowS() + 300 });
     return id;
   };
   const startSession = (c: Parameters<MiddlewareHandler<Env>>[0], ownerId: number) => {
@@ -121,7 +165,10 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
   };
 
   app.onError((err, c) => {
-    if (err instanceof HTTPException) return c.json({ error: err.message }, err.status);
+    if (err instanceof HTTPException) {
+      // Prepared responses (e.g. 429 with Retry-After) pass through unchanged.
+      return err.res ? err.getResponse() : c.json({ error: err.message }, err.status);
+    }
     console.error(err);
     return c.json({ error: "internal error" }, 500);
   });
@@ -172,6 +219,10 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     seenAgentSigs.set(sig, ts);
     for (const [k, t] of seenAgentSigs) if (Math.abs(nowS() - t) > AGENT_AUTH_MAX_SKEW_SECONDS) seenAgentSigs.delete(k);
     c.set("agent", addressSchema.parse(agent));
+    if (limits && limiter) {
+      const perAgent = limiter.take(`agent:${agent.toLowerCase()}`, limits.agent);
+      if (!perAgent.ok) throw tooMany(perAgent.retryAfterSeconds);
+    }
     c.set("body", body ? JSON.parse(body) : undefined);
     await next();
   };

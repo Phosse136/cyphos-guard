@@ -34,6 +34,13 @@ const app = createApp({
     secureCookies: origin.startsWith("https://"),
     ...(cosigner ? { cosigner } : {}),
     ...(process.env.OWNER_SETUP_CODE ? { setupCode: process.env.OWNER_SETUP_CODE } : {}),
+    // Per client IP / agent; generous for one owner and a few agents, tight enough to stop floods.
+    rateLimit: {
+      perIp: { max: Number(process.env.RATE_LIMIT_PER_IP_PER_MIN ?? 300), windowSeconds: 60 },
+      auth: { max: Number(process.env.RATE_LIMIT_AUTH_PER_MIN ?? 20), windowSeconds: 60 },
+      agent: { max: Number(process.env.RATE_LIMIT_AGENT_PER_MIN ?? 120), windowSeconds: 60 },
+      maxBodyBytes: 256 * 1024,
+    },
   },
 });
 

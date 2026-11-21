@@ -11,7 +11,7 @@ import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
 import { type Address, encodeFunctionData, erc20Abi, type Hex, parseEther, recoverTypedDataAddress } from "viem";
 import { generatePrivateKey, privateKeyToAccount, privateKeyToAddress } from "viem/accounts";
 import { describe, expect, it } from "vitest";
-import { createApp } from "./app.ts";
+import { type AppConfig, createApp } from "./app.ts";
 import type { ChainAdapter } from "./chain.ts";
 import { openStore } from "./store.ts";
 import { agentRequest, authenticationResponse, registrationResponse } from "./testing.ts";
@@ -21,7 +21,7 @@ const ACCOUNT = "0x4444444444444444444444444444444444444444" as Address;
 const SHOP = privateKeyToAddress(generatePrivateKey());
 const MIXER = privateKeyToAddress(generatePrivateKey());
 
-function setup(overrides: Partial<ChainAdapter> = {}, extraConfig: { setupCode?: string } = {}) {
+function setup(overrides: Partial<ChainAdapter> = {}, extraConfig: Partial<AppConfig> = {}) {
   let chainTime = 1_800_000_000;
   const chain: ChainAdapter = {
     chainId: 84532,
@@ -777,5 +777,59 @@ describe("x402 vaults", () => {
       (await (await t.owner.get("/activity")).json()) as { kind: string; detail: { payer?: string } }[]
     ).filter((a) => a.kind === "x402_paid");
     expect(paid.map((a) => a.detail.payer)).toEqual([VAULT]);
+  });
+});
+
+describe("rate limiting (public deployments)", () => {
+  const limits = {
+    perIp: { max: 5, windowSeconds: 60 },
+    auth: { max: 2, windowSeconds: 60 },
+    agent: { max: 3, windowSeconds: 60 },
+    maxBodyBytes: 1024,
+  };
+  const from = (ip: string, init: RequestInit = {}) => ({
+    ...init,
+    headers: { ...(init.headers as Record<string, string>), "x-forwarded-for": `${ip}, 127.0.0.1` },
+  });
+
+  it("limits each client IP, with Retry-After; other IPs are unaffected", async () => {
+    const t = setup({}, { rateLimit: limits });
+    const statuses = [];
+    for (let i = 0; i < 6; i++) statuses.push((await t.app.request("/health", from("203.0.113.1"))).status);
+    expect(statuses).toEqual([200, 200, 200, 200, 200, 429]);
+    const limited = await t.app.request("/health", from("203.0.113.1"));
+    expect(limited.headers.get("retry-after")).toBe("60");
+    expect(((await limited.json()) as { error: string }).error).toBe("rate_limited");
+    expect((await t.app.request("/health", from("198.51.100.9"))).status).toBe(200);
+  });
+
+  it("is stricter on passkey sign-in endpoints", async () => {
+    const t = setup({}, { rateLimit: limits });
+    const login = () => t.app.request("/auth/login/options", from("203.0.113.2", { method: "POST" }));
+    expect([(await login()).status, (await login()).status, (await login()).status]).toEqual([200, 200, 429]);
+  });
+
+  it("limits each agent across IPs, after its signature is verified", async () => {
+    const t = setup({}, { rateLimit: { ...limits, perIp: { max: 100, windowSeconds: 60 } } });
+    const statuses = [];
+    for (let i = 0; i < 4; i++) {
+      const req = await agentRequest(t.agent, "GET", "/agent/grants");
+      statuses.push((await t.app.request("/agent/grants", from(`203.0.113.${10 + i}`, req))).status);
+    }
+    expect(statuses).toEqual([200, 200, 200, 429]);
+  });
+
+  it("refuses oversized bodies", async () => {
+    const t = setup({}, { rateLimit: limits });
+    const res = await t.app.request(
+      "/auth/login/options",
+      from("203.0.113.3", { method: "POST", headers: { "content-type": "application/json" }, body: "x".repeat(4096) }),
+    );
+    expect(res.status).toBe(413);
+  });
+
+  it("is off unless configured (tests and local dev)", async () => {
+    const t = setup();
+    for (let i = 0; i < 20; i++) expect((await t.app.request("/health", from("203.0.113.4"))).status).toBe(200);
   });
 });

@@ -12,7 +12,8 @@ async function proxy(request: Request, ctx: { params: Promise<{ path: string[] }
   const headers = new Headers();
   // Agents reach the service through this proxy on a public deployment, so their signed-request headers must
   // pass (the signature covers the service-relative path, which is what the proxy forwards to).
-  for (const name of ["content-type", "cookie", ...Object.values(AGENT_HEADERS)]) {
+  // x-forwarded-for: the client IP as set by Caddy, for the service's per-IP rate limits.
+  for (const name of ["content-type", "cookie", "x-forwarded-for", ...Object.values(AGENT_HEADERS)]) {
     const v = request.headers.get(name);
     if (v) headers.set(name, v);
   }

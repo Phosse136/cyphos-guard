@@ -1,6 +1,16 @@
 {
   "name": "@cyphos-guard/contracts",
   "version": "0.0.0",
+  "description": "cyphos-guard contracts (CosignerEnforcer caveat, X402Vault) as typed ABI + bytecode.",
+  "keywords": [
+    "ai-agents",
+    "erc-7710",
+    "erc-1271",
+    "x402",
+    "delegation",
+    "cyphos-guard"
+  ],
+  "homepage": "https://cyphosguard.com",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -9,8 +19,33 @@
     "./x402-vault": "./generated/X402Vault.ts"
   },
   "scripts": {
-    "build": "forge build && node scripts/export-artifact.mjs",
+    "build": "tsc -p tsconfig.build.json",
     "test": "forge test",
     "typecheck": "tsc -p tsconfig.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/CosignerEnforcer.d.ts",
+        "default": "./dist/CosignerEnforcer.js"
+      },
+      "./x402-vault": {
+        "types": "./dist/X402Vault.d.ts",
+        "default": "./dist/X402Vault.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Phosse136/cyphos-guard.git",
+    "directory": "packages/contracts"
+  },
+  "engines": {
+    "node": ">=22.18"
   }
 }

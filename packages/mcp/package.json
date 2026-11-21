@@ -1,6 +1,17 @@
 {
   "name": "@cyphos-guard/mcp",
   "version": "0.0.0",
+  "description": "cyphos-guard MCP server: lets Claude and other MCP agents pay within on-chain limits, with passkey approval above them.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "ai-agents",
+    "payments",
+    "x402",
+    "cyphos-guard"
+  ],
+  "homepage": "https://cyphosguard.com",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -12,7 +23,8 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=../../.env src/server.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@cyphos-guard/sdk": "workspace:*",
@@ -24,5 +36,29 @@
   "devDependencies": {
     "@cyphos-guard/policy-service": "workspace:*",
     "@hono/node-server": "^2.1.11"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/tools.d.ts",
+        "default": "./dist/tools.js"
+      }
+    },
+    "bin": {
+      "cyphos-guard-mcp": "./dist/server.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Phosse136/cyphos-guard.git",
+    "directory": "packages/mcp"
+  },
+  "engines": {
+    "node": ">=22.18"
   }
 }

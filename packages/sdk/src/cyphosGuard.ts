@@ -27,7 +27,7 @@ import {
   type X402Context,
   x402VaultCap,
 } from "@cyphos-guard/shared";
-import type { Delegation, MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
+import type { Delegation, MetaMaskSmartAccount, SmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
 import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
 import {
   type Address,
@@ -132,7 +132,7 @@ export type ExecutionResult = {
 const x402Wire = (x?: X402Context) =>
   x ? { x402: { payTo: x.payTo, amount: x.amount.toString(), resource: x.resource } } : {};
 
-export function createCyphosGuard(opts: CyphosGuardOptions) {
+export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
   const chain: Chain = opts.chain ?? baseSepolia;
   if (chain.id !== SUPPORTED_CHAIN_IDS.baseSepolia && chain.id !== SUPPORTED_CHAIN_IDS.sepolia) {
     throw new Error(`chain ${chain.id} is not supported; cyphos-guard is testnet-only (Base Sepolia, Sepolia)`);
@@ -241,7 +241,7 @@ export function createCyphosGuard(opts: CyphosGuardOptions) {
     return { status: "executed", txHash: r.hash, via: "approval", requestId: req.id };
   }
 
-  const pw = {
+  const pw: CyphosGuard = {
     environment,
     publicClient,
 
@@ -590,4 +590,38 @@ function jsonSafe(v: unknown): unknown {
   return JSON.parse(JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? x.toString() : x)));
 }
 
-export type CyphosGuard = ReturnType<typeof createCyphosGuard>;
+/** The cyphos-guard client: agent methods need `agent`, owner methods need `owner` (see CyphosGuardOptions). */
+export interface CyphosGuard {
+  /** The MetaMask Delegation Framework deployment for the chain. */
+  environment: SmartAccountsEnvironment;
+  publicClient: PublicClient;
+
+  // ---- agent ----
+  /** Active grants of this agent (for `accountAddress` if set), or all grants of the account (owner). */
+  getGrants(): Promise<GrantJSON[]>;
+  /** The account this agent acts for: `accountAddress`, or the account of its single active grant. */
+  getAccount(): Promise<Address>;
+  /** Do it within the grants if possible, otherwise ask the owner (see the implementation for the errors). */
+  execute(input: ExecuteInput, options?: { wait?: boolean | WaitOptions }): Promise<ExecutionResult>;
+  /** Fetch an x402-paywalled URL and pay it within the owner's x402 permission. */
+  payX402(
+    url: string,
+    init: RequestInit | undefined,
+    options: { reason: string; maxAmount?: bigint; wait?: boolean | WaitOptions },
+  ): Promise<X402Result>;
+  getRequest(id: string): Promise<ApprovalRequestJSON>;
+  /** Poll until the owner decides, then execute. */
+  waitForApproval(id: string, options?: WaitOptions): Promise<ExecutionResult>;
+  /** Activity of this agent (agent signer) or of the whole account (owner). */
+  getActivity(): Promise<ActivityJSON[]>;
+
+  // ---- owner ----
+  /** Grant an agent a policy: compile → passkey-sign → register (replaces the agent's existing grant). */
+  grantAgent(args: { policy: PolicyInput }): Promise<GrantJSON>;
+  /** Revoke a grant on-chain, then record it. */
+  revoke(grantId: string): Promise<{ txHash: Hex }>;
+  getRequests(status?: RequestStatus): Promise<ApprovalRequestJSON[]>;
+  /** Approve with the owner's passkey: a one-shot delegation for exactly this request. */
+  approve(req: ApprovalRequestJSON): Promise<ApprovalRequestJSON>;
+  reject(requestId: string): Promise<ApprovalRequestJSON>;
+}

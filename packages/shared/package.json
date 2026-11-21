@@ -1,6 +1,15 @@
 {
   "name": "@cyphos-guard/shared",
   "version": "0.0.0",
+  "description": "Policy schema, wire types and off-chain checks for cyphos-guard (guardrails for AI agents that spend crypto).",
+  "keywords": [
+    "ai-agents",
+    "policy",
+    "erc-7710",
+    "zod",
+    "cyphos-guard"
+  ],
+  "homepage": "https://cyphosguard.com",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -8,10 +17,32 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "viem": "^2.58.2",
     "zod": "^4.6.7"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Phosse136/cyphos-guard.git",
+    "directory": "packages/shared"
+  },
+  "engines": {
+    "node": ">=22.18"
   }
 }

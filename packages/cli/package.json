@@ -1,6 +1,14 @@
 {
   "name": "@cyphos-guard/cli",
   "version": "0.0.0",
+  "description": "cyphos-guard CLI: create and inspect an AI agent's own key (the owner only ever sees its address).",
+  "keywords": [
+    "ai-agents",
+    "cli",
+    "wallet",
+    "cyphos-guard"
+  ],
+  "homepage": "https://cyphosguard.com",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -11,9 +19,34 @@
     ".": "./src/agent.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "viem": "^2.58.2"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/agent.d.ts",
+        "default": "./dist/agent.js"
+      }
+    },
+    "bin": {
+      "cyphos-guard": "./dist/cli.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Phosse136/cyphos-guard.git",
+    "directory": "packages/cli"
+  },
+  "engines": {
+    "node": ">=22.18"
   }
 }

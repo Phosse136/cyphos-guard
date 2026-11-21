@@ -1,6 +1,17 @@
 {
   "name": "@cyphos-guard/sdk",
   "version": "0.0.0",
+  "description": "cyphos-guard SDK: on-chain spending limits and passkey approvals for AI agents (MetaMask Delegation Framework, x402).",
+  "keywords": [
+    "ai-agents",
+    "agent-wallet",
+    "erc-7710",
+    "x402",
+    "passkeys",
+    "account-abstraction",
+    "cyphos-guard"
+  ],
+  "homepage": "https://cyphosguard.com",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -9,7 +20,8 @@
     "./testing": "./src/testing/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@cyphos-guard/contracts": "workspace:*",
@@ -20,5 +32,30 @@
   "devDependencies": {
     "@x402/core": "2.30.0",
     "@x402/evm": "2.30.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./testing": {
+        "types": "./dist/testing/index.d.ts",
+        "default": "./dist/testing/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Phosse136/cyphos-guard.git",
+    "directory": "packages/sdk"
+  },
+  "engines": {
+    "node": ">=22.18"
   }
 }

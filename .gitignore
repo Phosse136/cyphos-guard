@@ -16,7 +16,7 @@ packages/contracts/out/
 packages/contracts/cache/
 broadcast/
 *.sqlite*
-e2e/screenshots/
+**/e2e/screenshots/
 .dev/
 next-env.d.ts
 dist-site/

@@ -25,6 +25,8 @@ async function proxy(request: Request, ctx: { params: Promise<{ path: string[] }
   });
   const out = new Headers({ "content-type": res.headers.get("content-type") ?? "application/json" });
   for (const c of res.headers.getSetCookie()) out.append("set-cookie", c);
+  const retryAfter = res.headers.get("retry-after"); // rate limits: tell clients how long to back off
+  if (retryAfter) out.set("retry-after", retryAfter);
   return new Response(await res.text(), { status: res.status, headers: out });
 }
 

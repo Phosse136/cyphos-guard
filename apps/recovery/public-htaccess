@@ -1,0 +1,4 @@
+# Recovery page: its own script only and NO network connections (it reads the chain through the wallet).
+<IfModule mod_headers.c>
+  Header always set Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+</IfModule>

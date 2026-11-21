@@ -65,6 +65,11 @@ describe("recovery page in the browser (fork)", () => {
     });
     try {
       const page = await browser.newPage({ viewport: { width: 760, height: 1100 } });
+      // The page's CSP (no network, own script only) must not break anything.
+      const cspViolations: string[] = [];
+      page.on("console", (m) => {
+        if (/Content Security Policy|Refused to/i.test(m.text())) cspViolations.push(m.text());
+      });
       const wallet = testWallet(recoveryKey, FORK);
       await page.exposeFunction("__wallet", (method: string, params: unknown[]) =>
         wallet.request({ method, params } as never),
@@ -88,6 +93,7 @@ describe("recovery page in the browser (fork)", () => {
       await page.getByText("Done. Everything was sent to your recovery address.").waitFor({ timeout: 30_000 });
       await page.getByText("The account is empty.").waitFor({ timeout: 15_000 });
       if (SHOTS) await page.screenshot({ path: `${SHOTS}/recovery-2-done.png`, fullPage: true });
+      expect(cspViolations).toEqual([]);
     } finally {
       await browser.close();
     }

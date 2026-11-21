@@ -7,8 +7,9 @@ out=${1:-$root/dist-site/cyphosguard-site.zip}
 stage=$root/dist-site/stage
 rm -rf "$stage" && mkdir -p "$stage/recover" "$(dirname "$out")"
 pnpm --filter @cyphos-guard/recovery build >/dev/null
-cp "$root"/site/{index.html,favicon.svg,impressum.html,datenschutz.html} "$stage/"
+cp "$root"/site/{index.html,favicon.svg,impressum.html,datenschutz.html,.htaccess} "$stage/"
 cp -r "$root"/apps/recovery/dist/. "$stage/recover/"
+cp "$root"/apps/recovery/public-htaccess "$stage/recover/.htaccess"
 rm -f "$out"
 python3 -I - "$stage" "$out" <<'PY'
 import os, sys, zipfile

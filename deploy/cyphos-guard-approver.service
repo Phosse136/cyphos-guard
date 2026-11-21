@@ -20,5 +20,25 @@ ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 
+# Extra sandboxing (systemd-analyze security). No MemoryDenyWriteExecute: Node's JIT needs W^X exceptions.
+PrivateDevices=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=true
+LockPersonality=true
+RestrictRealtime=true
+RemoveIPC=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+
 [Install]
 WantedBy=multi-user.target

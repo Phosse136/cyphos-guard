@@ -5,6 +5,8 @@
 Give an agent a budget it can't exceed, get a passkey prompt when it wants more, and make some things impossible.
 All of it is enforced by your smart account, not by a server you have to trust.
 
+![Demo: Claude pays two invoices alone, one after a Face ID approval, and is blocked from a forbidden vendor](docs/media/cyphos-guard-demo.gif)
+
 ![cyphos-guard demo: grant an agent, approve a big payment with a passkey, see a forbidden payment blocked](docs/assets/demo.gif)
 
 > **Status:** working MVP on Base Sepolia (and local forks of it). **Testnet only. Not audited. Do not use with real funds.**

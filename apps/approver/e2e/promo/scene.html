@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>cyphos-guard demo scene</title>
+<!-- Rendered frame by frame by promo-video.ts: window.render(t) draws the state at t seconds. Content = the live
+     Base Sepolia run with the real Claude agent and a real phone (README, "Public instance with a real phone"). -->
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1200px; height: 676px; overflow: hidden; }
+  body {
+    background: radial-gradient(1200px 600px at 15% -10%, #e9e7ff 0%, transparent 60%),
+      radial-gradient(900px 500px at 110% 110%, #f3e8ff 0%, transparent 55%), #fbfbfd;
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #14161c;
+  }
+  .top { position: absolute; left: 48px; top: 30px; right: 48px; display: flex; justify-content: space-between; align-items: center; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 22px; }
+  .shield { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, #4f46e5, #7c3aed); display: grid; place-items: center; color: #fff; font-size: 17px; }
+  .logo { width: 32px; height: 32px; display: inline-block; } .logo.sm { width: 18px; height: 18px; } .logo.lg { width: 64px; height: 64px; background: #fff; border-radius: 18px; padding: 6px; }
+  .pill { font-size: 14px; color: #5b6170; background: #fff; border: 1px solid #e3e5ec; border-radius: 999px; padding: 6px 12px; }
+  .pill b { color: #15803d; }
+  h1 { position: absolute; left: 48px; top: 84px; font-size: 30px; letter-spacing: -0.02em; }
+  h1 span { background: linear-gradient(90deg, #4f46e5, #7c3aed); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  .term { position: absolute; left: 48px; top: 146px; width: 700px; height: 480px; background: #0f1220; border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(15,18,32,.25); overflow: hidden; }
+  .term .bar { height: 38px; background: #171a2b; display: flex; align-items: center; gap: 8px; padding: 0 16px; }
+  .term .bar i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .term .bar span { color: #8b90a8; font-size: 13px; margin-left: 10px; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+  .term .body { padding: 18px 20px; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 16px; line-height: 1.55; color: #e6e8f2; }
+  .line { white-space: pre; opacity: 0; transform: translateY(6px); }
+  .line.on { opacity: 1; transform: none; transition: none; }
+  .dim { color: #8b90a8; } .ok { color: #4ade80; } .warn { color: #fbbf24; } .bad { color: #f87171; } .you { color: #a5b4fc; }
+  .hash { color: #8b90a8; }
+
+  .phone { position: absolute; right: 60px; top: 120px; width: 300px; height: 530px; background: #111; border-radius: 44px; padding: 12px;
+    box-shadow: 0 24px 60px rgba(15,18,32,.3); }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 34px; overflow: hidden; background: #f2f3f7; }
+  .notch { position: absolute; left: 50%; top: 8px; width: 96px; height: 26px; margin-left: -48px; background: #111; border-radius: 14px; z-index: 5; }
+  .app { position: absolute; inset: 44px 14px 14px; }
+  .app h3 { font-size: 15px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .card { background: #fff; border: 1px solid #e3e5ec; border-radius: 14px; padding: 12px; margin-bottom: 10px; font-size: 13px; }
+  .k { color: #5b6170; font-size: 12px; }
+  .budget { height: 8px; border-radius: 99px; background: #eceef4; margin-top: 8px; overflow: hidden; }
+  .budget div { height: 100%; width: 0; background: linear-gradient(90deg, #4f46e5, #7c3aed); border-radius: 99px; }
+  .req { position: absolute; left: 14px; right: 14px; top: 190px; background: #fff; border-radius: 16px; padding: 14px;
+    border: 2px solid #4f46e5; box-shadow: 0 12px 30px rgba(79,70,229,.25); opacity: 0; transform: translateY(30px); }
+  .req .title { font-weight: 700; font-size: 18px; margin: 4px 0 2px; }
+  .btns { display: flex; gap: 8px; margin-top: 12px; }
+  .btn { flex: 1; text-align: center; padding: 10px 0; border-radius: 10px; font-weight: 600; font-size: 14px; }
+  .approve { background: #4f46e5; color: #fff; } .reject { background: #f2f3f7; color: #14161c; }
+  .approve.press { transform: scale(.95); background: #3730a3; }
+  .faceid { position: absolute; inset: 0; background: rgba(15,18,32,.55); display: grid; place-items: center; opacity: 0; z-index: 4; }
+  .faceid div { width: 110px; height: 110px; border-radius: 26px; background: rgba(255,255,255,.95); display: grid; place-items: center; font-size: 54px; }
+  .done { position: absolute; left: 14px; right: 14px; top: 190px; background: #ecfdf3; color: #15803d; border: 1px solid #bbf7d0;
+    border-radius: 16px; padding: 14px; font-weight: 700; font-size: 16px; opacity: 0; }
+  .blocked { position: absolute; left: 14px; right: 14px; top: 300px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+    border-radius: 16px; padding: 12px 14px; font-size: 13px; opacity: 0; }
+  .blocked b { display: block; font-size: 15px; margin-bottom: 2px; }
+
+  .end { position: absolute; inset: 0; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; opacity: 0; z-index: 10; }
+  .end .big { font-size: 54px; font-weight: 800; letter-spacing: -0.03em; display: flex; align-items: center; gap: 16px; }
+  .end .big .shield { width: 60px; height: 60px; border-radius: 16px; background: rgba(255,255,255,.18); font-size: 34px; }
+  .end p { font-size: 26px; margin-top: 14px; opacity: .95; }
+  .end .rows { margin-top: 30px; font-size: 20px; line-height: 1.8; opacity: .95; }
+  .end .url { margin-top: 30px; font-size: 30px; font-weight: 700; background: rgba(255,255,255,.16); padding: 10px 26px; border-radius: 999px; }
+  .end small { margin-top: 18px; font-size: 16px; opacity: .8; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand"><div class="logo"><img src="../../../../site/favicon.svg" alt="" style="width:100%;height:100%"></div>cyphos-guard</div>
+    <div class="pill"><b>●</b> Base Sepolia testnet · real transactions</div>
+  </div>
+  <h1>Claude pays 4 invoices. <span>Your rules decide.</span></h1>
+
+  <div class="term">
+    <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span>agent: claude-opus-5-5 · cyphos-guard MCP</span></div>
+    <div class="body" id="term"></div>
+  </div>
+
+  <div class="phone"><div class="screen">
+    <div class="notch"></div>
+    <div class="app">
+      <h3><span class="logo sm"><img src="../../../../site/favicon.svg" alt="" style="width:100%;height:100%"></span>cyphos-guard</h3>
+      <div class="card">
+        <div class="k">Agent budget today</div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px"><b id="spent">0.00 USDC</b><span class="k">of 5 USDC</span></div>
+        <div class="budget"><div id="bar"></div></div>
+      </div>
+      <div class="card">
+        <div class="k">Pending approvals</div>
+        <div id="pending" style="margin-top:4px">Nothing waiting</div>
+      </div>
+    </div>
+    <div class="req" id="req">
+      <div class="k">🙋 Your agent asks for approval</div>
+      <div class="title">Pay 4.00 USDC</div>
+      <div class="k">INV-1043 · annual plan · above the 2 USDC limit</div>
+      <div class="btns"><div class="btn reject">Reject</div><div class="btn approve" id="approve">Approve</div></div>
+    </div>
+    <div class="done" id="done">✅ Approved (Face ID)<br><span style="font-weight:500;font-size:13px">Paid on-chain</span></div>
+    <div class="blocked" id="blocked"><b>🛑 Blocked</b>0.0003 ETH to a forbidden vendor. Never even offered for approval.</div>
+    <div class="faceid" id="faceid"><div>🙂</div></div>
+  </div></div>
+
+  <div class="end" id="end">
+    <div class="big"><div class="logo lg"><img src="../../../../site/favicon.svg" alt="" style="width:100%;height:100%"></div>cyphos-guard</div>
+    <p>Guardrails for AI agents that spend money</p>
+    <div class="rows">✅ routine: pays alone within on-chain limits<br>📱 big: you approve with a passkey<br>⛔ forbidden: impossible</div>
+    <div class="url">cyphosguard.com</div>
+    <small>Open source · MetaMask Delegation Framework · testnet, not audited</small>
+  </div>
+
+<script>
+  const LINES = [
+    [0.6, '<span class="you">you ›</span> Please pay the open invoices.'],
+    [1.6, '<span class="dim">→ pay</span> INV-1041  1.20 USDC  <span class="dim">API usage</span>'],
+    [2.4, '<span class="ok">✔ paid alone</span> <span class="dim">· within limits ·</span> <span class="hash">0xe4f8…d862</span>'],
+    [3.3, '<span class="dim">→ pay</span> INV-1042  0.0005 ETH  <span class="dim">GPU time</span>'],
+    [4.1, '<span class="ok">✔ paid alone</span> <span class="dim">· within limits ·</span> <span class="hash">0x6242…26f6</span>'],
+    [5.0, '<span class="dim">→ pay</span> INV-1043  4.00 USDC  <span class="dim">annual plan</span>'],
+    [5.8, '<span class="warn">⏳ above my limit → asking the owner</span>'],
+    [9.4, '<span class="ok">✔ approved on the phone, paid</span> <span class="dim">·</span> <span class="hash">0xab39…6ee9</span>'],
+    [10.4, '<span class="dim">→ pay</span> INV-1044  0.0003 ETH  <span class="dim">new vendor</span>'],
+    [11.2, '<span class="bad">✘ blocked: forbidden (enforced on-chain)</span>'],
+    [12.2, '<span class="you">claude ›</span> 3 paid, 1 blocked. I won\'t retry the'],
+    [12.2, '         blocked vendor; please check it.'],
+  ];
+  const term = document.getElementById("term");
+  const els = LINES.map(([, html]) => {
+    const d = document.createElement("div");
+    d.className = "line";
+    d.innerHTML = html || "&nbsp;";
+    term.appendChild(d);
+    return d;
+  });
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x) => Math.max(0, Math.min(1, x));
+  const ease = (x) => 1 - (1 - clamp(x)) ** 3;
+  const fade = (t, a, d = 0.35) => ease((t - a) / d);
+
+  window.DURATION = 16.5;
+  window.render = (t) => {
+    LINES.forEach(([at], i) => {
+      const p = fade(t, at, 0.25);
+      els[i].style.opacity = p;
+      els[i].style.transform = `translateY(${(1 - p) * 6}px)`;
+    });
+    // budget: 1.20 USDC routine payment (the ETH one has its own budget)
+    const spent = t >= 2.4 ? 1.2 : 0;
+    $("spent").textContent = `${spent.toFixed(2)} USDC`;
+    $("bar").style.width = `${(spent / 5) * 100 * fade(t, 2.4, 0.5)}%`;
+    $("pending").textContent = t >= 5.9 && t < 9.2 ? "1 request" : "Nothing waiting";
+    // approval card slides in, button press, Face ID, done
+    const rIn = fade(t, 6.0, 0.4), rOut = fade(t, 9.0, 0.25);
+    $("req").style.opacity = rIn * (1 - rOut);
+    $("req").style.transform = `translateY(${(1 - rIn) * 30}px)`;
+    $("approve").classList.toggle("press", t >= 7.6 && t < 7.9);
+    $("faceid").style.opacity = fade(t, 7.9, 0.2) * (1 - fade(t, 8.8, 0.2));
+    $("done").style.opacity = fade(t, 9.1, 0.3);
+    $("blocked").style.opacity = fade(t, 11.2, 0.3);
+    $("end").style.opacity = fade(t, 13.3, 0.6);
+  };
+  window.render(0);
+</script>
+</body>
+</html>

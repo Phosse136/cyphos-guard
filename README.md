@@ -86,6 +86,23 @@ The demo agent was also run with the real Claude model (`claude-opus-5-5`, `pnpm
 Base Sepolia fork). It paid the two routine invoices alone, waited for the owner's passkey approval on the 4 USDC
 invoice, and was blocked when it tried to pay the denylisted vendor. On-chain balances confirmed each outcome.
 
+**Public instance with a real phone** (2026-11-21). A self-hosted instance behind HTTPS, the owner on a phone with a
+synced passkey, and the real Claude agent (`claude-opus-5-5`) paying four invoices from the owner's account
+[0x58Df…EC29](https://sepolia.basescan.org/address/0x58Dfa6C6F5b910f3ae24D2C93BcAf8F46d1bEC29):
+
+| Invoice                 | Result                                                | Transaction                                                                                              |
+| ----------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| 1.20 USDC · API usage   | ✔ paid by the agent alone                             | [tx](https://sepolia.basescan.org/tx/0xe4f89770842ce13e1f320afa22ebcee5e6e9c12343def588e0e855088eccd862) |
+| 0.0005 ETH · GPU time   | ✔ paid by the agent alone                             | [tx](https://sepolia.basescan.org/tx/0x62420fe16650974ffdc911d0e65d16bb523c1488c48119fd14dea8404b9426f6) |
+| 4.00 USDC · annual plan | ✔ approved with Face ID on the phone, then paid       | [tx](https://sepolia.basescan.org/tx/0xab39a007ae8dcde213d088442e8c790e4773cf8fef896cde4dfc481c8df36ee9) |
+| 0.0003 ETH · denylisted | ✘ blocked; Claude didn't retry and flagged the vendor | n/a                                                                                                      |
+
+**Recovery without cyphos-guard** (2026-11-21). With the [recovery page](apps/recovery) (static, at
+cyphosguard.com/recover/), the owner's recovery wallet (a MetaMask account, EIP-7702-upgraded) emptied that same account:
+no service, no passkey, no bundler. The wallet signed the UserOperation and submitted it itself
+([tx](https://sepolia.basescan.org/tx/0x16b461ccbdf1e9416fa1ee1c1434d8ba5e44a787fe72f73771e570053b91e9a4): 14.8 USDC
+and the remaining ETH to the recovery address; the account is now empty).
+
 ## Use it from your agent
 
 ### Create the agent's key

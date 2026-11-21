@@ -10,11 +10,14 @@ pnpm install --frozen-lockfile --offline >/dev/null 2>&1 || pnpm install --froze
 set -a; . /etc/cyphos-guard/env; set +a
 pnpm --filter @cyphos-guard/approver build >/dev/null
 install -d -o cyphos -g cyphos apps/approver/.next/cache
-UNITS="cyphos-guard-policy cyphos-guard-approver"
-# Second instance (app.cyphosguard.com), if installed.
-[ -f /etc/systemd/system/cyphos-guard-app-policy.service ] && UNITS="$UNITS cyphos-guard-app-policy cyphos-guard-app-approver"
+# Restart only the instances that are enabled (a retired instance stays down).
+UNITS=""
+for u in cyphos-guard-policy cyphos-guard-approver cyphos-guard-app-policy cyphos-guard-app-approver; do
+  systemctl is-enabled --quiet "$u" 2>/dev/null && UNITS="$UNITS $u"
+done
 systemctl restart $UNITS
 sleep 5
 systemctl is-active $UNITS
-curl -fsS http://127.0.0.1:8887/health && echo
-[ -f /etc/systemd/system/cyphos-guard-app-policy.service ] && curl -fsS http://127.0.0.1:8888/health && echo
+systemctl is-enabled --quiet cyphos-guard-policy 2>/dev/null && curl -fsS http://127.0.0.1:8887/health && echo
+systemctl is-enabled --quiet cyphos-guard-app-policy 2>/dev/null && curl -fsS http://127.0.0.1:8888/health && echo
+true

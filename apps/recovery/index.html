@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recover your wallet · cyphos-guard</title>
+<meta name="description" content="Move everything out of your cyphos-guard smart account with your recovery address. Works without the cyphos-guard service.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 4 54 13v17c0 14-9.5 24.5-22 29C19.5 54.5 10 44 10 30V13z' fill='%234f46e5'/%3E%3Cpath d='m22 32 7 7 13-14' fill='none' stroke='%23fff' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root { --bg:#fbfbfd; --card:#fff; --text:#14161c; --muted:#5b6170; --line:#e3e5ec; --brand:#4f46e5; --brand2:#7c3aed;
+    --ok:#15803d; --bad:#b91c1c; --warnbg:#fff7ed; --okbg:#ecfdf3; --badbg:#fef2f2; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0b0d12; --card:#151923; --text:#eceef4; --muted:#a0a6b6; --line:#252a36;
+    --brand:#818cf8; --brand2:#a78bfa; --ok:#4ade80; --bad:#f87171; --warnbg:rgba(251,191,36,.08); --okbg:rgba(74,222,128,.08); --badbg:rgba(248,113,113,.08); } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); line-height:1.6;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  a { color: var(--brand); }
+  main { max-width: 680px; margin: 0 auto; padding: 40px 20px 64px; }
+  h1 { font-size: 30px; margin: 8px 0 6px; letter-spacing: -0.01em; }
+  .lead { color: var(--muted); margin: 0 0 24px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; margin-top:16px; }
+  .card h2 { font-size: 17px; margin: 0 0 10px; }
+  .step { display:inline-grid; place-items:center; width:24px; height:24px; border-radius:50%; margin-right:8px; font-size:13px;
+    font-weight:700; color:#fff; background:linear-gradient(135deg,var(--brand),var(--brand2)); }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 12px; padding: 11px 18px; cursor: pointer; color: #fff;
+    background: linear-gradient(135deg, var(--brand), var(--brand2)); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  input { width: 100%; font: inherit; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px; padding: 10px 12px;
+    border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--text); margin: 6px 0 12px; }
+  .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; word-break: break-all; }
+  .muted { color: var(--muted); font-size: 14px; }
+  dl { display:grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 8px 0 0; font-size: 14px; }
+  dt { color: var(--muted); } dd { margin: 0; }
+  .msg { border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-top: 12px; }
+  .msg.ok { background: var(--okbg); color: var(--ok); } .msg.bad { background: var(--badbg); color: var(--bad); }
+  .msg.info { background: var(--warnbg); }
+  .hidden { display: none; }
+  footer { margin-top: 28px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <a href="../" style="text-decoration:none;color:var(--muted)">← cyphos-guard</a>
+  <h1>Recover your wallet</h1>
+  <p class="lead">Move everything out of your cyphos-guard smart account with your <strong>recovery address</strong>. This page
+    works on its own: no cyphos-guard service, no passkey. Your wallet signs, and your wallet sends the transaction.</p>
+
+  <div class="card">
+    <h2><span class="step">1</span>Connect your recovery wallet</h2>
+    <p class="muted">The wallet whose address you entered as "recovery address" when you created the account (e.g. MetaMask).</p>
+    <button id="connect" type="button">Connect wallet</button>
+    <p id="connected" class="mono hidden"></p>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">2</span>Your smart account</h2>
+    <label class="muted" for="account">Smart account address (shown as "Your wallet" in the cyphos-guard app)</label>
+    <input id="account" placeholder="0x…" autocomplete="off" spellcheck="false">
+    <button id="check" type="button" disabled>Check account</button>
+    <div id="state" class="hidden"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">3</span>Withdraw</h2>
+    <p class="muted">Sends all USDC and ETH of the account (and any gas deposit it holds) to your recovery address. Your wallet
+      asks you to sign, then to send the transaction; it pays a small network fee.</p>
+    <button id="withdraw" type="button" disabled>Withdraw everything to my recovery address</button>
+    <div id="result"></div>
+  </div>
+
+  <footer>Base Sepolia testnet only. This page loads nothing from third parties; it reads the blockchain through your
+    wallet. Agents of an empty account can't spend anything.</footer>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

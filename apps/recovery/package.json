@@ -1,0 +1,24 @@
+{
+  "name": "@cyphos-guard/recovery",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/recovery.ts"
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "viem": "^2.58.2"
+  },
+  "devDependencies": {
+    "vite": "8.3.8",
+    "@cyphos-guard/sdk": "workspace:*",
+    "@metamask/smart-accounts-kit": "2.0.0",
+    "playwright-core": "1.65.1"
+  }
+}

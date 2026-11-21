@@ -267,6 +267,25 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
 
+  apps/recovery:
+    dependencies:
+      viem:
+        specifier: ^2.58.2
+        version: 2.58.2(typescript@7.0.2)(zod@4.6.7)
+    devDependencies:
+      '@cyphos-guard/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@metamask/smart-accounts-kit':
+        specifier: 2.0.0
+        version: 2.0.0(typescript@7.0.2)(viem@2.58.2(typescript@7.0.2)(zod@4.6.7))(zod@4.6.7)
+      playwright-core:
+        specifier: 1.65.1
+        version: 1.65.1
+      vite:
+        specifier: 8.3.8
+        version: 8.3.8(@types/node@26.6.6)(jiti@2.7.0)
+
   examples/demo-agent:
     dependencies:
       '@anthropic-ai/sdk':

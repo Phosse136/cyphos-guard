@@ -215,7 +215,7 @@
       <div class="grid3">
         <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h3>On-chain limits</h3><p>Per-payment and per-day caps, allowed recipients and contract functions, expiry. Checked by the blockchain on every payment.</p></div>
         <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3a9 9 0 0 0 2 5.7M18 12V9a6 6 0 0 0-9-5.2M12 9v4a12 12 0 0 1-2 6.6M15 11v2a15 15 0 0 1-1.2 6"/></svg></div><h3>Passkey approvals</h3><p>Approve big payments on your phone with Face ID or fingerprint. Each approval allows exactly that one payment, once.</p></div>
-        <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Non-custodial</h3><p>The service never holds a key that can move your funds. You can revoke and withdraw anytime, even via your recovery address.</p></div>
+        <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Non-custodial</h3><p>The service never holds a key that can move your funds. You can revoke and withdraw anytime, even without the service, via your recovery address.</p></div>
         <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h7"/><circle cx="18" cy="16" r="3"/></svg></div><h3>Pay x402 APIs</h3><p>Agents can pay HTTP 402 APIs per request in USDC, within your limits, asking you above them. Tested against the official x402 facilitator.</p></div>
         <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13 6l-2 12"/></svg></div><h3>Works with Claude</h3><p>An MCP server gives Claude Code, Claude Desktop and other MCP agents tools to pay, fetch paid APIs and check approvals.</p></div>
         <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><h3>Full audit trail</h3><p>Every payment, request, approval and block, with the agent's stated reason and the on-chain receipt, in one activity log.</p></div>
@@ -297,7 +297,7 @@ claude mcp add cyphos-guard \
       <p class="sub">Short answers to what people ask first.</p>
       <details><summary>Can my agent drain my wallet?</summary><p>No. It can only spend from the account you funded, only to recipients you allowed, and only up to your limits per payment and per day. Your main wallet is never connected.</p></details>
       <details><summary>Do I need a seed phrase or a browser extension?</summary><p>No. You sign with a passkey (Face ID, fingerprint or security key). Optionally, you add a recovery address from a wallet you already have.</p></details>
-      <details><summary>What happens if cyphos-guard goes offline?</summary><p>Your funds stay in your smart account and the on-chain limits keep holding. Your recovery address can always control the account directly.</p></details>
+      <details><summary>What happens if cyphos-guard goes offline?</summary><p>Your funds stay in your smart account and the on-chain limits keep holding. With the wallet you set as recovery address (e.g. MetaMask), you can move everything out on the <a href="recover/">recovery page</a>, which works without the cyphos-guard service.</p></details>
       <details><summary>Which networks?</summary><p>Base Sepolia testnet today (Ethereum Sepolia as fallback). Mainnet only after an independent security audit.</p></details>
       <details><summary>Which agents work with it?</summary><p>Anything that can call the TypeScript SDK, and any MCP client such as Claude Code or Claude Desktop.</p></details>
     </div>
@@ -316,7 +316,7 @@ claude mcp add cyphos-guard \
 <footer class="site">
   <div class="wrap">
     <span>© 2026 cyphos-guard</span>
-    <span><a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a> · <a href="https://app.cyphosguard.com">App</a></span>
+    <span><a href="recover/">Recover wallet</a> · <a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a> · <a href="https://app.cyphosguard.com">App</a></span>
   </div>
 </footer>
 

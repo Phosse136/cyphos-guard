@@ -74,7 +74,12 @@ if (notifier && summaryHour !== undefined && summaryHour !== "") {
     const d = new Date();
     if (d.getHours() === Number(summaryHour) && d.getDate() !== lastDay) {
       lastDay = d.getDate();
-      void notifier.summary();
+      const since = Math.floor(Date.now() / 1000) - 86_400;
+      // From the database, so a restart during the day doesn't lose events; sign-ups come from the owners table.
+      void notifier.summary({
+        ...store.activity.countsSince(since),
+        owner_registered: store.owners.countSince(since),
+      });
     }
   }, 60_000).unref();
 }

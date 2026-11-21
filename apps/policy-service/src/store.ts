@@ -140,6 +140,7 @@ export function openStore(path = ":memory:") {
 
     owners: {
       count: () => n(one("SELECT COUNT(*) c FROM owners")?.c),
+      countSince: (since: number) => n(one("SELECT COUNT(*) c FROM owners WHERE created_at >= ?", since)?.c),
       create: (o: Omit<Owner, "id" | "accountAddress">) => {
         const r = run(
           "INSERT INTO owners (credential_id, public_key, x, y, counter, transports, created_at) VALUES (?,?,?,?,?,?,?)",
@@ -278,6 +279,14 @@ export function openStore(path = ":memory:") {
           JSON.stringify(a.detail),
           a.txHash,
           a.createdAt,
+        ),
+      /** Events per kind since `since` (unix s), across all accounts: for the operator's daily summary. */
+      countsSince: (since: number): Record<string, number> =>
+        Object.fromEntries(
+          all("SELECT kind, COUNT(*) c FROM activity WHERE created_at >= ? GROUP BY kind", since).map((r) => [
+            String(r.kind),
+            n(r.c),
+          ]),
         ),
       forAgent: (agent: string, limit = 100) =>
         all("SELECT * FROM activity WHERE lower(agent) = lower(?) ORDER BY id DESC LIMIT ?", agent, limit).map(

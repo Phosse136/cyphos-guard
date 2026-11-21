@@ -100,6 +100,12 @@ describe("operator notifications", () => {
     await m.notify({ kind: "routine_executed" });
     await m.summary();
     expect(JSON.parse(ok.calls[0]?.body ?? "{}").content).toMatch(/2× Payment/);
+    // counts from the database win (restart-proof); zero kinds are left out
+    await m.summary({ owner_tx: 1, owner_registered: 2, x402_paid: 0 });
+    const text = JSON.parse(ok.calls[1]?.body ?? "{}").content as string;
+    expect(text).toMatch(/1× Owner transaction/);
+    expect(text).toMatch(/2× New owner/);
+    expect(text).not.toMatch(/x402/);
   });
 
   it("is off unless a channel is configured", () => {

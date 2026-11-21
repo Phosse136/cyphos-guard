@@ -978,3 +978,16 @@ describe("open registration (public multi-owner instance)", () => {
     expect((await secondOwner(single.app)).status).toBe(403);
   });
 });
+
+describe("store counts for the daily summary", () => {
+  it("counts activity per kind and new owners since a time, across accounts", () => {
+    const store = openStore(":memory:");
+    const add = (kind: "owner_tx" | "x402_paid", account: Address, createdAt: number) =>
+      store.activity.add({ account, agent: null, kind, detail: {}, txHash: null, createdAt });
+    add("owner_tx", ACCOUNT, 100);
+    add("owner_tx", SHOP, 200);
+    add("x402_paid", ACCOUNT, 50);
+    expect(store.activity.countsSince(100)).toEqual({ owner_tx: 2 });
+    expect(store.owners.countSince(0)).toBe(0);
+  });
+});

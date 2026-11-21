@@ -172,9 +172,13 @@ export function createNotifier(cfg: NotifierConfig) {
             : "";
       return send(title, text + link, urgent);
     },
-    /** Sends "today: …" with the counts since the last summary, then resets them. */
-    summary(): Promise<unknown> {
-      const parts = [...counts.entries()].map(([k, n]) => `${n}× ${describeEvent({ kind: k }).title}`);
+    /**
+     * Sends "last 24 h: …". Pass `fromStore` (counts read from the database) so restarts don't lose events;
+     * without it, the in-memory counts since the last summary are used. Resets the in-memory counts.
+     */
+    summary(fromStore?: Record<string, number>): Promise<unknown> {
+      const source = fromStore ? Object.entries(fromStore) : [...counts.entries()];
+      const parts = source.filter(([, n]) => n > 0).map(([k, n]) => `${n}× ${describeEvent({ kind: k }).title}`);
       counts.clear();
       if (!channels) return Promise.resolve();
       return send(

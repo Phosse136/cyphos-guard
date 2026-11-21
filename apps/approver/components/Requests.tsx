@@ -29,7 +29,14 @@ export function Requests({
     // In-app notification: title badge + optional browser notification for new requests.
     document.title = list.length ? `(${list.length}) cyphos-guard approver` : "cyphos-guard approver";
     for (const r of list) {
-      if (!seen.current.has(r.id) && seen.current.size > 0 && Notification?.permission === "granted") {
+      // typeof guard: `Notification` doesn't exist at all in some browsers (e.g. iPhone Safari outside a home-screen
+      // web app), where `Notification?.permission` would throw a ReferenceError.
+      if (
+        !seen.current.has(r.id) &&
+        seen.current.size > 0 &&
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted"
+      ) {
         new Notification("Agent needs approval", { body: describe(r).title });
       }
       seen.current.add(r.id);

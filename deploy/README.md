@@ -22,5 +22,8 @@ its own owner. `app.cyphosguard.com` is a CNAME to the DynDNS name.
 
 Update: `sudo deploy/update.sh` (pulls the latest commit from the working repo, rebuilds, restarts).
 
-Known limits (fine for a testnet demo, fix before anything more): no rate limiting on the policy service, and
-`/rpc` forwards any JSON-RPC call to the public Base Sepolia RPC.
+Abuse protection: the policy service rate-limits per client IP (300/min), passkey sign-in (20/min per IP) and per
+agent (120/min), caps request bodies at 256 KB and pending sign-ins at 10,000 (override the rates with
+`RATE_LIMIT_PER_IP_PER_MIN`, `RATE_LIMIT_AUTH_PER_MIN`, `RATE_LIMIT_AGENT_PER_MIN`). The client IP comes from Caddy's
+`X-Forwarded-For`, so keep the service bound to localhost. `/rpc` forwards only read-only methods (no
+`eth_sendRawTransaction`), at most 600 calls/min per IP. Limits are in memory, per process.

@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cyphos-guard · Guardrails for AI agents that spend money</title>
+<meta name="description" content="Give your AI agent a budget it can't exceed, approve big payments with a passkey, and make some things impossible. Enforced by your smart account, not by a server you have to trust.">
+<meta property="og:title" content="cyphos-guard · Guardrails for AI agents that spend money">
+<meta property="og:description" content="On-chain limits, passkey approvals and hard blocks for AI agents that pay. Live on Base Sepolia testnet.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://cyphosguard.com/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #fbfbfd; --bg2: #f2f3f7; --card: #ffffff; --text: #14161c; --muted: #5b6170; --line: #e3e5ec;
+    --brand: #4f46e5; --brand2: #7c3aed; --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
+    --okbg: #ecfdf3; --warnbg: #fff7ed; --badbg: #fef2f2; --code: #0f1220; --codetext: #e6e8f2;
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 8px 24px rgba(16,24,40,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0d12; --bg2: #11141b; --card: #151923; --text: #eceef4; --muted: #a0a6b6; --line: #252a36;
+      --brand: #818cf8; --brand2: #a78bfa; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+      --okbg: rgba(74,222,128,.08); --warnbg: rgba(251,191,36,.08); --badbg: rgba(248,113,113,.08);
+      --code: #0a0c14; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.6;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  a { color: var(--brand); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  details p { color: var(--muted); margin: 10px 0 0; }
+  footer a { color: var(--muted); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+  .btn { display: inline-block; padding: 12px 20px; border-radius: 12px; font-weight: 600; border: 1px solid transparent; }
+  .btn:hover { text-decoration: none; filter: brightness(1.05); }
+  .btn-primary { background: linear-gradient(135deg, var(--brand), var(--brand2)); color: #fff; }
+  .btn-ghost { border-color: var(--line); color: var(--text); background: var(--card); }
+  .pill { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; background: var(--card); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px var(--okbg); }
+
+  header.nav { position: sticky; top: 0; z-index: 10; backdrop-filter: saturate(1.4) blur(10px);
+    background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid var(--line); }
+  header.nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 16px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); }
+  .logo:hover { text-decoration: none; }
+  .navlinks { display: flex; gap: 22px; align-items: center; font-size: 15px; }
+  .navlinks a:not(.btn) { color: var(--muted); }
+  @media (max-width: 760px) { .navlinks a:not(.btn) { display: none; } }
+
+  .hero { padding: 72px 0 40px; }
+  .hero-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 48px; align-items: center; }
+  @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; } }
+  h1 { font-size: clamp(36px, 5.2vw, 58px); line-height: 1.05; letter-spacing: -0.02em; margin: 18px 0 18px; }
+  .grad { background: linear-gradient(135deg, var(--brand), var(--brand2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { font-size: 19px; color: var(--muted); max-width: 560px; }
+  .ctas { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+  .fine { font-size: 13px; color: var(--muted); margin-top: 16px; }
+
+  .phone { justify-self: center; width: 300px; border-radius: 36px; padding: 14px; background: var(--card);
+    border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .screen { border-radius: 26px; background: var(--bg2); padding: 18px; }
+  .screen h4 { margin: 4px 0 12px; font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+  .req { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+  .req .amt { font-size: 26px; font-weight: 700; margin: 2px 0; }
+  .req .meta { font-size: 13px; color: var(--muted); }
+  .req .why { font-size: 13px; font-style: italic; margin: 10px 0 12px; }
+  .req .row { display: grid; gap: 8px; }
+  .req .row span { text-align: center; padding: 10px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+  .approve { background: linear-gradient(135deg, var(--brand), var(--brand2)); color: #fff; }
+  .reject { border: 1px solid var(--line); }
+  .mini { margin-top: 12px; display: grid; gap: 6px; font-size: 13px; }
+  .mini div { display: flex; justify-content: space-between; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+
+  section { padding: 64px 0; }
+  section.alt { background: var(--bg2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  h2 { font-size: clamp(26px, 3.4vw, 36px); letter-spacing: -0.01em; margin: 0 0 10px; }
+  .sub { color: var(--muted); max-width: 680px; margin: 0 0 32px; font-size: 17px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+  @media (max-width: 860px) { .grid3, .grid2 { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px; box-shadow: var(--shadow); }
+  .card h3 { margin: 6px 0 8px; font-size: 19px; }
+  .card p { margin: 0; color: var(--muted); }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; }
+  .tag.ok { background: var(--okbg); } .tag.warn { background: var(--warnbg); } .tag.bad { background: var(--badbg); }
+  .example { margin-top: 12px; font-size: 14px; border-top: 1px dashed var(--line); padding-top: 10px; color: var(--text); }
+
+  .steps { counter-reset: s; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  @media (max-width: 900px) { .steps { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .steps { grid-template-columns: 1fr; } }
+  .step { position: relative; padding-top: 44px; }
+  .step::before { counter-increment: s; content: counter(s); position: absolute; top: 18px; left: 22px; width: 28px; height: 28px;
+    border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; color: #fff;
+    background: linear-gradient(135deg, var(--brand), var(--brand2)); }
+
+  .feat .ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--bg2); border: 1px solid var(--line); }
+  .feat svg { width: 20px; height: 20px; stroke: var(--brand); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .tablecard { padding: 0; overflow-x: auto; }
+  .tablecard table { min-width: 560px; }
+
+  pre { background: var(--code); color: var(--codetext); padding: 18px; border-radius: 14px; overflow-x: auto; font-size: 13.5px; line-height: 1.55; margin: 0; }
+  .c { color: #8b93b0; } .k { color: #c4b5fd; } .s { color: #86efac; }
+
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+  details + details { margin-top: 10px; }
+  summary { cursor: pointer; font-weight: 600; }
+
+  .note { border: 1px solid var(--line); background: var(--warnbg); border-radius: 14px; padding: 14px 18px; font-size: 15px; }
+  footer { padding: 36px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  footer.site .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="./"><img src="favicon.svg" width="28" height="28" alt=""> cyphos-guard</a>
+    <nav class="navlinks">
+      <a href="#layers">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#security">Security</a>
+      <a href="#developers">Developers</a>
+      <a class="btn btn-primary" href="https://app.cyphosguard.com">Open app</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="pill"><span class="dot"></span> Live on Base Sepolia testnet</span>
+        <h1>Guardrails for AI agents that <span class="grad">spend money</span>.</h1>
+        <p class="lead">Give your agent a budget it can't exceed. Approve big payments with a passkey. Make some things impossible. Enforced by your own smart account, not by a server you have to trust.</p>
+        <div class="ctas">
+          <a class="btn btn-primary" href="https://app.cyphosguard.com">Open the app</a>
+          <a class="btn btn-ghost" href="#layers">See how it works</a>
+        </div>
+        <p class="fine">Testnet only · not audited · don't use with real funds yet.</p>
+      </div>
+      <div class="phone" role="img" aria-label="Illustration: an approval request on a phone, with two payments made alone and one blocked">
+        <div class="screen">
+          <h4>Pending approval</h4>
+          <div class="req">
+            <div class="meta">Your agent wants to</div>
+            <div class="amt">Pay 4 USDC</div>
+            <div class="meta">to Inference API · above its 2 USDC limit</div>
+            <div class="why">“Annual plan prepayment, invoice INV-1043”</div>
+            <div class="row"><span class="approve">Approve with Face ID</span><span class="reject">Reject</span></div>
+          </div>
+          <div class="mini">
+            <div><span>1.20 USDC · API usage</span><span class="ok">paid alone</span></div>
+            <div><span>0.0005 ETH · GPU time</span><span class="ok">paid alone</span></div>
+            <div><span>DataHarvest Ltd.</span><span class="bad">blocked</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section id="layers" class="alt">
+    <div class="wrap">
+      <h2>Three layers, like a company card</h2>
+      <p class="sub">You decide what your agent may do on its own, what needs your OK, and what can never happen.</p>
+      <div class="grid3">
+        <div class="card">
+          <span class="tag ok">Routine</span>
+          <h3>Pays on its own</h3>
+          <p>Small, expected payments go through automatically, within limits enforced on-chain by your smart account.</p>
+          <div class="example">e.g. up to 2 USDC per payment, 5 USDC a day, to your API provider</div>
+        </div>
+        <div class="card">
+          <span class="tag warn">Big or unusual</span>
+          <h3>Asks you first</h3>
+          <p>Anything above the limits becomes a request on your phone. Approve with Face ID or fingerprint. No seed phrase, no extension.</p>
+          <div class="example">e.g. a 4 USDC annual plan: one tap, then it's paid</div>
+        </div>
+        <div class="card">
+          <span class="tag bad">Forbidden</span>
+          <h3>Never happens</h3>
+          <p>Addresses on your denylist and amounts above your hard maximum are refused outright, and never even offered for approval.</p>
+          <div class="example">e.g. a vendor you don't trust, or more than 20 USDC</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Up and running in minutes</h2>
+      <p class="sub">The money stays in your own wallet. The agent only gets a limited permission to spend from it.</p>
+      <div class="steps">
+        <div class="card step"><h3>Create your wallet</h3><p>A smart account owned by your passkey, with an optional recovery address. No seed phrase.</p></div>
+        <div class="card step"><h3>Add a budget</h3><p>Send the amount your agents may work with. Everything else stays untouchable in your main wallet.</p></div>
+        <div class="card step"><h3>Grant your agent</h3><p>Paste the agent's address, set recipients, limits and a denylist, and sign once with your passkey.</p></div>
+        <div class="card step"><h3>Let it work</h3><p>Routine payments flow; big ones ping your phone; forbidden ones bounce. Revoke anytime in one click.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" class="alt">
+    <div class="wrap">
+      <h2>Built for agents that pay</h2>
+      <p class="sub">Everything an agent operator needs around the payment itself.</p>
+      <div class="grid3">
+        <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h3>On-chain limits</h3><p>Per-payment and per-day caps, allowed recipients and contract functions, expiry. Checked by the blockchain on every payment.</p></div>
+        <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3a9 9 0 0 0 2 5.7M18 12V9a6 6 0 0 0-9-5.2M12 9v4a12 12 0 0 1-2 6.6M15 11v2a15 15 0 0 1-1.2 6"/></svg></div><h3>Passkey approvals</h3><p>Approve big payments on your phone with Face ID or fingerprint. Each approval allows exactly that one payment, once.</p></div>
+        <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Non-custodial</h3><p>The service never holds a key that can move your funds. You can revoke and withdraw anytime, even via your recovery address.</p></div>
+        <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h7"/><circle cx="18" cy="16" r="3"/></svg></div><h3>Pay x402 APIs</h3><p>Agents can pay HTTP 402 APIs per request in USDC, within your limits, asking you above them. Tested against the official x402 facilitator.</p></div>
+        <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13 6l-2 12"/></svg></div><h3>Works with Claude</h3><p>An MCP server gives Claude Code, Claude Desktop and other MCP agents tools to pay, fetch paid APIs and check approvals.</p></div>
+        <div class="card feat"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><h3>Full audit trail</h3><p>Every payment, request, approval and block, with the agent's stated reason and the on-chain receipt, in one activity log.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Verified on Base Sepolia</h2>
+      <p class="sub">A real Claude agent paying four invoices from a passkey-owned account, live on testnet. Every line is on the blockchain.</p>
+      <div class="card tablecard">
+        <table>
+          <thead><tr><th>Invoice</th><th>What happened</th><th>Transaction</th></tr></thead>
+          <tbody>
+            <tr><td>1.20 USDC · Inference API</td><td><span class="ok">✔ paid by the agent alone</span> (within limits)</td><td><a href="https://sepolia.basescan.org/tx/0xe4f89770842ce13e1f320afa22ebcee5e6e9c12343def588e0e855088eccd862">Basescan ↗</a></td></tr><!-- allow-secret: public tx hash -->
+            <tr><td>0.0005 ETH · GPU market</td><td><span class="ok">✔ paid by the agent alone</span></td><td><a href="https://sepolia.basescan.org/tx/0x62420fe16650974ffdc911d0e65d16bb523c1488c48119fd14dea8404b9426f6">Basescan ↗</a></td></tr><!-- allow-secret: public tx hash -->
+            <tr><td>4.00 USDC · annual plan</td><td><span class="warn">✔ approved with a passkey on a phone</span>, then paid</td><td><a href="https://sepolia.basescan.org/tx/0xab39a007ae8dcde213d088442e8c790e4773cf8fef896cde4dfc481c8df36ee9">Basescan ↗</a></td></tr><!-- allow-secret: public tx hash -->
+            <tr><td>0.0003 ETH · DataHarvest</td><td><span class="bad">✘ blocked</span> (denylist); the agent didn't retry</td><td>none</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="security" class="alt">
+    <div class="wrap">
+      <h2>What you don't have to trust</h2>
+      <p class="sub">cyphos-guard is built on the MetaMask Delegation Framework, so the important rules live in your smart account.</p>
+      <div class="grid2">
+        <div class="card">
+          <h3>Enforced on-chain</h3>
+          <p>Recipients, per-day caps, contract functions, expiry, and one-shot approvals. These hold even if the cyphos-guard service is down or compromised. With the optional co-signer, per-payment caps are binding on-chain too.</p>
+        </div>
+        <div class="card">
+          <h3>Worst case, bounded</h3>
+          <p>If an agent's key is stolen, the thief gets the agent's permission and nothing more: your limits, your recipients, within the budget you put in. Revoke it in one click.</p>
+        </div>
+        <div class="card">
+          <h3>No seed phrase</h3>
+          <p>Your wallet is owned by a passkey on your phone, synced by iCloud Keychain or Google Password Manager. A recovery address you control is the backup.</p>
+        </div>
+        <div class="card">
+          <h3>Honest status</h3>
+          <p>Working MVP on Base Sepolia testnet. Not audited. No token, no DAO, no mainnet before an independent audit.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="developers">
+    <div class="wrap">
+      <h2>For developers</h2>
+      <p class="sub">A TypeScript SDK, an MCP server and a CLI. Your agent keeps its own key; the owner only ever sees its address.</p>
+      <div class="grid2">
+        <pre><span class="c">// pay within limits, ask the owner above them</span>
+<span class="k">const</span> pw = createCyphosGuard({ policyServiceUrl, agent });
+
+<span class="k">await</span> pw.execute({ to: vendor, value, reason: <span class="s">"GPU credits"</span> });
+
+<span class="c">// pay an x402 API per request</span>
+<span class="k">const</span> { response } = <span class="k">await</span> pw.payX402(
+  <span class="s">"https://api.example/report"</span>, {},
+  { reason: <span class="s">"weekly market report"</span> });</pre>
+        <pre><span class="c"># create the agent's own key (never leaves your machine)</span>
+pnpm cli agent new --env agent.env
+
+<span class="c"># give Claude the tools: pay, fetch_paid_api, check_approval…</span>
+claude mcp add cyphos-guard \
+  -e CYPHOS_AGENT_PRIVATE_KEY=0x… \
+  -- node packages/mcp/src/server.ts</pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="alt">
+    <div class="wrap">
+      <h2>Questions</h2>
+      <p class="sub">Short answers to what people ask first.</p>
+      <details><summary>Can my agent drain my wallet?</summary><p>No. It can only spend from the account you funded, only to recipients you allowed, and only up to your limits per payment and per day. Your main wallet is never connected.</p></details>
+      <details><summary>Do I need a seed phrase or a browser extension?</summary><p>No. You sign with a passkey (Face ID, fingerprint or security key). Optionally, you add a recovery address from a wallet you already have.</p></details>
+      <details><summary>What happens if cyphos-guard goes offline?</summary><p>Your funds stay in your smart account and the on-chain limits keep holding. Your recovery address can always control the account directly.</p></details>
+      <details><summary>Which networks?</summary><p>Base Sepolia testnet today (Ethereum Sepolia as fallback). Mainnet only after an independent security audit.</p></details>
+      <details><summary>Which agents work with it?</summary><p>Anything that can call the TypeScript SDK, and any MCP client such as Claude Code or Claude Desktop.</p></details>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap" style="text-align:center">
+      <h2>Give your agent a budget, not your keys.</h2>
+      <p class="sub" style="margin-left:auto;margin-right:auto">Try it on Base Sepolia testnet with free test tokens.</p>
+      <a class="btn btn-primary" href="https://app.cyphosguard.com">Open the app</a>
+      <p class="note" style="max-width:640px;margin:28px auto 0;text-align:left">Testnet only. cyphos-guard has not been audited. Do not use it with real funds.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>© 2026 cyphos-guard</span>
+    <span><a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a> · <a href="https://app.cyphosguard.com">App</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

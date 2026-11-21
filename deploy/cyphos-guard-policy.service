@@ -1,5 +1,5 @@
 [Unit]
-Description=cyphos-guard policy service (Base Sepolia, public at guard.cyphos.de)
+Description=cyphos-guard policy service (Base Sepolia; second instance, e.g. guard.example.com)
 After=network-online.target
 Wants=network-online.target
 

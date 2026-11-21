@@ -1,6 +1,6 @@
 /**
  * Live demo buyer: the agent pays the demo seller's x402 APIs through cyphos-guard.
- *   DEMO_AGENT_PRIVATE_KEY, POLICY_SERVICE_URL (e.g. https://guard.cyphos.de/api), SELLER_URL (default local)
+ *   DEMO_AGENT_PRIVATE_KEY, POLICY_SERVICE_URL (e.g. https://app.cyphosguard.com/api), SELLER_URL (default local)
  * /market-data (0.5 USDC) should pay within limits; /deep-report (3 USDC) should ask the owner first.
  */
 import { createCyphosGuard } from "@cyphos-guard/sdk";

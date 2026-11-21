@@ -1,5 +1,5 @@
 # cyphos-guard approver, public. Only port 443 is forwarded by the router, so certificates use TLS-ALPN-01.
-guard.cyphos.de {
+guard.example.com {
 	tls {
 		issuer acme {
 			disable_http_challenge

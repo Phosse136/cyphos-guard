@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Update the public instance in /opt/cyphos-guard to the latest commit of the working repo, rebuild, restart.
 set -euo pipefail
-SRC=${1:-/home/PHILCLAUDE/cyphos-guard}
+# Source: the working repo to pull from (argument, or $CYPHOS_GUARD_SRC).
+SRC=${1:-${CYPHOS_GUARD_SRC:?usage: update.sh <path-to-working-repo> (or set CYPHOS_GUARD_SRC)}}
 cd /opt/cyphos-guard
 git pull -q --ff-only "$SRC" main
 # Offline first (reuses the local store); falls back to the registry for packages the cache lacks.

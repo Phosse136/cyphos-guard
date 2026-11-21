@@ -1,5 +1,5 @@
 [Unit]
-Description=cyphos-guard approver web app (public at guard.cyphos.de)
+Description=cyphos-guard approver web app (second instance, e.g. guard.example.com)
 After=network-online.target cyphos-guard-policy.service
 Wants=network-online.target
 

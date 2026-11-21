@@ -27,3 +27,29 @@ agent (120/min), caps request bodies at 256 KB and pending sign-ins at 10,000 (o
 `RATE_LIMIT_PER_IP_PER_MIN`, `RATE_LIMIT_AUTH_PER_MIN`, `RATE_LIMIT_AGENT_PER_MIN`). The client IP comes from Caddy's
 `X-Forwarded-For`, so keep the service bound to localhost. `/rpc` forwards only read-only methods (no
 `eth_sendRawTransaction`), at most 600 calls/min per IP. Limits are in memory, per process.
+
+## Notifications (Telegram, Discord, ntfy)
+
+The policy service can message you when something happens: a new owner, an agent granted or revoked, **an approval
+waiting** (with a link to the app), payments, blocked attempts, x402 API payments, plus an optional daily summary. Off
+unless a channel is configured. Sends never block or break a request; at most 20 messages per minute (the rest are
+summarized as "+N more").
+
+Add to the instance's env file (`/etc/cyphos-guard/app.env`), then `systemctl restart cyphos-guard-app-policy`:
+
+```sh
+# Telegram: create a bot with @BotFather (/newbot) → token. Send your bot any message, then open
+# https://api.telegram.org/bot<TOKEN>/getUpdates and copy "chat":{"id": …}.
+TELEGRAM_BOT_TOKEN=123456:ABC…
+TELEGRAM_CHAT_ID=123456789
+# Discord: channel settings → Integrations → Webhooks → New webhook → copy URL.
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/…
+# ntfy (free push app, https://ntfy.sh): pick a long, unguessable topic name, subscribe to it in the app.
+NTFY_URL=https://ntfy.sh/cyphos-guard-<random>
+# Optional: only these events (default: all), and a daily summary at this hour (server time).
+NOTIFY_EVENTS=request_created,request_denied,routine_executed,x402_paid,owner_registered
+NOTIFY_SUMMARY_HOUR=20
+```
+
+Messages contain the event, amounts and shortened addresses. Mention the channel in your privacy policy if other
+people use your instance.

@@ -833,3 +833,22 @@ describe("rate limiting (public deployments)", () => {
     for (let i = 0; i < 20; i++) expect((await t.app.request("/health", from("203.0.113.4"))).status).toBe(200);
   });
 });
+
+describe("event hook (operator notifications)", () => {
+  it("emits owner registration and every recorded activity; a throwing hook never breaks a request", async () => {
+    const seen: string[] = [];
+    const t = setup({}, { onEvent: (e) => seen.push(e.kind) });
+    await t.ready(); // register + link account + grant
+    expect(seen).toEqual(["owner_registered", "grant_created"]);
+    const broken = setup(
+      {},
+      {
+        onEvent: () => {
+          throw new Error("telegram down");
+        },
+      },
+    );
+    await broken.ready(); // the grant (which records activity → hook throws) still returns 201
+    expect((await broken.requestApproval()).status).toBe(201); // and so does the next request
+  });
+});

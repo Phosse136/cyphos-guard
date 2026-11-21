@@ -86,6 +86,14 @@ export type AppConfig = {
    * approver proxy and Caddy (Caddy sets the header itself and ignores client-supplied values).
    */
   rateLimit?: { perIp: Limit; auth: Limit; agent: Limit; maxBodyBytes: number };
+  /** Called for every recorded activity and for new owner registrations (e.g. operator notifications). */
+  onEvent?: (e: {
+    kind: string;
+    account?: string | null;
+    agent?: string | null;
+    detail?: Record<string, unknown>;
+    txHash?: string | null;
+  }) => void;
 };
 
 /** Pending passkey challenges kept at most (each expires after 5 minutes). */
@@ -107,6 +115,15 @@ const toX402 = (x?: z.output<typeof x402ContextSchema>): X402Context | undefined
 export function createApp({ store, chain, config }: { store: Store; chain: ChainAdapter; config: AppConfig }) {
   const app = new Hono<Env>();
   const SESSION_COOKIE = sessionCookieName(config.secureCookies);
+  /** store.activity.add + the onEvent hook (which must never break a request). */
+  const recordActivity = (a: Parameters<Store["activity"]["add"]>[0]) => {
+    store.activity.add(a);
+    try {
+      config.onEvent?.(a);
+    } catch {
+      // notifications are best-effort
+    }
+  };
   const limits = config.rateLimit;
   const limiter = limits ? createRateLimiter() : null;
   const tooMany = (retryAfterSeconds: number) =>
@@ -315,6 +332,11 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
       createdAt: nowS(),
     });
     startSession(c, id);
+    try {
+      config.onEvent?.({ kind: "owner_registered" });
+    } catch {
+      // best-effort
+    }
     return c.json({
       ok: true,
       credentialId: credential.id,
@@ -456,7 +478,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
       createdAt: nowS(),
     };
     store.grants.create(grant);
-    store.activity.add({
+    recordActivity({
       account,
       agent: policy.agent,
       kind: "grant_created",
@@ -479,7 +501,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     }
     const body = (await c.req.json().catch(() => ({}))) as { txHash?: string };
     store.grants.markRevoked(grant.id, nowS());
-    store.activity.add({
+    recordActivity({
       account,
       agent: grant.agent,
       kind: "grant_revoked",
@@ -522,7 +544,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     if (!store.requests.transition(req.id, "pending", "approved", { decidedAt: nowS(), delegation })) {
       throw new HTTPException(409, { message: "request changed concurrently" });
     }
-    store.activity.add({
+    recordActivity({
       account,
       agent: req.agent,
       kind: "request_approved",
@@ -540,7 +562,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     if (!store.requests.transition(req.id, "pending", "rejected", { decidedAt: nowS() })) {
       throw new HTTPException(409, { message: `request is ${req.status}` });
     }
-    store.activity.add({
+    recordActivity({
       account,
       agent: req.agent,
       kind: "request_rejected",
@@ -636,7 +658,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     const body = parse(createApprovalRequestSchema, c.get("body"));
     const [grant] = store.grants.activeFor(body.account, agent);
     const deny = (code: string, message: string, status: 403 | 404) => {
-      store.activity.add({
+      recordActivity({
         account: body.account,
         agent,
         kind: "request_denied",
@@ -669,7 +691,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
       expiresAt: now + policy.escalation.approvalTtlSeconds,
     };
     store.requests.create(req);
-    store.activity.add({
+    recordActivity({
       account: body.account,
       agent,
       kind: "request_created",
@@ -715,7 +737,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     if (!store.requests.transition(req.id, "approved", "executed", { txHash: txHash as Hex })) {
       throw new HTTPException(409, { message: `request is ${req.status}` });
     }
-    store.activity.add({
+    recordActivity({
       account: req.account,
       agent,
       kind: "request_executed",
@@ -746,7 +768,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     if (!redeemed || !isAddressEqual(redeemed.delegator, body.account)) {
       throw new HTTPException(400, { message: "tx is not a successful redemption by this agent from this account" });
     }
-    store.activity.add({
+    recordActivity({
       account: body.account,
       agent,
       kind: "routine_executed",
@@ -793,7 +815,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
     if (moved === null || moved !== BigInt(body.amount)) {
       throw new HTTPException(400, { message: "tx does not show this payment from this payer to this seller" });
     }
-    store.activity.add({
+    recordActivity({
       account: body.account,
       agent,
       kind: "x402_paid",

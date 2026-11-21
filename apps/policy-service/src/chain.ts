@@ -8,6 +8,7 @@ import {
   deployCosignerEnforcer,
   type Execution,
   encodeRedeem,
+  readVault,
   revertReason,
   submitUserOp,
   type UserOpJSON,
@@ -61,6 +62,17 @@ export type ChainAdapter = {
    * the tx itself) and whose account it spent from (root delegator). Otherwise null.
    */
   verifiedRedeem(hash: Hex, from: Address): Promise<VerifiedRedeem | null>;
+  /** A deployed X402Vault's configuration, or null if there is no contract at `vault`. */
+  readX402Vault(
+    vault: Address,
+    sellers: Address[],
+  ): Promise<{
+    owner: Address;
+    agent: Address;
+    token: Address;
+    maxPerPayment: bigint;
+    allSellersListed: boolean;
+  } | null>;
   /** Total `token` moved from → to by the successful tx `hash` (ERC-20 Transfer logs), or null if it failed. */
   erc20Transferred(hash: Hex, token: Address, from: Address, to: Address): Promise<bigint | null>;
   /** True if `account` is deployed and has the passkey (keyId → x,y) as a signer. */
@@ -147,6 +159,10 @@ export async function createChainAdapter(opts: { rpcUrl: string; network: "fork"
       } catch {
         return null;
       }
+    },
+    async readX402Vault(vault, sellers) {
+      if (!(await client.getCode({ address: vault }))) return null;
+      return readVault(client, vault, sellers).catch(() => null);
     },
     async erc20Transferred(hash, token, from, to) {
       const receipt = await client.getTransactionReceipt({ hash }).catch(() => null);

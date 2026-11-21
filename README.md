@@ -142,20 +142,27 @@ allowed sellers within your limits, asks you above them, and never pays a forbid
 const { response, paid } = await pw.payX402("https://api.example/report", {}, { reason: "weekly market report" });
 ```
 
-How it works: an x402 payment must be signed by the payer, and only your passkey can sign for your account. So each
-payment moves exactly the price from your account to the agent's own address (on-chain: only to the agent, capped per
-period, per-payment cap binding via the co-signer), and the agent immediately signs the x402 payment to the seller.
+How it works: an x402 payment must be signed by the payer, and only your passkey can sign for your account. So when
+you grant x402, the SDK deploys a small **vault contract** for that agent (one extra passkey confirmation). Each payment
+moves exactly the price from your account into the vault, and the agent signs the x402 payment _as the vault_. The vault
+([X402Vault.sol](packages/contracts/src/X402Vault.sol), ERC-1271) only approves a USDC payment to a **listed seller**, up
+to its cap, signed by the agent. Everything else is refused, including any other kind of signature request.
 
-| Rule                                                   | Enforced                                                                                                                                                   |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Total x402 spend per period, top-ups only to the agent | on-chain                                                                                                                                                   |
-| Per-payment cap                                        | on-chain via the co-signer (required for x402)                                                                                                             |
-| Which sellers may be paid                              | SDK + co-signer. The last hop (agent → seller) is signed by the agent alone, so a **stolen agent key could redirect at most what the on-chain caps allow** |
+| Rule                             | Enforced                                                                                           |
+| -------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Which sellers may be paid        | **on-chain** (vault). Unlisted sellers can't be paid, not even with approval: add them to the list |
+| Largest single payment           | **on-chain** (vault cap = your "ask me up to" maximum)                                             |
+| Total x402 spend per period      | **on-chain** (top-ups only into the vault, period cap)                                             |
+| Routine vs. "ask me" per payment | SDK + escalation; binding on-chain too if you enable the co-signer                                 |
 
-Verified against the official x402 server and facilitator (`@x402/core` / `@x402/evm` 2.30) on a Base Sepolia fork:
-routine payment, escalation with approval, forbidden seller, max-amount guard
-([test](examples/x402-seller/src/x402.fork.test.ts)). When x402's delegation-based transfer method (ERC-7710) is
-supported by facilitators, the last hop can move on-chain too.
+So a **stolen agent key can only pay your listed sellers**, within your caps. The vault is owned by your account: you
+can withdraw from it anytime (normally it's empty, because it's topped up just before each payment).
+
+Verified against the official x402 server and facilitator (`@x402/core` / `@x402/evm` 2.30) on a Base Sepolia fork
+with real USDC: vault deployment at grant time, routine payment, escalation with approval, unlisted seller refused before
+any money moves, and the vault refusing unlisted sellers, over-cap amounts and foreign signatures even when asked
+directly ([integration test](examples/x402-seller/src/x402.fork.test.ts),
+[vault test](examples/x402-seller/src/vault.fork.test.ts)). **The vault contract is new and not audited.**
 
 ## How it works
 
@@ -279,7 +286,8 @@ corrections welcome).
   policy-service signature per redemption. It makes ERC-20 per-payment caps and range checks on arguments binding
   even for a compromised agent, while the co-signer still can't move funds.
 
-- **x402**: agents pay HTTP 402 APIs within your limits (`payX402`, MCP `fetch_paid_api`).
+- **x402**: agents pay HTTP 402 APIs within your limits (`payX402`, MCP `fetch_paid_api`); an X402Vault per agent
+  enforces the seller list on-chain.
 
 **Next**
 
@@ -305,7 +313,7 @@ apps/approver         Next.js owner app: passkey login, approvals, grants, revok
 apps/policy-service   approval queue · grant registry · activity (Hono + node:sqlite), holds no keys
 packages/cli          cyphos-guard CLI: `agent new` / `agent show` (agent key, kept by the agent's developer)
 examples/x402-seller  x402 seller on the official x402 server logic (tests, live demo)
-packages/contracts    CosignerEnforcer (Foundry, on Delegation Framework v1.3.0 as submodule)
+packages/contracts    CosignerEnforcer + X402Vault (Foundry, on Delegation Framework v1.3.0 as submodule)
 packages/mcp          MCP server (pay, check_approval, … for Claude Code / Claude Desktop)
 packages/sdk          @cyphos-guard/sdk: createCyphosGuard, policy compiler, co-signer, typed errors
 packages/shared       policy schema (zod), API types, escalation and off-chain checks

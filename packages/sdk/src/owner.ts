@@ -41,7 +41,11 @@ export async function deployAccount(
   return hash;
 }
 
-/** Unsigned userOp for `calls` with fixed, generous gas limits (no bundler estimation round-trip). */
+/**
+ * Unsigned userOp for `calls` with generous gas limits (no bundler estimation round-trip). The call gas is the
+ * sum of each call's own estimate (as sent from the account) with headroom, and at least 300k, so heavy calls
+ * such as deploying an X402Vault fit.
+ */
 export async function buildUserOp(
   account: MetaMaskSmartAccount,
   publicClient: PublicClient,
@@ -54,13 +58,23 @@ export async function buildUserOp(
     account.isDeployed(),
   ]);
   const init = deployed ? {} : await account.getFactoryArgs();
+  const estimates = await Promise.all(
+    calls.map((c) =>
+      publicClient
+        .estimateGas({ account: account.address, to: c.to, data: c.data, value: c.value })
+        .catch(() => 300_000n),
+    ),
+  );
+  const callGasLimit = [(estimates.reduce((a, b) => a + b, 0n) * 13n) / 10n + 100_000n, 300_000n].reduce((a, b) =>
+    a > b ? a : b,
+  );
   return {
     sender: account.address,
     nonce,
     callData,
     ...(init.factory && init.factoryData ? { factory: init.factory, factoryData: init.factoryData } : {}),
     // Validation is one ECDSA/ERC-1271/P-256 check; deployment (first op) needs more.
-    callGasLimit: 300_000n,
+    callGasLimit,
     verificationGasLimit: deployed ? 800_000n : 2_000_000n,
     preVerificationGas: 60_000n,
     maxFeePerGas: fees.maxFeePerGas * 2n,

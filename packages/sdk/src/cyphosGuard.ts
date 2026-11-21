@@ -25,6 +25,7 @@ import {
   type RequestStatus,
   SUPPORTED_CHAIN_IDS,
   type X402Context,
+  x402VaultCap,
 } from "@cyphos-guard/shared";
 import type { Delegation, MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
 import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
@@ -55,6 +56,7 @@ import {
   PolicyServiceError,
   PolicyViolation,
 } from "./errors.ts";
+import { encodeVaultSignature, randomVaultSalt, vaultDeployment } from "./vault.ts";
 import {
   decodeX402Header,
   encodeX402Header,
@@ -383,9 +385,10 @@ export function createCyphosGuard(opts: CyphosGuardOptions) {
       if (!header) throw new X402Error(`402 without a ${X402_HEADERS.required} header (only x402 v2 is supported)`);
       const required = decodeX402Header<PaymentRequired>(header);
 
-      const permissions = (await pw.getGrants()).flatMap((g) =>
-        parsePolicy(g.policy).permissions.filter((p) => p.kind === "x402"),
-      );
+      const permissions = (await pw.getGrants()).flatMap((g) => {
+        const policy = parsePolicy(g.policy);
+        return policy.permissions.flatMap((p) => (p.kind === "x402" ? [{ ...p, cap: x402VaultCap(policy, p) }] : []));
+      });
       const choice: PaymentRequirements | null = selectRequirement(required, {
         chainId,
         tokens: permissions.map((p) => p.token),
@@ -401,20 +404,33 @@ export function createCyphosGuard(opts: CyphosGuardOptions) {
         throw new X402Error(`the API asks ${amount}, more than maxAmount ${maxAmount}`);
       }
       const payment = { payTo: choice.payTo, asset: choice.asset, amount, resource: required.resource?.url ?? url };
+      const sameToken = permissions.filter((p) => p.token.toLowerCase() === choice.asset.toLowerCase());
+      const perm =
+        sameToken.find((p) => p.sellers.some((s) => s.toLowerCase() === choice.payTo.toLowerCase())) ?? sameToken[0];
+      // Vault mode: the vault itself refuses unlisted sellers and amounts above its cap, so don't move money
+      // (or ask the owner) for a payment that can't go through.
+      if (perm?.vault) {
+        if (!perm.sellers.some((s) => s.toLowerCase() === choice.payTo.toLowerCase())) {
+          throw new X402Error(`seller ${choice.payTo} is not on this agent's x402 vault list; the owner can add it`);
+        }
+        if (amount > perm.cap)
+          throw new X402Error(`the API asks ${amount}, above the vault's per-payment cap ${perm.cap}`);
+      }
+      const payer: Address = perm?.vault ?? agent.address;
 
       // Just-in-time: only the shortfall leaves the account (leftovers from a failed attempt are reused).
       const held = await publicClient.readContract({
         address: choice.asset,
         abi: erc20Abi,
         functionName: "balanceOf",
-        args: [agent.address],
+        args: [payer],
       });
       let topUp: ExecutionResult | undefined;
       if (held < amount) {
         topUp = await pw.execute(
           {
             to: choice.asset,
-            data: encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [agent.address, amount - held] }),
+            data: encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [payer, amount - held] }),
             reason: `x402 payment to ${choice.payTo} for ${payment.resource}: ${reason}`,
             x402: { payTo: choice.payTo, amount, resource: payment.resource },
           },
@@ -422,7 +438,10 @@ export function createCyphosGuard(opts: CyphosGuardOptions) {
         );
       }
 
-      const signed = await signExactEip3009(agent, choice, chainId);
+      const raw = await signExactEip3009(agent, choice, chainId, perm?.vault ? { from: perm.vault } : {});
+      const signed = perm?.vault
+        ? { authorization: raw.authorization, signature: encodeVaultSignature(raw.authorization, raw.signature) }
+        : raw;
       const headers = new Headers(init.headers);
       headers.set(
         X402_HEADERS.signature,
@@ -441,9 +460,10 @@ export function createCyphosGuard(opts: CyphosGuardOptions) {
           amount: amount.toString(),
           resource: payment.resource,
           reason,
+          payer,
         }).catch((e) => log.warn?.("could not report x402 payment", { error: String(e) }));
       } else if (!paid) {
-        log.warn?.("x402 payment not settled; the topped-up amount stays with the agent for the next attempt", {
+        log.warn?.("x402 payment not settled; the topped-up amount stays with the payer for the next attempt", {
           status: response.status,
           error: settlement?.errorReason,
         });
@@ -463,8 +483,33 @@ export function createCyphosGuard(opts: CyphosGuardOptions) {
      * Grant an agent a policy: compile → passkey-sign each delegation → register.
      * Any existing active grant for the same agent is revoked on-chain first, so caps never stack.
      */
-    async grantAgent({ policy: input }: { policy: PolicyInput }): Promise<GrantJSON> {
+    async grantAgent({ policy: requested }: { policy: PolicyInput }): Promise<GrantJSON> {
       const owner = needOwner("grantAgent");
+      // x402 permissions get their own X402Vault (sellers + cap enforced on-chain), deployed from the owner's
+      // account before signing, so its address can go into the policy and the top-up delegation.
+      const parsedRequest = parsePolicy(requested);
+      const vaultCalls: { to: Address; data: Hex }[] = [];
+      const input: PolicyInput = {
+        ...requested,
+        permissions: requested.permissions.map((perm, i) => {
+          const parsed = parsedRequest.permissions[i];
+          if (perm.kind !== "x402" || parsed?.kind !== "x402" || parsed.vault) return perm;
+          const d = vaultDeployment({
+            owner: owner.account.address,
+            agent: parsedRequest.agent,
+            token: parsed.token,
+            maxPerPayment: x402VaultCap(parsedRequest, parsed),
+            sellers: parsed.sellers,
+            salt: randomVaultSalt(),
+          });
+          vaultCalls.push(d.call);
+          return { ...perm, vault: d.address };
+        }),
+      };
+      if (vaultCalls.length) {
+        await owner.sendCalls(vaultCalls);
+        log.info?.("x402 vault(s) deployed", { count: vaultCalls.length });
+      }
       const policy = parsePolicy(input);
       if (policy.chainId !== chainId) throw new Error(`policy is for chain ${policy.chainId}, client is ${chainId}`);
       const existing = (await pw.getGrants()).filter(

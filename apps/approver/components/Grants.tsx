@@ -202,10 +202,12 @@ export function Grants({
   };
 
   const sellers = form.x402Sellers.split(/[\s,]+/).filter(Boolean);
-  const cosigned = Boolean(cosigner && useCosigner);
   const x402Ok =
     !form.x402Sellers ||
-    (sellers.every((a) => isAddress(a)) && Number(form.x402PerTx) > 0 && Number(form.x402Daily) > 0 && cosigned);
+    (sellers.length > 0 &&
+      sellers.every((a) => isAddress(a)) &&
+      Number(form.x402PerTx) > 0 &&
+      Number(form.x402Daily) > 0);
   const ethOk = !form.ethRecipient || (isAddress(form.ethRecipient) && Number(form.ethDaily) > 0);
   const usdcOk = !form.usdcRecipient || (isAddress(form.usdcRecipient) && Number(form.usdcDaily) > 0);
   const valid =
@@ -246,7 +248,7 @@ export function Grants({
                   )}
                 </div>
               </div>
-              {open && <AgentDetails grant={g} fork={fork} />}
+              {open && <AgentDetails grant={g} fork={fork} account={account} />}
             </li>
           );
         })}
@@ -287,7 +289,7 @@ export function Grants({
 
         <Field
           label="x402 API sellers (USDC)"
-          hint="Optional: payTo addresses of paid APIs (x402) the agent may pay; comma-separated. Needs the co-signer."
+          hint="Optional: payTo addresses of paid APIs (x402) the agent may pay; comma-separated. A vault contract enforces this list on-chain (one extra passkey confirmation)."
         >
           <input className={inputClass} value={form.x402Sellers} onChange={set("x402Sellers")} placeholder="0x…, 0x…" />
         </Field>
@@ -299,11 +301,6 @@ export function Grants({
             <input className={inputClass} value={form.x402PerTx} onChange={set("x402PerTx")} />
           </Field>
         </div>
-        {form.x402Sellers && !cosigned && (
-          <p className="text-xs text-red-600 sm:col-span-2">
-            x402 payments need the cyphos-guard co-signer (it binds the per-payment limit and the seller check).
-          </p>
-        )}
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Ask me up to (ETH)" hint="Above: denied">

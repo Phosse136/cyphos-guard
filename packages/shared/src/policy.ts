@@ -88,10 +88,13 @@ const erc20TransferSchema = z.object({
 /**
  * Pay x402 APIs (HTTP 402, "exact" scheme, EIP-3009 tokens such as USDC). The x402 payer must sign a token
  * authorization, which only the owner's passkey can do for the smart account. So each payment is a
- * just-in-time top-up: the account sends exactly the shortfall to the AGENT's own address (on-chain:
- * token, recipient = agent, period cap; per-payment cap binding via the required co-signer), then the agent
- * signs the x402 authorization to the seller. The seller allowlist is checked by the SDK and the co-signer;
- * a compromised agent key could redirect at most what the on-chain caps allow.
+ * just-in-time top-up of the shortfall from the account to the PAYER, which then signs the x402 payment:
+ *
+ * - With `vault` (default when granting through the SDK): the payer is an X402Vault contract (ERC-1271). It
+ *   approves only payments to listed sellers, up to its cap, signed by the agent. Sellers and cap are
+ *   enforced ON-CHAIN; unlisted sellers can't be paid at all (add them to the vault instead).
+ * - Without `vault` (legacy): the payer is the agent's own address; the seller list is checked by the SDK and
+ *   the required co-signer only, so a compromised agent key could redirect what the on-chain caps allow.
  */
 const x402Schema = z.object({
   kind: z.literal("x402"),
@@ -102,6 +105,8 @@ const x402Schema = z.object({
   perTx: amountSchema,
   /** Required: the on-chain safety floor for all top-ups together. */
   perPeriod: periodLimitSchema,
+  /** The agent's X402Vault (set by the SDK when it deploys the vault at grant time). */
+  vault: addressSchema.optional(),
 });
 
 const contractCallSchema = z.object({
@@ -174,11 +179,11 @@ export const policySchema = z
     }
     const forbidden = new Set(p.forbidden.targets);
     p.permissions.forEach((perm, i) => {
-      if (perm.kind === "x402" && !p.cosigner) {
+      if (perm.kind === "x402" && !perm.vault && !p.cosigner) {
         ctx.addIssue({
           code: "custom",
           path: ["permissions", i],
-          message: "x402 permissions require a co-signer (it binds the per-payment cap and the seller check)",
+          message: "x402 permissions need a vault or a co-signer (to bind the per-payment cap and the seller check)",
         });
       }
       const touched =
@@ -229,13 +234,16 @@ export const ENFORCEMENT = {
     how: "SDK pre-check → escalation; BINDING on-chain via CosignerEnforcer when policy.cosigner is set",
   },
   "erc20Transfer.perPeriod": { where: "onchain", how: "ERC20PeriodTransferEnforcer" },
-  "x402.token": { where: "onchain", how: "ERC20PeriodTransferEnforcer (top-up: token.transfer to the agent only)" },
-  "x402.topUpRecipient": { where: "onchain", how: "AllowedCalldataEnforcer @ offset 4 (= the agent's address)" },
-  "x402.perTx": { where: "onchain", how: "CosignerEnforcer (required for x402)" },
+  "x402.token": { where: "onchain", how: "ERC20PeriodTransferEnforcer (top-ups: token.transfer to the payer only)" },
+  "x402.topUpRecipient": { where: "onchain", how: "AllowedCalldataEnforcer @ offset 4 (= the vault, or the agent)" },
   "x402.perPeriod": { where: "onchain", how: "ERC20PeriodTransferEnforcer" },
   "x402.sellers": {
-    where: "offchain",
-    how: "SDK + co-signer check the x402 payTo; the final agent → seller hop is signed by the agent alone",
+    where: "onchain",
+    how: "X402Vault.isValidSignature: only listed sellers (legacy, no vault: SDK + co-signer only)",
+  },
+  "x402.perTx": {
+    where: "onchain",
+    how: "routine top-ups: CosignerEnforcer if set; every payment: X402Vault cap (= hard max, else perTx)",
   },
   "contractCall.target": { where: "onchain", how: "AllowedTargetsEnforcer" },
   "contractCall.functions": { where: "onchain", how: "AllowedMethodsEnforcer" },
@@ -255,6 +263,17 @@ export const ENFORCEMENT = {
     how: "never escalated; agent already can't reach them on-chain (allowlist)",
   },
 } as const;
+
+/**
+ * The X402Vault's per-payment cap for an x402 permission: the owner's "ask me up to" hard maximum for the token
+ * (so approved larger payments can still be paid), else the routine per-payment limit.
+ */
+export function x402VaultCap(policy: Policy, permission: Extract<Permission, { kind: "x402" }>): bigint {
+  const hard = policy.escalation.hardMax.find(
+    (h) => h.token !== "native" && h.token.toLowerCase() === permission.token.toLowerCase(),
+  );
+  return hard && hard.amount > permission.perTx ? hard.amount : permission.perTx;
+}
 
 export function parsePolicy(input: unknown): Policy {
   return policySchema.parse(input);

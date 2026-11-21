@@ -221,3 +221,35 @@ describe("compilePolicy: x402", () => {
     expect(() => parsePolicy({ ...base, cosigner: COSIGNER, forbidden: { targets: [SELLER] } })).toThrow(/forbidden/);
   });
 });
+
+describe("compilePolicy: x402 with a vault", () => {
+  const VAULT = "0x7777777777777777777777777777777777777777";
+  const SELLER = "0x6666666666666666666666666666666666666666";
+  it("pins top-ups to the vault and needs no co-signer", () => {
+    const p = parsePolicy({
+      version: 1,
+      chainId: 84532,
+      agent: AGENT,
+      validFrom: NOW,
+      expiresAt: NOW + DAY,
+      permissions: [
+        {
+          kind: "x402",
+          token: USDC_ADDRESS,
+          sellers: [SELLER],
+          perTx: "1000000",
+          perPeriod: { amount: "5000000", periodSeconds: DAY },
+          vault: VAULT,
+        },
+      ],
+    });
+    const [c] = compilePolicy({ policy: p, delegator: ACCOUNT, environment: env });
+    const calldata = c?.delegation.caveats.find(
+      (cv) => cv.enforcer.toLowerCase() === env.caveatEnforcers.AllowedCalldataEnforcer?.toLowerCase(),
+    );
+    expect(calldata?.terms.toLowerCase()).toBe(
+      `0x${(4).toString(16).padStart(64, "0")}${VAULT.slice(2).padStart(64, "0")}`.toLowerCase(),
+    );
+    expect(c?.delegation.caveats).toHaveLength(4); // no CosignerEnforcer
+  });
+});

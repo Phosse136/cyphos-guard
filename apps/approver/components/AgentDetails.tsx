@@ -1,13 +1,14 @@
 "use client";
 
-import { cosignerEnforcerAddress } from "@cyphos-guard/sdk";
+import { cosignerEnforcerAddress, x402VaultAbi } from "@cyphos-guard/sdk";
 import { type GrantJSON, parsePolicy } from "@cyphos-guard/shared";
-import { useEffect, useState } from "react";
-import { formatEther, formatUnits, isAddressEqual } from "viem";
+import type { MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
+import { useCallback, useEffect, useState } from "react";
+import { type Address, encodeFunctionData, erc20Abi, formatEther, formatUnits, isAddressEqual } from "viem";
 import { api } from "@/lib/api";
 import { duration, USDC, when } from "@/lib/format";
-import { environment } from "@/lib/wallet";
-import { Addr, Badge, Details, TxHash } from "./ui";
+import { environment, publicClient, sendOwnerCalls } from "@/lib/wallet";
+import { Addr, Badge, Button, Details, ErrorText, TxHash } from "./ui";
 
 /** Name of the caveat enforcer at `address`, read from the deployed environment (what the chain actually checks). */
 function enforcerName(address: string): string {
@@ -21,7 +22,15 @@ function enforcerName(address: string): string {
 const tokenLabel = (token: string) => (isAddressEqual(token as `0x${string}`, USDC) ? "USDC" : `token ${token}`);
 
 /** Everything this agent may do, in plain language, plus the on-chain rules that enforce each permission. */
-export function AgentDetails({ grant, fork }: { grant: GrantJSON; fork: boolean }) {
+export function AgentDetails({
+  grant,
+  fork,
+  account,
+}: {
+  grant: GrantJSON;
+  fork: boolean;
+  account: MetaMaskSmartAccount;
+}) {
   const policy = parsePolicy(grant.policy);
   const [revokeTx, setRevokeTx] = useState<string | null>(null);
   useEffect(() => {
@@ -176,13 +185,29 @@ export function AgentDetails({ grant, fork }: { grant: GrantJSON; fork: boolean 
                         "Per period",
                         `${formatUnits(p.perPeriod.amount, 6)} ${tokenLabel(p.token)} per ${duration(p.perPeriod.periodSeconds)}`,
                       ],
-                      ["Per payment", `max ${formatUnits(p.perTx, 6)} ${tokenLabel(p.token)} (binding via co-signer)`],
                       [
-                        "How",
-                        "Each payment moves exactly the price from your account to the agent's own address, then the agent signs the x402 payment to the seller. On-chain: only to the agent, capped per period. The seller check is done by the co-signer.",
+                        "Per payment",
+                        `max ${formatUnits(p.perTx, 6)} ${tokenLabel(p.token)} on its own${p.vault ? "; above: ask me" : " (binding via co-signer)"}`,
                       ],
+                      ...(p.vault
+                        ? ([
+                            ["Vault", <Addr key="v" value={p.vault} />],
+                            [
+                              "How",
+                              "Each payment moves exactly the price from your account into this agent's vault, then the agent signs the x402 payment. The vault contract only pays the sellers listed above, up to your hard maximum per payment, so even a stolen agent key can't pay anyone else.",
+                            ],
+                          ] as [string, React.ReactNode][])
+                        : ([
+                            [
+                              "How",
+                              "Legacy (no vault): each payment moves exactly the price to the agent's own address, then the agent signs the x402 payment. The seller check is done by the co-signer, not on-chain.",
+                            ],
+                          ] as [string, React.ReactNode][])),
                     ]}
                   />
+                )}
+                {p.kind === "x402" && p.vault && (
+                  <VaultPanel vault={p.vault} token={p.token} account={account} fork={fork} />
                 )}
                 {delegation && (
                   <p className="mt-2 text-xs text-zinc-500">
@@ -242,6 +267,68 @@ export function AgentDetails({ grant, fork }: { grant: GrantJSON; fork: boolean 
           ]}
         />
       </div>
+    </div>
+  );
+}
+
+/** Live balance of an agent's X402Vault and a passkey-signed withdrawal back to the owner's account. */
+function VaultPanel({
+  vault,
+  token,
+  account,
+  fork,
+}: {
+  vault: Address;
+  token: Address;
+  account: MetaMaskSmartAccount;
+  fork: boolean;
+}) {
+  const [balance, setBalance] = useState<bigint | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tx, setTx] = useState<string | null>(null);
+  const load = useCallback(
+    () =>
+      publicClient()
+        .readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [vault] })
+        .then(setBalance)
+        .catch(() => setBalance(null)),
+    [token, vault],
+  );
+  useEffect(() => {
+    load();
+  }, [load]);
+  const withdraw = async () => {
+    if (!balance) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const data = encodeFunctionData({
+        abi: x402VaultAbi,
+        functionName: "withdraw",
+        args: [token, account.address, balance],
+      });
+      setTx(await sendOwnerCalls(account, fork, [{ to: vault, data }]));
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+      <span>
+        In the vault: {balance === null ? "…" : `${formatUnits(balance, 6)} ${tokenLabel(token)}`} (normally 0: it is
+        topped up just before each payment)
+      </span>
+      {balance !== null && balance > 0n && (
+        <Button variant="ghost" disabled={busy} onClick={withdraw}>
+          {busy ? "Confirm with passkey…" : "Withdraw to my wallet"}
+        </Button>
+      )}
+      {tx && <TxHash hash={tx} fork={fork} />}
+      <ErrorText error={error} />
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { createApp } from "@cyphos-guard/policy-service/app";
 import { createChainAdapter } from "@cyphos-guard/policy-service/chain";
 import { openStore } from "@cyphos-guard/policy-service/store";
 import { setupSoftOwner } from "@cyphos-guard/policy-service/testing";
-import { createCyphosGuard, PolicyViolation, X402Error } from "@cyphos-guard/sdk";
+import { createCyphosGuard, X402Error, x402VaultAbi } from "@cyphos-guard/sdk";
 import { ensureFork } from "@cyphos-guard/sdk/testing";
 import { serve } from "@hono/node-server";
 import {
@@ -38,6 +38,7 @@ let owner: Awaited<ReturnType<typeof setupSoftOwner>>["owner"];
 let pw: ReturnType<typeof createCyphosGuard>;
 let shop: string;
 let shady: string;
+let vault: Address;
 
 const listen = async (fetch: (r: Request) => Response | Promise<Response>) => {
   const s = serve({ fetch, port: 0, hostname: "127.0.0.1" });
@@ -121,6 +122,11 @@ beforeAll(async () => {
     ).fetch,
   );
   pw = createCyphosGuard({ policyServiceUrl: serviceUrl, publicClient, agent, rpcUrl: FORK });
+  const [grant] = await owner.getGrants();
+  if (!grant) throw new Error("no grant");
+  const perm = (grant.policy as { permissions: { kind: string; vault?: Address }[] }).permissions[0];
+  if (!perm?.vault) throw new Error("grantAgent did not set up an x402 vault");
+  vault = perm.vault;
 });
 
 afterAll(() => {
@@ -128,7 +134,18 @@ afterAll(() => {
 });
 
 describe("x402 against the reference server + facilitator (fork)", () => {
-  it("pays a routine x402 price within limits: account → agent (exact shortfall) → seller, settled on-chain", async () => {
+  it("grantAgent deployed the agent's X402Vault, owned by the account, listing the seller", async () => {
+    const read = (functionName: "owner" | "agent" | "maxPerPayment") =>
+      publicClient.readContract({ address: vault, abi: x402VaultAbi, functionName });
+    const isSeller = (a: Address) =>
+      publicClient.readContract({ address: vault, abi: x402VaultAbi, functionName: "isSeller", args: [a] });
+    expect((await read("agent")) as Address).toBe(agent.address);
+    expect(await read("maxPerPayment")).toBe(parseUnits("20", 6)); // = hard max: approved larger payments can pay
+    expect(await isSeller(SELLER)).toBe(true);
+    expect(await isSeller(MIXER)).toBe(false);
+  });
+
+  it("pays a routine x402 price within limits: account → vault (exact shortfall) → seller, settled on-chain", async () => {
     const before = await usdcOf(SELLER);
     const r = await pw.payX402(`${shop}/data`, {}, { reason: "price check" });
     expect(r.paid).toBe(true);
@@ -136,7 +153,8 @@ describe("x402 against the reference server + facilitator (fork)", () => {
     expect(r.topUp?.via).toBe("grant");
     expect(r.settlement?.transaction).toMatch(/^0x[0-9a-f]{64}$/);
     expect((await usdcOf(SELLER)) - before).toBe(parseUnits("0.5", 6));
-    expect(await usdcOf(agent.address)).toBe(0n); // nothing left behind with the agent
+    expect(await usdcOf(vault)).toBe(0n); // nothing left behind in the vault
+    expect(await usdcOf(agent.address)).toBe(0n); // and the agent itself never holds funds
   });
 
   it("above the per-payment cap: asks the owner, pays after approval", async () => {
@@ -157,9 +175,11 @@ describe("x402 against the reference server + facilitator (fork)", () => {
     expect((await usdcOf(SELLER)) - before).toBe(parseUnits("3", 6));
   });
 
-  it("never pays a forbidden seller (not even with approval)", async () => {
-    await expect(pw.payX402(`${shady}/data`, {}, { reason: "cheap data" })).rejects.toBeInstanceOf(PolicyViolation);
+  it("never pays a seller that isn't on the vault's list: refused before any money moves", async () => {
+    const before = await usdcOf(vault);
+    await expect(pw.payX402(`${shady}/data`, {}, { reason: "cheap data" })).rejects.toBeInstanceOf(X402Error);
     expect(await usdcOf(MIXER)).toBe(0n);
+    expect(await usdcOf(vault)).toBe(before);
   });
 
   it("respects the caller's maxAmount and passes non-402 responses through", async () => {
@@ -175,6 +195,7 @@ describe("x402 against the reference server + facilitator (fork)", () => {
     const activity = await owner.getActivity();
     const paid = activity.filter((a) => a.kind === "x402_paid");
     expect(paid).toHaveLength(2);
+    expect(paid.every((a) => (a.detail as { payer: string }).payer === vault)).toBe(true);
     expect(paid.map((a) => (a.detail as { resource: string }).resource).sort()).toEqual([
       `${shop}/data`,
       `${shop}/report`,

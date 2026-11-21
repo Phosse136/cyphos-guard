@@ -98,13 +98,22 @@ const authorizationTypes = {
   ],
 } as const;
 
-/** The `payload` of an exact/EIP-3009 PaymentPayload, signed by `signer` (same fields as @x402/evm). */
-export async function signExactEip3009(signer: LocalAccount, req: PaymentRequirements, chainId: number) {
+/**
+ * The `payload` of an exact/EIP-3009 PaymentPayload, signed by `signer` (same fields as @x402/evm). With `from`
+ * (a contract payer such as an X402Vault), the authorization is from that address and `signer`'s signature is
+ * returned raw: wrap it in the contract's own signature format (encodeVaultSignature).
+ */
+export async function signExactEip3009(
+  signer: LocalAccount,
+  req: PaymentRequirements,
+  chainId: number,
+  { from }: { from?: Address } = {},
+) {
   if (!req.extra?.name || !req.extra?.version)
     throw new X402Error("payment requirements lack the token's EIP-712 domain");
   const now = Math.floor(Date.now() / 1000);
   const authorization = {
-    from: getAddress(signer.address),
+    from: getAddress(from ?? signer.address),
     to: getAddress(req.payTo),
     value: req.amount,
     validAfter: "0",

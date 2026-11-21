@@ -5,4 +5,5 @@ export * from "./cyphosGuard.ts";
 export * from "./delegations.ts";
 export * from "./errors.ts";
 export * from "./owner.ts";
+export * from "./vault.ts";
 export * from "./x402.ts";

@@ -28,6 +28,7 @@ function setup(overrides: Partial<ChainAdapter> = {}, extraConfig: { setupCode?:
     accountHasPasskey: async () => true,
     ensureCosignerEnforcer: async () => true,
     erc20Transferred: async () => null, // overridden per test
+    readX402Vault: async () => null, // overridden per test
     ...overrides,
   };
   const store = openStore(":memory:");
@@ -677,3 +678,81 @@ function fakeDelegationFor(agent: Address) {
     signature: "0x01",
   };
 }
+
+describe("x402 vaults", () => {
+  const TOKEN = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address;
+  const SELLER = privateKeyToAddress(generatePrivateKey());
+  const VAULT = privateKeyToAddress(generatePrivateKey());
+  const vaultGrant = (t: ReturnType<typeof setup>) =>
+    t.owner.post("/grants", {
+      policy: {
+        version: 1,
+        chainId: 84532,
+        agent: t.agent.address,
+        expiresAt: 1_800_086_400,
+        permissions: [
+          {
+            kind: "x402",
+            token: TOKEN,
+            sellers: [SELLER],
+            perTx: "1000000",
+            perPeriod: { amount: "5000000", periodSeconds: 86_400 },
+            vault: VAULT,
+          },
+        ],
+        escalation: { enabled: true, approvalTtlSeconds: 600, hardMax: [{ token: TOKEN, amount: "20000000" }] },
+      },
+      delegations: [fakeDelegationFor(t.agent.address)],
+    });
+  const good = (t: ReturnType<typeof setup>) => ({
+    owner: ACCOUNT,
+    agent: t.agent.address,
+    token: TOKEN,
+    maxPerPayment: 20_000_000n, // the hard max, so approved larger payments can still be paid
+    allSellersListed: true,
+  });
+  const ready = async (t: ReturnType<typeof setup>) => {
+    await t.owner.register();
+    await t.owner.put("/me/account", { accountAddress: ACCOUNT });
+  };
+
+  it("accepts a grant only if the vault on-chain matches the policy (no co-signer needed)", async () => {
+    for (const [label, mutate, status] of [
+      ["matching vault", (v: ReturnType<typeof good>) => v, 201],
+      ["vault of another owner", (v: ReturnType<typeof good>) => ({ ...v, owner: MIXER }), 400],
+      ["vault for another agent", (v: ReturnType<typeof good>) => ({ ...v, agent: MIXER }), 400],
+      ["wrong cap", (v: ReturnType<typeof good>) => ({ ...v, maxPerPayment: 1n }), 400],
+      ["seller not listed", (v: ReturnType<typeof good>) => ({ ...v, allSellersListed: false }), 400],
+    ] as const) {
+      let t: ReturnType<typeof setup>;
+      t = setup({ readX402Vault: async () => mutate(good(t)) });
+      await ready(t);
+      expect((await vaultGrant(t)).status, label).toBe(status);
+    }
+    const missing = setup({ readX402Vault: async () => null });
+    await ready(missing);
+    expect((await vaultGrant(missing)).status).toBe(400);
+  });
+
+  it("records payments from the agent's vault, but not from some other payer", async () => {
+    let t: ReturnType<typeof setup>;
+    t = setup({ readX402Vault: async () => good(t), erc20Transferred: async () => 500_000n });
+    await ready(t);
+    expect((await vaultGrant(t)).status).toBe(201);
+    const body = (payer: Address) => ({
+      account: ACCOUNT,
+      txHash: `0x${"b".repeat(64)}`,
+      asset: TOKEN,
+      payTo: SELLER,
+      amount: "500000",
+      resource: "https://api.example/data",
+      payer,
+    });
+    expect((await t.asAgent("POST", "/agent/x402/paid", body(VAULT))).status).toBe(201);
+    expect((await t.asAgent("POST", "/agent/x402/paid", body(MIXER))).status).toBe(400);
+    const paid = (
+      (await (await t.owner.get("/activity")).json()) as { kind: string; detail: { payer?: string } }[]
+    ).filter((a) => a.kind === "x402_paid");
+    expect(paid.map((a) => a.detail.payer)).toEqual([VAULT]);
+  });
+});

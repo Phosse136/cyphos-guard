@@ -30,6 +30,7 @@ import {
   requestStatusSchema,
   type X402Context,
   x402ContextSchema,
+  x402VaultCap,
 } from "@cyphos-guard/shared";
 import type { Delegation } from "@metamask/smart-accounts-kit";
 import {
@@ -349,6 +350,22 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
         !body.delegations.every((d) => delegationCosigner(d as Delegation)?.toLowerCase() === cosigner.toLowerCase())
       ) {
         throw new HTTPException(400, { message: "every delegation must carry the co-signer caveat" });
+      }
+    }
+    // x402 vaults: the owner deployed them before signing; check they really are what the policy says (so the
+    // approver shows the owner the truth about where top-ups go and what the vault allows).
+    for (const perm of policy.permissions) {
+      if (perm.kind !== "x402" || !perm.vault) continue;
+      const v = await chain.readX402Vault(perm.vault, perm.sellers);
+      if (
+        !v ||
+        !isAddressEqual(v.owner, account) ||
+        !isAddressEqual(v.agent, policy.agent) ||
+        !isAddressEqual(v.token, perm.token) ||
+        v.maxPerPayment !== x402VaultCap(policy, perm) ||
+        !v.allSellersListed
+      ) {
+        throw new HTTPException(400, { message: `x402 vault ${perm.vault} is missing or doesn't match the policy` });
       }
     }
     // One active grant per agent: each grant has its own on-chain period counters, so two overlapping
@@ -684,14 +701,24 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
         amount: z.string().regex(/^\d+$/),
         resource: z.string().trim().min(1).max(500),
         reason: z.string().trim().max(500).optional(),
+        /** Who paid: the agent's own address (legacy) or its X402Vault. Defaults to the agent. */
+        payer: addressSchema.optional(),
       }),
       c.get("body"),
     );
-    if (store.grants.activeFor(body.account, agent).length === 0) throw new HTTPException(404, { message: "no grant" });
-    // Record what the chain shows: the agent's own address paid the seller exactly this amount in this tx.
-    const moved = await chain.erc20Transferred(body.txHash as Hex, body.asset, agent, body.payTo);
+    const grants = store.grants.activeFor(body.account, agent);
+    if (grants.length === 0) throw new HTTPException(404, { message: "no grant" });
+    const payer = body.payer ?? agent;
+    const vaults = grants.flatMap((g) =>
+      parsePolicy(g.policy).permissions.flatMap((p) => (p.kind === "x402" && p.vault ? [p.vault] : [])),
+    );
+    if (!isAddressEqual(payer, agent) && !vaults.some((v) => isAddressEqual(v, payer))) {
+      throw new HTTPException(400, { message: "payer is neither this agent nor one of its x402 vaults" });
+    }
+    // Record what the chain shows: the payer sent the seller exactly this amount in this tx.
+    const moved = await chain.erc20Transferred(body.txHash as Hex, body.asset, payer, body.payTo);
     if (moved === null || moved !== BigInt(body.amount)) {
-      throw new HTTPException(400, { message: "tx does not show this payment from this agent to this seller" });
+      throw new HTTPException(400, { message: "tx does not show this payment from this payer to this seller" });
     }
     store.activity.add({
       account: body.account,
@@ -703,7 +730,7 @@ export function createApp({ store, chain, config }: { store: Store; chain: Chain
         value: "0",
         data: encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [body.payTo, BigInt(body.amount)] }),
         resource: body.resource,
-        payer: agent,
+        payer,
         ...(body.reason ? { reason: body.reason } : {}),
       },
       txHash: body.txHash as Hex,

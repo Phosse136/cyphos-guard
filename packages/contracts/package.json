@@ -1,6 +1,6 @@
 {
   "name": "@cyphos-guard/contracts",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "cyphos-guard contracts (CosignerEnforcer caveat, X402Vault) as typed ABI + bytecode.",
   "keywords": [
     "ai-agents",
@@ -12,7 +12,6 @@
   ],
   "homepage": "https://cyphosguard.com",
   "license": "Apache-2.0",
-  "private": true,
   "type": "module",
   "exports": {
     ".": "./generated/CosignerEnforcer.ts",

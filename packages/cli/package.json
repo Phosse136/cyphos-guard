@@ -1,6 +1,6 @@
 {
   "name": "@cyphos-guard/cli",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "cyphos-guard CLI: create and inspect an AI agent's own key (the owner only ever sees its address).",
   "keywords": [
     "ai-agents",
@@ -10,7 +10,6 @@
   ],
   "homepage": "https://cyphosguard.com",
   "license": "Apache-2.0",
-  "private": true,
   "type": "module",
   "bin": {
     "cyphos-guard": "./src/cli.ts"

@@ -1,6 +1,7 @@
 {
   "name": "@cyphos-guard/mcp",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "mcpName": "io.github.Phosse136/cyphos-guard",
   "description": "cyphos-guard MCP server: lets Claude and other MCP agents pay within on-chain limits, with passkey approval above them.",
   "keywords": [
     "mcp",
@@ -13,7 +14,6 @@
   ],
   "homepage": "https://cyphosguard.com",
   "license": "Apache-2.0",
-  "private": true,
   "type": "module",
   "bin": {
     "cyphos-guard-mcp": "./src/server.ts"

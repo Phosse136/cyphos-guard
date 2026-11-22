@@ -110,3 +110,8 @@ Reasons, in order of weight:
 2. **Phase 2:** `signDelegation` with a **WebAuthn** signer on the Hybrid account, end to end in a browser (EIP-712
    over WebAuthn → `isValidSignature`). If it fails, fall back to a passkey-signed userOp via the bundler.
 3. Gas cost of P-256 verification on Base Sepolia (expected cheap via RIP-7212; measure).
+
+**Outcome (2026-11):** 1 passed on live Base Sepolia (README, "Verified on Base Sepolia"). 2 passed
+(`examples/poc/src/spike-passkey.ts`, then live with a real phone); no fallback needed. 3: the RIP-7212 precompile is
+live on Base Sepolia and used by `P256SCLVerifierLib`; the fallback cost on other chains is noted in
+[passkey-path.md](../passkey-path.md).

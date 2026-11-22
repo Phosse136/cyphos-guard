@@ -21,19 +21,22 @@ co-signatures automatically.
 
 ## Setup
 
-You need a running policy service (`pnpm dev` at the repo root, or `NETWORK=live pnpm dev`, see
-[docs/live-guide.md](../../docs/live-guide.md)), and an agent granted in the approver. The agent key below is the
-**agent's own throwaway testnet key** (`pnpm demo:setup` generates one): it pays its own gas, and the model never sees it.
-Node ≥ 24 runs the TypeScript entry point directly.
+You need a policy service and an agent granted to your account:
+
+1. **Owner:** sign up at the public testnet instance [app.cyphosguard.com](https://app.cyphosguard.com) with a passkey
+   (or self-host, see [docs/live-guide.md](../../docs/live-guide.md)).
+2. **Agent key:** `npx @cyphos-guard/cli agent new --env agent.env` creates the **agent's own throwaway testnet key**
+   and prints its address. It pays its own gas (send it a little Base Sepolia ETH); the model never sees it.
+3. **Grant:** in the app, grant that address an agent permission.
 
 **Claude Code**
 
 ```sh
 claude mcp add cyphos-guard \
   -e CYPHOS_AGENT_PRIVATE_KEY=0x… \
-  -e CYPHOS_POLICY_SERVICE_URL=http://127.0.0.1:8787 \
-  -e NETWORK=fork \
-  -- node /path/to/cyphos-guard/packages/mcp/src/server.ts
+  -e CYPHOS_POLICY_SERVICE_URL=https://app.cyphosguard.com/api \
+  -e NETWORK=live \
+  -- npx -y @cyphos-guard/mcp
 ```
 
 **Claude Desktop** (`claude_desktop_config.json`)
@@ -42,19 +45,20 @@ claude mcp add cyphos-guard \
 {
   "mcpServers": {
     "cyphos-guard": {
-      "command": "node",
-      "args": ["/path/to/cyphos-guard/packages/mcp/src/server.ts"],
+      "command": "npx",
+      "args": ["-y", "@cyphos-guard/mcp"],
       "env": {
         "CYPHOS_AGENT_PRIVATE_KEY": "0x…",
-        "CYPHOS_POLICY_SERVICE_URL": "http://127.0.0.1:8787",
-        "NETWORK": "fork"
+        "CYPHOS_POLICY_SERVICE_URL": "https://app.cyphosguard.com/api",
+        "NETWORK": "live"
       }
     }
   }
 }
 ```
 
-Use `NETWORK=live` (and optionally `RPC_URL`) for Base Sepolia.
+For a local fork from a repo checkout (`pnpm dev`), use `CYPHOS_POLICY_SERVICE_URL=http://127.0.0.1:8787`,
+`NETWORK=fork` and `node /path/to/cyphos-guard/packages/mcp/src/server.ts` (Node ≥ 24 runs the TypeScript directly).
 
 Then ask your agent something like _"Pay 1.20 USDC to 0x… for this month's API usage"_. Above the limit you'll see the
 request in the approver; after you approve, the agent calls `check_approval` and the payment goes through.

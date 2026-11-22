@@ -1,6 +1,7 @@
 # Running cyphos-guard on live Base Sepolia
 
-Everything defaults to a local fork. To run on the real Base Sepolia testnet:
+Everything defaults to a local fork. To just try it on live Base Sepolia, use the public instance at
+[app.cyphosguard.com](https://app.cyphosguard.com) (open sign-up). To run your own instance on the real testnet:
 
 ## 1. Configure `.env`
 
@@ -36,12 +37,13 @@ Open http://localhost:3000. Use `localhost`, because the passkey is bound to tha
 
 ## What runs where on live
 
-| Action                     | Path                                                               |
-| -------------------------- | ------------------------------------------------------------------ |
-| Account deployment, revoke | passkey-signed userOp → public bundler (`NEXT_PUBLIC_BUNDLER_URL`) |
-| Grants, approvals          | passkey signatures only (no transaction)                           |
-| Agent payments             | plain transactions from the agent's own key                        |
-| Co-signing                 | policy service key, checked on-chain by the CosignerEnforcer       |
+| Action                                                   | Path                                                                                     |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Account deployment, revoke, sending out, recovery change | passkey-signed userOp → public bundler (`NEXT_PUBLIC_BUNDLER_URL`)                       |
+| Withdraw / emergency stop without the service            | recovery wallet on the [recovery page](https://cyphosguard.com/recover/), self-submitted |
+| Grants, approvals                                        | passkey signatures only (no transaction)                                                 |
+| Agent payments                                           | plain transactions from the agent's own key                                              |
+| Co-signing                                               | policy service key, checked on-chain by the CosignerEnforcer                             |
 
 The fork-only dev relay and `/dev/fund` don't exist on live.
 

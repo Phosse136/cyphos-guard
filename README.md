@@ -7,9 +7,11 @@ All of it is enforced by your smart account, not by a server you have to trust.
 
 ![Demo: Claude pays two invoices alone, one after a Face ID approval, and is blocked from a forbidden vendor](docs/media/cyphos-guard-demo.gif)
 
-![cyphos-guard demo: grant an agent, approve a big payment with a passkey, see a forbidden payment blocked](docs/assets/demo.gif)
-
 > **Status:** working MVP on Base Sepolia (and local forks of it). **Testnet only. Not audited. Do not use with real funds.**
+
+**Try it:** [cyphosguard.com](https://cyphosguard.com) · public testnet instance at
+[app.cyphosguard.com](https://app.cyphosguard.com) (open sign-up with a passkey; you need a little Base Sepolia ETH
+from a faucet) · [recovery page](https://cyphosguard.com/recover/) · packages on [npm](https://www.npmjs.com/org/cyphos-guard)
 
 ## The three layers
 
@@ -324,6 +326,12 @@ corrections welcome).
 
 **Done recently**
 
+- **Public instance + npm** (0.1.0). [app.cyphosguard.com](https://app.cyphosguard.com) with open sign-up, the five
+  packages on npm, the MCP server in the MCP Registry. Operator notifications via Telegram, Discord or ntfy.
+
+- **Recovery page with emergency stop** ([apps/recovery](apps/recovery)). The recovery wallet can withdraw everything
+  or remove the passkey (which kills every delegation it signed), without the service.
+
 - **MCP server** ([packages/mcp](packages/mcp/README.md)). Any MCP-capable agent can pay under cyphos-guard's rules.
 
 - **Live Base Sepolia guide** ([docs/live-guide.md](docs/live-guide.md)). The full approver flow runs on live Base Sepolia.
@@ -357,6 +365,7 @@ corrections welcome).
 ```
 apps/approver         Next.js owner app: passkey login, approvals, grants, revoke, activity
 apps/policy-service   approval queue · grant registry · activity (Hono + node:sqlite), holds no keys
+apps/recovery         static recovery page: withdraw everything / emergency stop with the recovery wallet
 packages/cli          cyphos-guard CLI: `agent new` / `agent show` (agent key, kept by the agent's developer)
 examples/x402-seller  x402 seller on the official x402 server logic (tests, live demo)
 packages/contracts    CosignerEnforcer + X402Vault (Foundry, on Delegation Framework v1.3.0 as submodule)
@@ -365,6 +374,8 @@ packages/sdk          @cyphos-guard/sdk: createCyphosGuard, policy compiler, co-
 packages/shared       policy schema (zod), API types, escalation and off-chain checks
 examples/poc          Phase 1 proof of concept + passkey spike + e2e escalation flow
 examples/demo-agent   Claude accounts-payable agent (Messages API tool runner)
+deploy/               self-hosted public instance: systemd, Caddy, backups, notifications
+site/                 cyphosguard.com landing page (static)
 docs/                 ADRs, policy examples, demo script, assets
 ```
 

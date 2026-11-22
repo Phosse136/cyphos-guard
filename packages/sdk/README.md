@@ -20,7 +20,7 @@ import { privateKeyToAccount } from "viem/accounts";
 
 const pw = createCyphosGuard({
   accountAddress: "0xOwnerSmartAccount…", // the account the agent spends from
-  policyServiceUrl: "http://127.0.0.1:8787",
+  policyServiceUrl: "https://app.cyphosguard.com/api", // public testnet instance, or your own (local: http://127.0.0.1:8787)
   rpcUrl: "https://sepolia.base.org",
   agent: privateKeyToAccount(process.env.AGENT_PRIVATE_KEY as `0x${string}`), // the agent's own key
 });

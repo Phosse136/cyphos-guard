@@ -15,7 +15,7 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
   generated locally and are throwaway. Never ask the user for a real private key or seed phrase. The pre-commit
   hook (`scripts/check-secrets.sh`, enabled via `core.hooksPath=.githooks`) must stay on. Don't bypass it with `--no-verify`.
 - **Don't reinvent wallets.** Use the Delegation Framework's audited enforcers. Write Solidity only when no enforcer
-  exists (e.g. a future `CosignerEnforcer`), with Foundry tests and an ADR.
+  exists (as with `CosignerEnforcer`, ADR 0005), with Foundry tests and an ADR.
 - **Verify current APIs before coding against them.** Read the installed package's types/README/source
   (`node_modules/...`) or current docs. Do not rely on memory for crypto libraries.
 - Keep it simple: no token, no DAO, no speculative abstractions.
@@ -52,7 +52,9 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
 ## Project status
 
 Phases 0-5 done (see README). License Apache-2.0. CI: `.github/workflows/ci.yml` (checks job offline; fork job runs
-fork/e2e/browser suites with the runner's Chrome via `CHROMIUM_PATH`). Regenerate the README GIF with `scripts/make-demo-gif.sh`.
+fork/e2e/browser suites with the runner's Chrome via `CHROMIUM_PATH`). Public testnet instance: app.cyphosguard.com
+(`deploy/`), landing page cyphosguard.com (`site/`, built with `scripts/build-site.sh`), packages 0.1.0 on npm.
+The README/landing demo video and GIF come from `apps/approver/e2e/promo/promo-video.ts`.
 
 ## Commands
 
@@ -63,5 +65,6 @@ fork/e2e/browser suites with the runner's Chrome via `CHROMIUM_PATH`). Regenerat
 
 ## Layout
 
-`apps/approver` (Next.js), `apps/policy-service` (queue API), `packages/shared` (schema, types), `packages/sdk`,
-`packages/contracts` (Foundry, only if needed), `examples/poc`, `examples/demo-agent`, `docs/decisions` (ADRs).
+`apps/approver` (Next.js), `apps/policy-service` (queue API), `apps/recovery` (static recovery page), `packages/shared`
+(schema, types), `packages/sdk`, `packages/contracts` (Foundry: CosignerEnforcer, X402Vault), `packages/mcp`,
+`packages/cli`, `examples/poc`, `examples/demo-agent`, `examples/x402-seller`, `deploy/`, `site/`, `docs/decisions` (ADRs).

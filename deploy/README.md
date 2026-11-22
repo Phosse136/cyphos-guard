@@ -33,7 +33,9 @@ agent (120/min), caps request bodies at 256 KB and pending sign-ins at 10,000 (o
 ## Notifications (Telegram, Discord, ntfy)
 
 The policy service can message you when something happens: a new owner, an agent granted or revoked, **an approval
-waiting** (with a link to the app), payments, blocked attempts, x402 API payments, plus an optional daily summary. Off
+waiting** (with a link to the app), payments, blocked attempts, x402 API payments, the owners' own passkey
+transactions (sending out, recovery changes, vault deploy/withdraw), plus an optional daily summary (counted from the
+database, so restarts don't reset it). Off
 unless a channel is configured. Sends never block or break a request; at most 20 messages per minute (the rest are
 summarized as "+N more").
 

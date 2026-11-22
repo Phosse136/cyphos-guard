@@ -31,6 +31,7 @@ pnpm dev              # local fork + policy service + approver on http://localho
 | Command                                                     | What                                            | Needs          |
 | ----------------------------------------------------------- | ----------------------------------------------- | -------------- |
 | `pnpm lint` · `pnpm typecheck` · `pnpm test`                | Biome, tsc, Vitest unit tests                   | nothing        |
+| `pnpm contracts:test`                                       | Foundry tests                                   | Foundry        |
 | `pnpm test:fork`                                            | SDK integration tests on a Base Sepolia fork    | anvil, network |
 | `pnpm poc` · `pnpm e2e` · `pnpm demo:selftest --fake-model` | end-to-end flows on a fork                      | anvil, network |
 | `pnpm e2e:browser` · `pnpm e2e:demo`                        | the approver in Chromium with a virtual passkey | + Chromium     |
@@ -48,7 +49,9 @@ Fork tests start anvil themselves if nothing listens on `127.0.0.1:8545`.
 ## Where things are
 
 `packages/shared` (policy schema, API types) · `packages/sdk` (compiler, `createCyphosGuard`, typed errors) ·
-`apps/policy-service` (Hono + SQLite) · `apps/approver` (Next.js) · `examples/poc`, `examples/demo-agent` ·
+`packages/contracts` (Foundry: CosignerEnforcer, X402Vault) · `packages/mcp` (MCP server) · `packages/cli` (agent keys) ·
+`apps/policy-service` (Hono + SQLite) · `apps/approver` (Next.js) · `apps/recovery` (static recovery page) ·
+`examples/poc`, `examples/demo-agent`, `examples/x402-seller` · `deploy/` (public instance) · `site/` (landing page) ·
 `docs/decisions` (ADRs).
 
 By contributing you agree that your contributions are licensed under the [Apache License 2.0](LICENSE).

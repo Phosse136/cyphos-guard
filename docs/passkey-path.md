@@ -1,5 +1,8 @@
 # Passkey path (Phase 2)
 
+> **Status: done.** This was the plan before Phase 2. Everything below is implemented and runs live on Base Sepolia
+> (see the README's "Verified on Base Sepolia"). The spike passed, so the fallback was never needed.
+
 The Phase 1 PoC uses a local EOA as the Hybrid account's owner, because a WebAuthn ceremony needs a browser.
 Nothing else in the flow changes when a passkey is added. This is the plan, with the APIs it relies on.
 
@@ -37,7 +40,14 @@ End-to-end `signDelegation` with a WebAuthn signer in a real browser, verified b
 `isValidSignature`. If that fails, the fallback is approval as a passkey-signed userOp that executes the call
 directly.
 
+**Result:** passed ([examples/poc/src/spike-passkey.ts](../examples/poc/src/spike-passkey.ts)): passkey-signed delegations
+and one-shot approvals redeem, an approval works exactly once and only for the pinned call, tampered signatures are
+refused, and a passkey-signed revoke userOp is accepted by the EntryPoint.
+
 ## Notes
 
 - Passkeys are bound to the RP ID. Losing the domain means losing the passkey, which is why the recovery EOA exists.
-- Test passkeys in Chrome DevTools → WebAuthn virtual authenticator, so no real device is needed in CI.
+- Test passkeys without a device: the browser e2e tests use Chrome's WebAuthn virtual authenticator, the fork tests
+  a software authenticator ([softAuthenticator.ts](../packages/sdk/src/testing/softAuthenticator.ts)) that produces the
+  same bytes as a real one. Both are test-only.
+- The recovery page's emergency stop removes the passkey (`updateSigners`), which invalidates every delegation it signed.

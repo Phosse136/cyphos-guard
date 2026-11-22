@@ -6,13 +6,13 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { extname, join, resolve } from "node:path";
-import { ensureFork } from "@cyphos-guard/sdk/testing";
+import { createSoftPasskey, ensureFork } from "@cyphos-guard/sdk/testing";
 import { chromium } from "playwright-core";
 import { type Address, type Chain, createPublicClient, erc20Abi, http, type PublicClient, parseUnits } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { recoverableAccount, testWallet } from "./fork-fixture.ts";
+import { recoverableSmartAccount, testWallet } from "./fork-fixture.ts";
 import { USDC } from "./recovery.ts";
 
 const FORK = process.env.FORK_RPC_URL || "http://127.0.0.1:8545";
@@ -32,7 +32,7 @@ beforeAll(async () => {
   const anvil = await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
   kill = () => anvil?.kill();
   publicClient = createPublicClient({ chain, transport: http(FORK) });
-  account = await recoverableAccount(publicClient, FORK, recovery.address);
+  account = (await recoverableSmartAccount(publicClient, FORK, recovery.address, createSoftPasskey())).address;
   const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript" };
   server = createServer((req, res) => {
     const path = join(
@@ -58,7 +58,7 @@ afterAll(() => {
 });
 
 describe("recovery page in the browser (fork)", () => {
-  it("connect → check → withdraw everything to the recovery address", async () => {
+  it("connect → check → emergency stop → withdraw everything to the recovery address", async () => {
     const browser = await chromium.launch({
       executablePath: process.env.CHROMIUM_PATH ?? "/usr/bin/chromium",
       args: ["--no-sandbox"],
@@ -89,6 +89,16 @@ describe("recovery page in the browser (fork)", () => {
       await page.getByText("Your wallet is this account's recovery address").waitFor({ timeout: 15_000 });
       expect(await page.getByText("14.8 USDC").isVisible()).toBe(true);
       if (SHOTS) await page.screenshot({ path: `${SHOTS}/recovery-1-ready.png`, fullPage: true });
+      const dialogs: string[] = [];
+      page.once("dialog", (d) => {
+        dialogs.push(d.message());
+        void d.accept();
+      });
+      await page.getByRole("button", { name: "Stop all agents" }).click();
+      await page.getByText("Done. The passkey was removed").waitFor({ timeout: 30_000 });
+      await page.getByText("none (agents stopped)").waitFor({ timeout: 15_000 });
+      expect(dialogs[0]).toContain("Stop all agents?");
+      expect(await page.getByRole("button", { name: "Stop all agents" }).isDisabled()).toBe(true);
       await page.getByRole("button", { name: "Withdraw everything to my recovery address" }).click();
       await page.getByText("Done. Everything was sent to your recovery address.").waitFor({ timeout: 30_000 });
       await page.getByText("The account is empty.").waitFor({ timeout: 15_000 });

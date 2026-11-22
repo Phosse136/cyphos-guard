@@ -103,7 +103,11 @@ synced passkey, and the real Claude agent (`claude-opus-5-5`) paying four invoic
 cyphosguard.com/recover/), the owner's recovery wallet (a MetaMask account, EIP-7702-upgraded) emptied that same account:
 no service, no passkey, no bundler. The wallet signed the UserOperation and submitted it itself
 ([tx](https://sepolia.basescan.org/tx/0x16b461ccbdf1e9416fa1ee1c1434d8ba5e44a787fe72f73771e570053b91e9a4): 14.8 USDC
-and the remaining ETH to the recovery address; the account is now empty).
+and the remaining ETH to the recovery address; the account is now empty). The page also has an **emergency stop**: the
+recovery wallet removes the passkey from the account (`updateSigners(recovery, [], [], [])`). The DelegationManager checks
+the delegator's signature at every redemption, so every delegation the passkey signed (agent permissions and pending
+approvals) stops working at once, without a list of delegations and without the service (fork-tested in
+[recovery.fork.test.ts](apps/recovery/src/recovery.fork.test.ts)).
 
 **x402 with a vault, live** (2026-11-21, `pnpm --filter @cyphos-guard/x402-seller buy`). The agent paid an x402 API
 (the [demo seller](examples/x402-seller/src/main.ts), settled by the public x402.org testnet facilitator) from the

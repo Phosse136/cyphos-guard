@@ -1,8 +1,11 @@
 /**
  * Recovery without cyphos-guard, on a Base Sepolia fork: a Hybrid DeleGator account whose owner EOA (the recovery
  * address) empties it through an EIP-1193 wallet only: USDC, ETH and the EntryPoint deposit. A stranger can't.
+ * And the emergency stop: removing the passkey kills every delegation it signed.
  */
-import { ensureFork } from "@cyphos-guard/sdk/testing";
+import { buildApprovalDelegation, encodeRedeem } from "@cyphos-guard/sdk";
+import { createSoftPasskey, ensureFork } from "@cyphos-guard/sdk/testing";
+import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
 import {
   type Address,
   type Chain,
@@ -17,13 +20,14 @@ import {
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { recoverableAccount, testWallet } from "./fork-fixture.ts";
+import { recoverableAccount, recoverableSmartAccount, testWallet } from "./fork-fixture.ts";
 import {
   buildUserOp,
   encodeBatchExecute,
   inspect,
   RecoveryError,
   signAndSubmit,
+  stopAgentsCalls,
   USDC,
   withdrawAllCalls,
 } from "./recovery.ts";
@@ -98,5 +102,70 @@ describe("recovery page core (fork)", () => {
     const op = await buildUserOp(wallet, USDC, "0x");
     await expect(signAndSubmit(wallet, recovery.address, op)).rejects.toThrow();
     expect(RecoveryError).toBeDefined();
+  });
+});
+
+describe("emergency stop (fork)", () => {
+  it("removing the passkey stops every delegation it signed; the recovery address can still withdraw", async () => {
+    const env = getSmartAccountsEnvironment(chain.id);
+    const key = generatePrivateKey();
+    const rec = privateKeyToAccount(key);
+    const passkey = createSoftPasskey();
+    const sa = await recoverableSmartAccount(publicClient, FORK, rec.address, passkey);
+    const agent = privateKeyToAccount(generatePrivateKey());
+    await publicClient.request({
+      method: "anvil_setBalance" as never,
+      params: [agent.address, toHex(parseEther("0.01"))] as never,
+    });
+    const payee = privateKeyToAccount(generatePrivateKey()).address;
+    const now = Number((await publicClient.getBlock()).timestamp);
+    const unsigned = buildApprovalDelegation({
+      environment: env,
+      delegator: sa.address,
+      agent: agent.address,
+      execution: { to: payee, value: parseEther("0.001") },
+      expiresAt: now + 900,
+    });
+    const approval = { ...unsigned, signature: await sa.signDelegation({ delegation: unsigned }) };
+    const redeem = () =>
+      publicClient.call({
+        account: agent,
+        to: env.DelegationManager,
+        data: encodeRedeem(approval, { to: payee, value: parseEther("0.001") }),
+      });
+
+    await expect(redeem()).resolves.toBeDefined(); // the passkey-signed delegation works
+
+    const wallet = testWallet(key, FORK);
+    const s = await inspect(wallet, sa.address);
+    expect(s.passkeys).toBe(1);
+    await signAndSubmit(
+      wallet,
+      rec.address,
+      await buildUserOp(wallet, sa.address, encodeBatchExecute(stopAgentsCalls(s))),
+    );
+
+    const stopped = await inspect(wallet, sa.address);
+    expect(stopped).toMatchObject({ passkeys: 0, recovery: rec.address, usdc: parseUnits("14.8", 6) });
+    await expect(redeem()).rejects.toThrow(); // ...and now it doesn't
+
+    const op = await buildUserOp(wallet, sa.address, encodeBatchExecute(withdrawAllCalls(stopped, rec.address)));
+    await signAndSubmit(wallet, rec.address, op);
+    expect(await inspect(wallet, sa.address)).toMatchObject({ eth: 0n, usdc: 0n, deposit: 0n });
+  });
+
+  it("a stranger can't trigger it", async () => {
+    const stranger = generatePrivateKey();
+    const strangerAddr = privateKeyToAccount(stranger).address;
+    await publicClient.request({
+      method: "anvil_setBalance" as never,
+      params: [strangerAddr, toHex(parseEther("0.01"))] as never,
+    });
+    const sa = await recoverableSmartAccount(publicClient, FORK, recovery.address, createSoftPasskey());
+    const wallet = testWallet(stranger, FORK);
+    const s = await inspect(wallet, sa.address);
+    const op = await buildUserOp(wallet, sa.address, encodeBatchExecute(stopAgentsCalls(s)));
+    await expect(signAndSubmit(wallet, strangerAddr, op)).rejects.toThrow();
+    expect((await inspect(wallet, sa.address)).passkeys).toBe(1);
   });
 });

@@ -1,6 +1,6 @@
 /** Test fixtures (fork only): an EIP-1193 wallet backed by a private key, and a recoverable Hybrid account. */
-import { fundUsdc } from "@cyphos-guard/sdk/testing";
-import { Implementation, toMetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
+import { fundUsdc, type SoftPasskey } from "@cyphos-guard/sdk/testing";
+import { Implementation, type MetaMaskSmartAccount, toMetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
 import {
   type Address,
   type Chain,
@@ -61,6 +61,19 @@ export async function recoverableAccount(
   FORK: string,
   recovery: Address,
 ): Promise<Address> {
+  return (await recoverableSmartAccount(publicClient, FORK, recovery)).address;
+}
+
+/**
+ * Same, optionally with `passkey` as a second signer (like accounts made in the app). The returned account signs
+ * with the passkey.
+ */
+export async function recoverableSmartAccount(
+  publicClient: PublicClient,
+  FORK: string,
+  recovery: Address,
+  passkey?: SoftPasskey,
+): Promise<MetaMaskSmartAccount> {
   const funder = privateKeyToAccount(generatePrivateKey());
   await publicClient.request({
     method: "anvil_setBalance" as never,
@@ -70,12 +83,16 @@ export async function recoverableAccount(
     method: "anvil_setBalance" as never,
     params: [recovery, toHex(parseEther("0.01"))] as never,
   });
+  const keyId = passkey ? toHex(passkey.credentialId) : undefined;
   const sa = await toMetaMaskSmartAccount({
     client: publicClient,
     implementation: Implementation.Hybrid,
-    deployParams: [recovery, [], [], []],
+    deployParams: passkey && keyId ? [recovery, [keyId], [passkey.x], [passkey.y]] : [recovery, [], [], []],
     deploySalt: toHex(crypto.getRandomValues(new Uint8Array(32))),
-    signer: { account: privateKeyToAccount(generatePrivateKey()) },
+    signer:
+      passkey && keyId
+        ? { webAuthnAccount: passkey.account, keyId }
+        : { account: privateKeyToAccount(generatePrivateKey()) },
   });
   const { factory, factoryData } = await sa.getFactoryArgs();
   const w = createWalletClient({ account: funder, chain, transport: http(FORK) });
@@ -95,5 +112,5 @@ export async function recoverableAccount(
       value: parseEther("0.001"),
     }),
   });
-  return sa.address;
+  return sa;
 }

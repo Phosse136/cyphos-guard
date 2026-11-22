@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Recover your wallet · cyphos-guard</title>
-<meta name="description" content="Move everything out of your cyphos-guard smart account with your recovery address. Works without the cyphos-guard service.">
+<meta name="description" content="Stop all agents or move everything out of your cyphos-guard smart account with your recovery address. Works without the cyphos-guard service.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 4 54 13v17c0 14-9.5 24.5-22 29C19.5 54.5 10 44 10 30V13z' fill='%234f46e5'/%3E%3Cpath d='m22 32 7 7 13-14' fill='none' stroke='%23fff' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   :root { --bg:#fbfbfd; --card:#fff; --text:#14161c; --muted:#5b6170; --line:#e3e5ec; --brand:#4f46e5; --brand2:#7c3aed;
@@ -44,7 +44,7 @@
 <main>
   <a href="../" style="text-decoration:none;color:var(--muted)">← cyphos-guard</a>
   <h1>Recover your wallet</h1>
-  <p class="lead">Move everything out of your cyphos-guard smart account with your <strong>recovery address</strong>. This page
+  <p class="lead">Stop every agent, or move everything out of your cyphos-guard smart account, with your <strong>recovery address</strong>. This page
     works on its own: no cyphos-guard service, no passkey. Your wallet signs, and your wallet sends the transaction.</p>
 
   <div class="card">
@@ -63,7 +63,19 @@
   </div>
 
   <div class="card">
-    <h2><span class="step">3</span>Withdraw</h2>
+    <h2><span class="step">3</span>Emergency stop <span class="muted">(optional)</span></h2>
+    <p class="muted">Removes your passkey from the account. Every permission your agents have, and every approval you signed
+      with the passkey, stops working at once, even if the cyphos-guard service is down or compromised. Your funds stay in
+      the account; your recovery wallet can still withdraw them below. Use this if you think an agent, its key or your
+      passkey is compromised. Afterwards the passkey can't use this account any more.</p>
+    <p class="muted">x402 vaults are normally empty (they are topped up just before each payment); any rest in a vault
+      can only go to the sellers you listed.</p>
+    <button id="stop" type="button" disabled>Stop all agents</button>
+    <div id="stop-result"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">4</span>Withdraw</h2>
     <p class="muted">Sends all USDC and ETH of the account (and any gas deposit it holds) to your recovery address. Your wallet
       asks you to sign, then to send the transaction; it pays a small network fee.</p>
     <button id="withdraw" type="button" disabled>Withdraw everything to my recovery address</button>

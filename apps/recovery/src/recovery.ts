@@ -1,7 +1,7 @@
 /**
  * Recovery without cyphos-guard: the owner's RECOVERY address (an EOA, e.g. MetaMask) moves everything out of
- * a MetaMask Hybrid DeleGator smart account, using only an EIP-1193 wallet. No cyphos-guard service, no
- * passkey, no bundler.
+ * a MetaMask Hybrid DeleGator smart account, or stops every agent at once, using only an EIP-1193 wallet. No
+ * cyphos-guard service, no passkey, no bundler.
  *
  * The account only executes calls that come through the ERC-4337 EntryPoint (`onlyEntryPoint`), so the
  * recovery key signs a UserOperation (EIP-712 typed data, which wallets show and sign natively) and then
@@ -38,6 +38,8 @@ const accountAbi = parseAbi([
   "function entryPoint() view returns (address)",
   "function execute(bytes32 mode, bytes executionCalldata) payable",
   "function withdrawDeposit(address withdrawAddress, uint256 withdrawAmount)",
+  "function getKeyIdHashesCount() view returns (uint256)",
+  "function updateSigners(address owner, string[] keyIds, uint256[] xValues, uint256[] yValues)",
   "function getPackedUserOperationTypedDataHash((address sender,uint256 nonce,bytes initCode,bytes callData,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData,bytes signature) userOp) view returns (bytes32)",
 ]);
 const entryPointAbi = parseAbi([
@@ -68,6 +70,8 @@ export type AccountState = {
   usdc: bigint;
   /** ETH the account holds at the EntryPoint (gas deposit), also withdrawable. */
   deposit: bigint;
+  /** Number of passkeys (P-256 signers) on the account. */
+  passkeys: number;
 };
 
 export class RecoveryError extends Error {
@@ -87,7 +91,7 @@ export async function inspect(provider: EIP1193Provider, account: Address): Prom
   const { publicClient } = clients(provider);
   const code = await publicClient.getCode({ address: account });
   const deployed = !!code && code !== "0x";
-  const [eth, usdc, deposit, recovery] = await Promise.all([
+  const [eth, usdc, deposit, recovery, passkeys] = await Promise.all([
     publicClient.getBalance({ address: account }),
     publicClient
       .readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [account] })
@@ -101,8 +105,14 @@ export async function inspect(provider: EIP1193Provider, account: Address): Prom
           .then((o) => (isAddressEqual(o, zeroAddress) ? null : o))
           .catch(() => null)
       : Promise.resolve(null),
+    deployed
+      ? publicClient
+          .readContract({ address: account, abi: accountAbi, functionName: "getKeyIdHashesCount" })
+          .then(Number)
+          .catch(() => 0)
+      : Promise.resolve(0),
   ]);
-  return { account, deployed, recovery, eth, usdc, deposit };
+  return { account, deployed, recovery, eth, usdc, deposit, passkeys };
 }
 
 /** The calls that empty the account into `to`: USDC, ETH and the EntryPoint deposit (whatever is non-zero). */
@@ -127,6 +137,30 @@ export function withdrawAllCalls(state: AccountState, to: Address) {
   }
   if (state.eth > 0n) calls.push({ target: to, value: state.eth, callData: "0x", label: `${state.eth} wei` });
   return calls;
+}
+
+/**
+ * Emergency stop: removes every passkey from the account and keeps the recovery address as its only signer.
+ * The DelegationManager checks the delegator's signature (ERC-1271) at every redemption, so every delegation
+ * the passkey ever signed (agent permissions and pending one-shot approvals) stops working at once. No list of
+ * delegations is needed, which this page couldn't get without the cyphos-guard service.
+ * Afterwards the passkey can't sign for this account any more; the recovery address can still withdraw.
+ */
+export function stopAgentsCalls(state: AccountState) {
+  if (!state.recovery) throw new RecoveryError("the account has no recovery address");
+  return [
+    {
+      target: state.account,
+      value: 0n,
+      // updateSigners is onlyEntryPointOrSelf: the account calls itself. Same owner, no keys → keys deleted.
+      callData: encodeFunctionData({
+        abi: accountAbi,
+        functionName: "updateSigners",
+        args: [state.recovery, [], [], []],
+      }),
+      label: `remove ${state.passkeys} passkey(s)`,
+    },
+  ];
 }
 
 /** ERC-7579 batch execution: mode 0x01 (batch, default exec type), calldata abi.encode(Execution[]). */

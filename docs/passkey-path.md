@@ -11,6 +11,11 @@ Nothing else in the flow changes when a passkey is added. This is the plan, with
 - `HybridDeleGator` verifies P-256 via `P256SCLVerifierLib`: RIP-7212 precompile at `0x100`, SCL fallback.
 - The precompile is live on Base Sepolia **and on an anvil fork of it**. Verified with a real P-256 signature
   (returns `1`).
+- **Gas on other chains:** the precompile costs 3,450 gas per verification (RIP-7212). On a chain without it,
+  `P256SCLVerifierLib` falls back to the Solidity SCL verifier, which works but costs a few hundred thousand gas
+  per passkey signature check (every owner userOp, and every redemption of a passkey-signed delegation, since the
+  DelegationManager re-verifies the delegator's signature each time). cyphos-guard only targets Base, where the
+  precompile exists; check for it before deploying elsewhere.
 
 ## Plan
 

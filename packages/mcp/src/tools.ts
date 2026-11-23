@@ -5,6 +5,8 @@
  *
  * The agent's private key lives in this server process only (env); it is never part of any tool result.
  */
+
+import { createRequire } from "node:module";
 import {
   ApprovalExpired,
   ApprovalPending,
@@ -61,7 +63,9 @@ function describe(d: { value?: string; to?: Address; data?: Hex }): string {
 }
 
 export function createCyphosGuardMcpServer({ pw, publicClient, live = false }: ServerOptions) {
-  const server = new McpServer({ name: "cyphos-guard", version: "0.1.0" });
+  // ../package.json from both src/ (monorepo) and dist/ (npm).
+  const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
+  const server = new McpServer({ name: "cyphos-guard", version });
   const tx = (h: string) => (live ? `https://sepolia.basescan.org/tx/${h}` : h);
 
   // MCP clients may call tools in parallel; transactions from the agent's single key must not race for a nonce.

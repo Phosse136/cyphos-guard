@@ -1,6 +1,6 @@
 {
   "name": "@cyphos-guard/contracts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "cyphos-guard contracts (CosignerEnforcer and ERC20PerTransferCapEnforcer caveats, X402Vault) as typed ABI + bytecode.",
   "keywords": [
     "ai-agents",

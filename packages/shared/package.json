@@ -1,6 +1,6 @@
 {
   "name": "@cyphos-guard/shared",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Policy schema, wire types and off-chain checks for cyphos-guard (guardrails for AI agents that spend crypto).",
   "keywords": [
     "ai-agents",

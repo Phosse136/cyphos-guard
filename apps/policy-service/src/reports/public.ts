@@ -83,7 +83,10 @@ export function buildPublicStats(
   const weeks = new Map<string, { accounts: Set<string>; payments: Row[] }>();
   const week = (w: string) => {
     let e = weeks.get(w);
-    if (!e) weeks.set(w, (e = { accounts: new Set(), payments: [] }));
+    if (!e) {
+      e = { accounts: new Set(), payments: [] };
+      weeks.set(w, e);
+    }
     return e;
   };
   for (const a of activity) week(isoWeek(a.created_at)).accounts.add(a.account.toLowerCase());

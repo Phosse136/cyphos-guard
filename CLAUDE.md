@@ -56,7 +56,9 @@ fork/e2e/browser suites with the runner's Chrome via `CHROMIUM_PATH`). Public te
 (`deploy/`), landing page cyphosguard.com (`site/`, built with `scripts/build-site.sh`; `site/theme.js` is the light/dark
 switch shared with the app, /recover and /stats), public anonymous stats at app.cyphosguard.com/stats (ADR 0007,
 `apps/policy-service/src/reports/public.ts`). npm: contracts 0.2.0, shared 0.1.1, sdk 0.2.0, mcp 0.1.2, cli 0.1.0
-(`docs/releasing.md`). When shipping something user-visible, add a line to "What's new" in `site/index.html`.
+(`docs/releasing.md`). Security checks: `docs/security/verification.md` (red-team catalog
+`packages/sdk/src/testing/attacks.ts`, run on a fork in CI and hourly live by `apps/canary`; `pnpm contracts:verify` =
+Slither + Halmos + mutation test, tools in a venv). A new attack idea goes into the catalog first. When shipping something user-visible, add a line to "What's new" in `site/index.html`.
 The README/landing demo video and GIF come from `apps/approver/e2e/promo/promo-video.ts`.
 
 ## Commands
@@ -68,6 +70,6 @@ The README/landing demo video and GIF come from `apps/approver/e2e/promo/promo-v
 
 ## Layout
 
-`apps/approver` (Next.js), `apps/policy-service` (queue API), `apps/recovery` (static recovery page), `packages/shared`
+`apps/approver` (Next.js), `apps/policy-service` (queue API), `apps/recovery` (static recovery page), `apps/canary` (live red team), `packages/shared`
 (schema, types), `packages/sdk`, `packages/contracts` (Foundry: CosignerEnforcer, ERC20PerTransferCapEnforcer, X402Vault), `packages/mcp`,
 `packages/cli`, `examples/poc`, `examples/demo-agent`, `examples/x402-seller`, `deploy/`, `site/`, `docs/decisions` (ADRs).

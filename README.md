@@ -265,7 +265,8 @@ Design records: [account stack](docs/decisions/0001-account-stack.md) ·
 [policy schema](docs/decisions/0002-policy-schema.md) ·
 [owner actions](docs/decisions/0003-owner-actions-without-bundler.md) ·
 [approval flow & trust model](docs/decisions/0004-approval-flow.md) ·
-[co-signer](docs/decisions/0005-cosigner-enforcer.md) · [security](SECURITY.md)
+[co-signer](docs/decisions/0005-cosigner-enforcer.md) · [security](SECURITY.md) ·
+[threat model](docs/security/threat-model.md) · [how we check it](docs/security/verification.md)
 
 | Pending approval (decoded locally from what will be signed)                                       | Activity after the demo run                                                                   |
 | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -332,6 +333,11 @@ corrections welcome).
 
 **Done recently**
 
+- **We attack ourselves** ([verification](docs/security/verification.md), [threat model](docs/security/threat-model.md)).
+  A catalog of 25 attacks with a stolen agent key runs in CI on a fork and every hour against a live grant
+  ([apps/canary](apps/canary), result on [/stats](https://app.cyphosguard.com/stats/)). Contracts: invariant tests,
+  Halmos proofs, Slither, a mutation test of 26 planted bugs. Not an audit, but checked by machines, continuously.
+
 - **Public instance + npm** (0.1.0). [app.cyphosguard.com](https://app.cyphosguard.com) with open sign-up, the five
   packages on npm, the MCP server in the MCP Registry. Operator notifications via Telegram, Discord or ntfy.
 
@@ -384,6 +390,7 @@ apps/approver         Next.js owner app: passkey login, approvals, grants, revok
 apps/policy-service   approval queue · grant registry · activity (Hono + node:sqlite), holds no keys; usage reports
                       (CSV/TXT/XLSX) and the public /stats page (src/reports)
 apps/recovery         static recovery page: withdraw everything / emergency stop with the recovery wallet
+apps/canary           hourly live red-team check of a test grant on Base Sepolia (alerts, result on /stats)
 packages/cli          cyphos-guard CLI: `agent new` / `agent show` (agent key, kept by the agent's developer)
 examples/x402-seller  x402 seller on the official x402 server logic (tests, live demo)
 packages/contracts    CosignerEnforcer, ERC20PerTransferCapEnforcer, X402Vault (Foundry, on Delegation Framework v1.3.0)
@@ -394,7 +401,7 @@ examples/poc          Phase 1 proof of concept + passkey spike + e2e escalation 
 examples/demo-agent   Claude accounts-payable agent (Messages API tool runner)
 deploy/               self-hosted public instance: systemd, Caddy, backups, notifications
 site/                 cyphosguard.com landing page (static) + theme.js (light/dark switch, shared)
-docs/                 ADRs, policy examples, demo script, assets
+docs/                 ADRs, policy examples, demo script, assets, security (threat model, verification)
 ```
 
 ## Development

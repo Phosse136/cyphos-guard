@@ -110,7 +110,10 @@ export function Onboarding({ me, onChange }: { me: Me; onChange: () => void }) {
 }
 
 /** On live Base Sepolia the account pays for its own deployment, so it must hold test ETH first. */
-const MIN_DEPLOY_BALANCE = parseEther("0.0003");
+// The account reserves the maximum gas fee during its first userOp and gets the unused part back. Measured on
+// Base Sepolia (Nov 2026): deployment cost ≈ 0.0000034 ETH, max reservation ≈ 0.00001–0.00002 ETH at 0.006 gwei.
+// 0.0001 ETH (one Coinbase faucet claim) leaves 5–10× headroom; if gas spikes, the bundler refuses up front (AA21).
+const MIN_DEPLOY_BALANCE = parseEther("0.0001");
 
 function CreateAccount({
   me,
@@ -186,14 +189,15 @@ function CreateAccount({
           <p className="mt-1 break-all font-mono text-xs">{address}</p>
           <p className="mt-1 text-xs text-zinc-500">
             Balance: {balance === null ? "…" : `${formatEther(balance)} ETH`} · needs at least{" "}
-            {formatEther(MIN_DEPLOY_BALANCE)} ETH to pay for its own deployment. Send from your wallet or a Base Sepolia
-            faucet; this updates automatically. Changing the recovery address changes this address.
+            {formatEther(MIN_DEPLOY_BALANCE)} ETH to pay for its own deployment (it actually uses far less). Send from
+            your wallet or a Base Sepolia faucet; this updates automatically. Changing the recovery address changes this
+            address.
           </p>
           <p className="mt-2 text-xs">
             Free test ETH:{" "}
             {[
+              ["Coinbase (one claim is enough)", "https://portal.cdp.coinbase.com/products/faucet"],
               ["ETHGlobal (login, 0.05/day)", "https://ethglobal.com/faucet/base-sepolia-84532"],
-              ["Coinbase (account, 0.0001 per claim)", "https://portal.cdp.coinbase.com/products/faucet"],
               ["more faucets", "https://docs.base.org/base-chain/tools/network-faucets"],
             ].map(([label, href], i) => (
               <span key={href}>

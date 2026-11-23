@@ -103,7 +103,14 @@ async function submitOwnerCalls(
   }
   const bundlerUrl = process.env.NEXT_PUBLIC_BUNDLER_URL ?? "https://public.pimlico.io/v2/84532/rpc";
   const bundler = createBundlerClient({ account, client: publicClient(), transport: http(bundlerUrl) });
-  const hash = await bundler.sendUserOperation({ calls });
+  const hash = await bundler.sendUserOperation({ calls }).catch((e: unknown) => {
+    // AA21: the account can't cover the gas reservation (prefund). Nothing was sent or spent.
+    if (/AA21|didn't pay prefund|prefund/i.test(String((e as Error)?.message ?? e)))
+      throw new Error(
+        "Not enough test ETH in your account for the network fee right now. Nothing was sent. Add a little more test ETH (e.g. another faucet claim) and try again.",
+      );
+    throw e;
+  });
   const receipt = await bundler.waitForUserOperationReceipt({ hash });
   if (!receipt.success) throw new Error(`userOp failed (${hash})`);
   return receipt.receipt.transactionHash;

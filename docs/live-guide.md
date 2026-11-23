@@ -28,9 +28,9 @@ Open http://localhost:3000. Use `localhost`, because the passkey is bound to tha
 ## 3. Onboard
 
 1. **Create passkey.**
-2. The approver shows your **account address** and its live balance. Send it at least 0.0003 test ETH (more if your
+2. The approver shows your **account address** and its live balance. Send it at least 0.0001 test ETH (one Coinbase faucet claim; more if your
    agent will pay with it) from your wallet or a faucet:
-   [Coinbase CDP](https://portal.cdp.coinbase.com/products/faucet) or [Superchain](https://console.optimism.io/faucet).
+   [Coinbase CDP](https://portal.cdp.coinbase.com/products/faucet) or [ETHGlobal](https://ethglobal.com/faucet/base-sepolia-84532).
    If you add a recovery address, do that **before** funding: it changes the account address.
 3. **Create account.** Your passkey signs the deployment; the public bundler submits it, paid from the account's balance.
 4. **Grant an agent.** The agent needs a little test ETH in its **own** address for gas.

@@ -21,6 +21,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "forge test",
+    "slither": "slither .",
+    "halmos": "FOUNDRY_DYNAMIC_TEST_LINKING=false halmos --contract SymbolicProofs --default-bytes-lengths 0,4,52,64,65,66,67,68,69,100,320,352",
+    "mutation": "node scripts/mutation-test.mjs",
     "typecheck": "tsc -p tsconfig.json"
   },
   "publishConfig": {

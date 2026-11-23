@@ -62,12 +62,14 @@ contract CosignerEnforcer is CaveatEnforcer, EIP712 {
         address cosigner_ = getTermsInfo(_terms);
         require(_args.length != 0, "CosignerEnforcer:missing-cosignature");
         (bytes32 salt_, uint256 deadline_, bytes memory signature_) = abi.decode(_args, (bytes32, uint256, bytes));
+        // slither-disable-next-line timestamp (a deadline of minutes; a few seconds of miner skew don't matter)
         require(block.timestamp <= deadline_, "CosignerEnforcer:expired");
 
         bytes32 digest_ =
             getCosignDigest(msg.sender, _delegationHash, _redeemer, keccak256(_executionCallData), salt_, deadline_);
         require(!usedCosignatures[msg.sender][digest_], "CosignerEnforcer:already-used");
 
+        // slither-disable-next-line unused-return (the third value is only a detail of error_, which is checked)
         (address recovered_, ECDSA.RecoverError error_,) = ECDSA.tryRecover(digest_, signature_);
         require(error_ == ECDSA.RecoverError.NoError && recovered_ == cosigner_, "CosignerEnforcer:invalid-cosignature");
 

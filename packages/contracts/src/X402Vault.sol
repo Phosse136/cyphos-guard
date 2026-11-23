@@ -82,6 +82,7 @@ contract X402Vault is IERC1271 {
             keccak256(abi.encodePacked("\x19\x01", IEIP3009Token(token).DOMAIN_SEPARATOR(), structHash));
         if (digest != hash) return INVALID;
 
+        // slither-disable-next-line unused-return (the third value is only a detail of err, which is checked)
         (address signer, ECDSA.RecoverError err,) = ECDSA.tryRecover(digest, agentSig);
         if (err != ECDSA.RecoverError.NoError || signer != agent) return INVALID;
         return MAGIC;
@@ -94,6 +95,7 @@ contract X402Vault is IERC1271 {
     /// @notice Owner pulls funds back (e.g. to the smart account). Any token, in case something else lands here.
     function withdraw(address token_, address to, uint256 amount) external onlyOwner {
         if (to == address(0)) revert ZeroAddress();
+        // slither-disable-next-line reentrancy-events (onlyOwner, no state after the call; event order is cosmetic)
         IERC20(token_).safeTransfer(to, amount);
         emit Withdrawn(to, amount);
     }

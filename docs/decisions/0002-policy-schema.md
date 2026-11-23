@@ -20,7 +20,7 @@ A **policy** is what an owner grants one **agent** on one testnet chain:
 Permission kinds (the brief's `allowedTargets`, `allowedFunctions` and `limits` live inside them):
 
 - `nativeTransfer`: plain ETH sends to `recipients`, with `perTx` and **required** `perPeriod`.
-- `erc20Transfer`: `token.transfer()` to `recipients`, with `perTx` (off-chain) and **required** `perPeriod`.
+- `erc20Transfer`: `token.transfer()` to `recipients`, with `perTx` (on-chain since [ADR 0006](0006-per-transfer-cap.md)) and **required** `perPeriod`.
 - `contractCall`: one `target`, a list of `functions` (signatures), optional `args` rules per function, and
   optional native `value` caps (default: no value allowed).
 
@@ -81,7 +81,7 @@ compile to its own delegation keeps "what the owner reads" equal to "what the ch
 | `nativeTransfer.perPeriod`                    | on-chain      | `NativeTokenPeriodTransferEnforcer`                                                                                |
 | `erc20Transfer.token` + `perPeriod`           | on-chain      | `ERC20PeriodTransferEnforcer`                                                                                      |
 | `erc20Transfer.recipients`                    | on-chain      | `AllowedCalldataEnforcer` at offset 4 (one recipient; several → `LogicalOrWrapperEnforcer` or one delegation each) |
-| `erc20Transfer.perTx`                         | **off-chain** | SDK pre-check → escalation (no per-tx ERC-20 enforcer exists)                                                      |
+| `erc20Transfer.perTx`                         | on-chain      | `ERC20PerTransferCapEnforcer` (ours, [ADR 0006](0006-per-transfer-cap.md)); was off-chain before                   |
 | `contractCall.target`                         | on-chain      | `AllowedTargetsEnforcer`                                                                                           |
 | `contractCall.functions`                      | on-chain      | `AllowedMethodsEnforcer`                                                                                           |
 | `contractCall.args` with `eq` on static types | on-chain      | `AllowedCalldataEnforcer`                                                                                          |

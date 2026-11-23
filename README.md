@@ -60,7 +60,9 @@ is a real transaction that the chain reverted; Basescan shows which caveat enfor
 cyphos-guard's own **CosignerEnforcer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)) is deployed on Base Sepolia at
 [`0x0a2f40e9789235B6ce2a23668FD3F90cef5eefbf`](https://sepolia.basescan.org/address/0x0a2f40e9789235B6ce2a23668FD3F90cef5eefbf)
 ([deploy tx](https://sepolia.basescan.org/tx/0x173932c273aa54d8d1751b2a1c646ba12c7fee64e8480e7869548d3523892b47)). It has the same address on every
-chain, no owner and no upgrade path.
+chain, no owner and no upgrade path. The **ERC20PerTransferCapEnforcer** ([ADR 0006](docs/decisions/0006-per-transfer-cap.md)) is at
+[`0x4D5a6De281dfDC3d276A787a1fD517DBCe04936b`](https://sepolia.basescan.org/address/0x4D5a6De281dfDC3d276A787a1fD517DBCe04936b)
+([deploy tx](https://sepolia.basescan.org/tx/0xba0716240cb43af98627828d3b984d250dad07e002181581f2b01023517e587b)), same properties.
 
 **Co-signer scenario** (`NETWORK=live pnpm poc:cosigner`, 2026-11-20). Grant: 0.001 ETH/day to one shop, with a co-signer.
 The co-signer key signs exactly the typed data the policy service signs.
@@ -200,7 +202,7 @@ to its cap, signed by the agent. Everything else is refused, including any other
 | Which sellers may be paid        | **on-chain** (vault). Unlisted sellers can't be paid, not even with approval: add them to the list |
 | Largest single payment           | **on-chain** (vault cap = your "ask me up to" maximum)                                             |
 | Total x402 spend per period      | **on-chain** (top-ups only into the vault, period cap)                                             |
-| Routine vs. "ask me" per payment | SDK + escalation; binding on-chain too if you enable the co-signer                                 |
+| Routine vs. "ask me" per payment | SDK + escalation; each routine top-up is capped on-chain at the per-payment limit                  |
 
 So a **stolen agent key can only pay your listed sellers**, within your caps. The vault is owned by your account: you
 can withdraw from it anytime (normally it's empty, because it's topped up just before each payment).
@@ -252,8 +254,11 @@ flowchart LR
 - **Hybrid enforcement.** Hard caps live on-chain. The policy service only refuses or escalates: it holds no key that
   can move funds, can't widen a grant, and isn't needed to revoke.
 - **Optional co-signer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)). cyphos-guard's own `CosignerEnforcer` makes
-  the rules the chain can't express (ERC-20 per-payment caps, range checks) binding: each redemption needs a fresh
+  the rules the chain can't express (blocked addresses, range checks on arguments) binding: each redemption needs a fresh
   co-signature for that exact call, and the service only co-signs within policy. The co-signer can only block.
+
+- **Per-payment cap** ([ADR 0006](docs/decisions/0006-per-transfer-cap.md)). `ERC20PerTransferCapEnforcer` enforces
+  "max X per token payment" on-chain, with or without the co-signer.
 
 Design records: [account stack](docs/decisions/0001-account-stack.md) ·
 [policy schema](docs/decisions/0002-policy-schema.md) ·
@@ -274,8 +279,8 @@ bank that requires two signatures on a cheque, except that the second signer can
 
 - **Limits the smart contracts enforce directly**, such as "max 5 USDC per day" or "only pay this address". The
   blockchain refuses anything outside them, whatever the agent does.
-- **Limits the contracts can't express**, such as "max 2 USDC _per payment_" for tokens, or "amount must be below X".
-  Without the co-signer only the SDK checks these, inside the agent's own program. A hacked or buggy agent could skip
+- **Limits the contracts can't express**, such as "never pay this blocked address" or "argument 2 must be below X" for
+  a contract call. Without the co-signer only the SDK checks these, inside the agent's own program. A hacked or buggy agent could skip
   the SDK and use its signed permission directly, and the blockchain would let the payment through.
 
 **How it fixes that**
@@ -337,8 +342,12 @@ corrections welcome).
 - **Live Base Sepolia guide** ([docs/live-guide.md](docs/live-guide.md)). The full approver flow runs on live Base Sepolia.
 
 - **Co-signer enforcer** ([ADR 0005](docs/decisions/0005-cosigner-enforcer.md)). An optional caveat that requires a fresh
-  policy-service signature per redemption. It makes ERC-20 per-payment caps and range checks on arguments binding
+  policy-service signature per redemption. It makes blocked addresses and range checks on arguments binding
   even for a compromised agent, while the co-signer still can't move funds.
+
+- **Per-payment cap enforcer** ([ADR 0006](docs/decisions/0006-per-transfer-cap.md)). `ERC20PerTransferCapEnforcer`
+  caps every single token payment on-chain (stateless, pins `transfer` and single-call mode), so "max 2 USDC per
+  payment" holds without the co-signer.
 
 - **x402**: agents pay HTTP 402 APIs within your limits (`payX402`, MCP `fetch_paid_api`); an X402Vault per agent
   enforces the seller list on-chain.

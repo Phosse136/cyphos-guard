@@ -1,7 +1,7 @@
 {
   "name": "@cyphos-guard/contracts",
   "version": "0.1.0",
-  "description": "cyphos-guard contracts (CosignerEnforcer caveat, X402Vault) as typed ABI + bytecode.",
+  "description": "cyphos-guard contracts (CosignerEnforcer and ERC20PerTransferCapEnforcer caveats, X402Vault) as typed ABI + bytecode.",
   "keywords": [
     "ai-agents",
     "erc-7710",
@@ -15,7 +15,8 @@
   "type": "module",
   "exports": {
     ".": "./generated/CosignerEnforcer.ts",
-    "./x402-vault": "./generated/X402Vault.ts"
+    "./x402-vault": "./generated/X402Vault.ts",
+    "./per-transfer-cap": "./generated/ERC20PerTransferCapEnforcer.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -32,6 +33,10 @@
       "./x402-vault": {
         "types": "./dist/X402Vault.d.ts",
         "default": "./dist/X402Vault.js"
+      },
+      "./per-transfer-cap": {
+        "types": "./dist/ERC20PerTransferCapEnforcer.d.ts",
+        "default": "./dist/ERC20PerTransferCapEnforcer.js"
       }
     }
   },

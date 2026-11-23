@@ -105,7 +105,7 @@ On its own it binds a well-behaved agent only; add `"cosigner": "0x…"` (the po
 }
 ```
 
-Weekly USDC budget of 10, at most 2 per payment (per-payment is off-chain). Payments to `0xKnownScam` are never
+Weekly USDC budget of 10, at most 2 per payment (both on-chain; the per-payment cap since ADR 0006). Payments to `0xKnownScam` are never
 executed and never shown to you for approval.
 
 ## Limits of v1 (by design, for on-chain soundness)

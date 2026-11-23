@@ -38,7 +38,7 @@ beforeAll(async () => {
   anvil = await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
   publicClient = createPublicClient({ chain, transport: http(FORK) });
   const adapter = await createChainAdapter({ rpcUrl: FORK, network: "fork" });
-  await adapter.ensureCosignerEnforcer();
+  await adapter.ensureEnforcers();
   const cosigner = privateKeyToAccount(generatePrivateKey());
   service = serve({
     fetch: createApp({

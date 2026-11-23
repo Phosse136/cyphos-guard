@@ -238,8 +238,8 @@ export const ENFORCEMENT = {
     how: "AllowedCalldataEnforcer @ offset 4 (one recipient; several via LogicalOrWrapperEnforcer)",
   },
   "erc20Transfer.perTx": {
-    where: "offchain",
-    how: "SDK pre-check → escalation; BINDING on-chain via CosignerEnforcer when policy.cosigner is set",
+    where: "onchain",
+    how: "ERC20PerTransferCapEnforcer (stateless, every transfer <= perTx); SDK pre-check → escalation above it",
   },
   "erc20Transfer.perPeriod": { where: "onchain", how: "ERC20PeriodTransferEnforcer" },
   "x402.token": { where: "onchain", how: "ERC20PeriodTransferEnforcer (top-ups: token.transfer to the payer only)" },
@@ -251,7 +251,7 @@ export const ENFORCEMENT = {
   },
   "x402.perTx": {
     where: "onchain",
-    how: "routine top-ups: CosignerEnforcer if set; every payment: X402Vault cap (= hard max, else perTx)",
+    how: "routine top-ups: ERC20PerTransferCapEnforcer (<= perTx each); every payment: X402Vault cap (= hard max, else perTx)",
   },
   "contractCall.target": { where: "onchain", how: "AllowedTargetsEnforcer" },
   "contractCall.functions": { where: "onchain", how: "AllowedMethodsEnforcer" },

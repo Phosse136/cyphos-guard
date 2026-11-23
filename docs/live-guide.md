@@ -13,7 +13,8 @@ COSIGNER_PRIVATE_KEY=0x…                                  # optional: enables 
 ```
 
 For a co-signer key, generate a fresh throwaway key (e.g. `cast wallet new`); never reuse a key that has held
-funds. The CosignerEnforcer is already deployed on Base Sepolia at `0x0a2f40e9789235B6ce2a23668FD3F90cef5eefbf`.
+funds. The CosignerEnforcer is already deployed on Base Sepolia at `0x0a2f40e9789235B6ce2a23668FD3F90cef5eefbf`, the
+ERC20PerTransferCapEnforcer at `0x4D5a6De281dfDC3d276A787a1fD517DBCe04936b`.
 On another chain, deploy it once with `pnpm contracts:deploy`.
 
 ## 2. Start

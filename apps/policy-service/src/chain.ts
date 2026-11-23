@@ -6,8 +6,10 @@
 import {
   cosignerEnforcerAddress,
   deployCosignerEnforcer,
+  deployPerTransferCapEnforcer,
   type Execution,
   encodeRedeem,
+  perTransferCapEnforcerAddress,
   readVault,
   revertReason,
   submitUserOp,
@@ -84,10 +86,11 @@ export type ChainAdapter = {
   /** True if `account` is deployed and has the passkey (keyId → x,y) as a signer. */
   accountHasPasskey(account: Address, keyId: string, x: Hex, y: Hex): Promise<boolean>;
   /**
-   * Makes sure the CosignerEnforcer exists at its CREATE2 address. Fork: deploys it with the dev relayer.
-   * Live: only checks (deploy once with `pnpm contracts:deploy`). Returns whether it is deployed.
+   * Makes sure our caveat enforcers (CosignerEnforcer, ERC20PerTransferCapEnforcer) exist at their CREATE2
+   * addresses. Fork: deploys them with the dev relayer. Live: only checks (deploy once with
+   * `pnpm contracts:deploy`). Returns which ones are deployed.
    */
-  ensureCosignerEnforcer(): Promise<boolean>;
+  ensureEnforcers(): Promise<{ cosigner: boolean; perTransferCap: boolean }>;
   /** Fork only. Submits a passkey-signed userOp via EntryPoint.handleOps from a throwaway relayer key. */
   relayUserOp?(op: UserOpJSON): Promise<Hex>;
   /** Fork only. anvil_setBalance. */
@@ -192,7 +195,10 @@ export async function createChainAdapter(opts: { rpcUrl: string; network: "fork"
       );
       return ok ? decodeOwnerOp(tx.input, account) : null;
     },
-    ensureCosignerEnforcer: async () => !!(await client.getCode({ address: cosignerEnforcerAddress })),
+    ensureEnforcers: async () => ({
+      cosigner: !!(await client.getCode({ address: cosignerEnforcerAddress })),
+      perTransferCap: !!(await client.getCode({ address: perTransferCapEnforcerAddress })),
+    }),
     async accountHasPasskey(account, keyId, x, y) {
       if (!(await client.getCode({ address: account }))) return false;
       try {
@@ -211,9 +217,10 @@ export async function createChainAdapter(opts: { rpcUrl: string; network: "fork"
       client.request({ method: "anvil_setBalance" as never, params: [a, toHex(parseEther(eth))] as never });
     await setBalance(relayer.address, "100");
     adapter.relayUserOp = (op) => submitUserOp(userOpFromJSON(op), relayerWallet, client);
-    adapter.ensureCosignerEnforcer = async () => {
+    adapter.ensureEnforcers = async () => {
       await deployCosignerEnforcer(relayerWallet, client);
-      return true;
+      await deployPerTransferCapEnforcer(relayerWallet, client);
+      return { cosigner: true, perTransferCap: true };
     };
     adapter.fund = async (address, ether) => {
       await setBalance(address, ether);

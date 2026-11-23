@@ -1,6 +1,6 @@
 "use client";
 
-import { cosignerEnforcerAddress, x402VaultAbi } from "@cyphos-guard/sdk";
+import { cosignerEnforcerAddress, perTransferCapEnforcerAddress, x402VaultAbi } from "@cyphos-guard/sdk";
 import { type GrantJSON, parsePolicy } from "@cyphos-guard/shared";
 import type { MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
 import { useCallback, useEffect, useState } from "react";
@@ -13,11 +13,17 @@ import { Addr, Badge, Button, Details, ErrorText, TxHash } from "./ui";
 /** Name of the caveat enforcer at `address`, read from the deployed environment (what the chain actually checks). */
 function enforcerName(address: string): string {
   if (isAddressEqual(address as `0x${string}`, cosignerEnforcerAddress)) return "CosignerEnforcer (cyphos-guard)";
+  if (isAddressEqual(address as `0x${string}`, perTransferCapEnforcerAddress))
+    return "ERC20PerTransferCapEnforcer (cyphos-guard)";
   const hit = Object.entries(environment.caveatEnforcers).find(
     ([, a]) => a && isAddressEqual(a, address as `0x${string}`),
   );
   return hit ? hit[0] : address;
 }
+
+/** Grants made before the per-transfer cap existed don't carry it; say what THIS delegation enforces. */
+const hasPerTransferCap = (d: { caveats: { enforcer: string }[] } | undefined) =>
+  !!d?.caveats.some((c) => isAddressEqual(c.enforcer as `0x${string}`, perTransferCapEnforcerAddress));
 
 const tokenLabel = (token: string) => (isAddressEqual(token as `0x${string}`, USDC) ? "USDC" : `token ${token}`);
 
@@ -136,7 +142,7 @@ export function AgentDetails({
                       [
                         "Per payment",
                         p.perTx !== undefined
-                          ? `max ${formatUnits(p.perTx, 6)} ${tokenLabel(p.token)} (${policy.cosigner ? "binding via co-signer" : "checked by the SDK only"})`
+                          ? `max ${formatUnits(p.perTx, 6)} ${tokenLabel(p.token)} (${hasPerTransferCap(delegation) ? "enforced on-chain" : policy.cosigner ? "binding via co-signer" : "checked by the SDK only; re-grant to enforce it on-chain"})`
                           : "no extra limit",
                       ],
                     ]}
@@ -187,7 +193,7 @@ export function AgentDetails({
                       ],
                       [
                         "Per payment",
-                        `max ${formatUnits(p.perTx, 6)} ${tokenLabel(p.token)} on its own${p.vault ? "; above: ask me" : " (binding via co-signer)"}`,
+                        `max ${formatUnits(p.perTx, 6)} ${tokenLabel(p.token)} on its own${p.vault ? "; above: ask me" : hasPerTransferCap(delegation) ? " (enforced on-chain)" : " (binding via co-signer)"}`,
                       ],
                       ...(p.vault
                         ? ([

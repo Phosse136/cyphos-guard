@@ -22,9 +22,14 @@ const chain = await createChainAdapter({ rpcUrl, network });
 let cosigner = process.env.COSIGNER_PRIVATE_KEY
   ? privateKeyToAccount(process.env.COSIGNER_PRIVATE_KEY as `0x${string}`)
   : undefined;
-if (cosigner && !(await chain.ensureCosignerEnforcer())) {
+const enforcers = await chain.ensureEnforcers();
+if (cosigner && !enforcers.cosigner) {
   console.warn("CosignerEnforcer is not deployed on this chain; co-signing disabled (run `pnpm contracts:deploy`).");
   cosigner = undefined;
+}
+if (!enforcers.perTransferCap) {
+  // Grants with a per-payment token limit would be refused at redemption (fail closed) until it is deployed.
+  console.warn("ERC20PerTransferCapEnforcer is not deployed on this chain (run `pnpm contracts:deploy`).");
 }
 // Optional operator notifications (Telegram / Discord / ntfy), see deploy/README.md.
 const notifier = notifierFromEnv(process.env, origin.startsWith("https://") ? origin : undefined);

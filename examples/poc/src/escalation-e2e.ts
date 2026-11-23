@@ -47,7 +47,7 @@ await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
 
 // ---------- policy service (in-process, in-memory DB) ----------
 const adapter = await createChainAdapter({ rpcUrl: FORK, network: "fork" });
-await adapter.ensureCosignerEnforcer(); // fork: deploys the CosignerEnforcer at its CREATE2 address
+await adapter.ensureEnforcers(); // fork: deploys our enforcers at their CREATE2 addresses
 const cosigner = privateKeyToAccount(generatePrivateKey()); // the service's co-signer key (can only block)
 const app = createApp({
   store: openStore(":memory:"),

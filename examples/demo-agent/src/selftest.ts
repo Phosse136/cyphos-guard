@@ -72,7 +72,7 @@ const startBalances = await balances();
 
 // ---- policy service (with co-signer) ----
 const adapter = await createChainAdapter({ rpcUrl: FORK, network: "fork" });
-await adapter.ensureCosignerEnforcer();
+await adapter.ensureEnforcers();
 const cosigner = privateKeyToAccount(generatePrivateKey());
 const service = serve({
   fetch: createApp({

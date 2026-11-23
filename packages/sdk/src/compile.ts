@@ -27,6 +27,7 @@ import {
   toHex,
 } from "viem";
 import { cosignerCaveat } from "./cosigner.ts";
+import { perTransferCapCaveat } from "./transferCap.ts";
 
 /** One caveat in object form, e.g. { type: "timestamp", afterThreshold, beforeThreshold }. */
 type CaveatConfig = Extract<Caveats, readonly unknown[]>[number];
@@ -108,7 +109,13 @@ function compilePermission(
       return createDelegation({
         ...base,
         scope: { type: ScopeType.Erc20PeriodTransfer, tokenAddress: permission.token, ...period(permission.perPeriod) },
-        caveats: [{ type: "allowedCalldata", startIndex: 4, value: pad(recipient, { size: 32 }) }, expiry, ...extra],
+        caveats: [
+          { type: "allowedCalldata", startIndex: 4, value: pad(recipient, { size: 32 }) },
+          expiry,
+          // perTx is binding on-chain, with or without a co-signer.
+          ...(permission.perTx !== undefined ? [perTransferCapCaveat(permission.token, permission.perTx)] : []),
+          ...extra,
+        ],
       });
     }
 
@@ -120,7 +127,13 @@ function compilePermission(
       return createDelegation({
         ...base,
         scope: { type: ScopeType.Erc20PeriodTransfer, tokenAddress: permission.token, ...period(permission.perPeriod) },
-        caveats: [{ type: "allowedCalldata", startIndex: 4, value: pad(payer, { size: 32 }) }, expiry, ...extra],
+        caveats: [
+          { type: "allowedCalldata", startIndex: 4, value: pad(payer, { size: 32 }) },
+          expiry,
+          // A top-up covers at most the shortfall of one payment, which is <= perTx.
+          perTransferCapCaveat(permission.token, permission.perTx),
+          ...extra,
+        ],
       });
     }
 

@@ -52,7 +52,9 @@ const check = (label: string, pass: boolean, detail = "") => {
 
 // ---- live policy service (co-signer enabled) + approver in live mode ----
 const adapter = await createChainAdapter({ rpcUrl: RPC, network: "live" });
-check("CosignerEnforcer deployed on Base Sepolia", await adapter.ensureCosignerEnforcer());
+const deployed = await adapter.ensureEnforcers();
+check("CosignerEnforcer deployed on Base Sepolia", deployed.cosigner);
+check("ERC20PerTransferCapEnforcer deployed on Base Sepolia", deployed.perTransferCap);
 const store = openStore(":memory:");
 const service = serve({
   fetch: createApp({

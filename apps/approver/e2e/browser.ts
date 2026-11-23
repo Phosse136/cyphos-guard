@@ -40,7 +40,7 @@ await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
 
 // policy service on the port the Next rewrites point to
 const adapter = await createChainAdapter({ rpcUrl: FORK, network: "fork" });
-await adapter.ensureCosignerEnforcer();
+await adapter.ensureEnforcers();
 const service = serve({
   fetch: createApp({
     store: openStore(":memory:"),

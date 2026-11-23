@@ -52,7 +52,7 @@ const check = (label: string, pass: boolean, detail = "") => {
 
 await ensureFork(FORK, process.env.RPC_URL || "https://sepolia.base.org");
 const adapter = await createChainAdapter({ rpcUrl: FORK, network: "fork" });
-await adapter.ensureCosignerEnforcer();
+await adapter.ensureEnforcers();
 const service = serve({
   fetch: createApp({
     store: openStore(":memory:"),

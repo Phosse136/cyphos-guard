@@ -325,8 +325,10 @@ export function Grants({
           <span>
             <span className="font-medium">Require the cyphos-guard co-signer</span>
             <span className="block text-xs text-zinc-500">
-              Makes the per-payment limit binding on-chain, even if the agent is compromised. The co-signer can only
-              block; it can never move funds. If the service is down, the agent can't act on its own.
+              Every redemption also needs the service's signature, which makes the remaining off-chain rules (blocked
+              addresses, contract-call argument checks) binding even if the agent is compromised. Token per-payment
+              limits are enforced on-chain either way. The co-signer can only block; it can never move funds. If the
+              service is down, the agent can't act on its own.
             </span>
           </span>
         </label>

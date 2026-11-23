@@ -2,6 +2,7 @@ import { parsePolicy } from "@cyphos-guard/shared";
 import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
 import { describe, expect, it } from "vitest";
 import { compilePolicy } from "./compile.ts";
+import { perTransferCapEnforcerAddress } from "./transferCap.ts";
 
 const env = getSmartAccountsEnvironment(84532);
 const AGENT = "0x1111111111111111111111111111111111111111";
@@ -85,6 +86,42 @@ describe("compilePolicy: erc20Transfer", () => {
     expect(calldata?.terms.toLowerCase()).toBe(
       `0x${(4).toString(16).padStart(64, "0")}${SHOP.slice(2).padStart(64, "0")}`.toLowerCase(),
     );
+  });
+
+  it("makes perTx binding on-chain with the per-transfer cap enforcer (no co-signer needed)", () => {
+    const [c] = compilePolicy({
+      policy: withPermissions([
+        {
+          kind: "erc20Transfer",
+          token: USDC_ADDRESS,
+          recipients: [SHOP],
+          perTx: "2000000",
+          perPeriod: { amount: "5000000", periodSeconds: DAY },
+        },
+      ]),
+      delegator: ACCOUNT,
+      environment: env,
+    });
+    const cap = c?.delegation.caveats.find((cv) => cv.enforcer === perTransferCapEnforcerAddress);
+    // terms = token (20 bytes) ‖ uint256 max amount
+    expect(cap?.terms.toLowerCase()).toBe(`${USDC_ADDRESS}${(2_000_000).toString(16).padStart(64, "0")}`.toLowerCase());
+    expect(c?.delegation.caveats).toHaveLength(5);
+  });
+
+  it("adds no cap caveat without perTx", () => {
+    const [c] = compilePolicy({
+      policy: withPermissions([
+        {
+          kind: "erc20Transfer",
+          token: USDC_ADDRESS,
+          recipients: [SHOP],
+          perPeriod: { amount: "5", periodSeconds: DAY },
+        },
+      ]),
+      delegator: ACCOUNT,
+      environment: env,
+    });
+    expect(c?.delegation.caveats.some((cv) => cv.enforcer === perTransferCapEnforcerAddress)).toBe(false);
   });
 
   it("refuses several recipients (would need several caps)", () => {
@@ -198,7 +235,11 @@ describe("compilePolicy: x402", () => {
       "TimestampEnforcer",
       "ValueLteEnforcer",
     ]);
-    expect(c?.delegation.caveats).toHaveLength(5); // + the CosignerEnforcer (not in the kit's environment)
+    // + the per-transfer cap and the CosignerEnforcer (ours, not in the kit's environment)
+    expect(c?.delegation.caveats).toHaveLength(6);
+    expect(c?.delegation.caveats.find((cv) => cv.enforcer === perTransferCapEnforcerAddress)?.terms.toLowerCase()).toBe(
+      `${USDC_ADDRESS}${(1_000_000).toString(16).padStart(64, "0")}`.toLowerCase(),
+    );
   });
 
   it("the schema refuses x402 without a co-signer and sellers on the denylist", () => {
@@ -250,6 +291,6 @@ describe("compilePolicy: x402 with a vault", () => {
     expect(calldata?.terms.toLowerCase()).toBe(
       `0x${(4).toString(16).padStart(64, "0")}${VAULT.slice(2).padStart(64, "0")}`.toLowerCase(),
     );
-    expect(c?.delegation.caveats).toHaveLength(4); // no CosignerEnforcer
+    expect(c?.delegation.caveats).toHaveLength(5); // + the per-transfer cap, no CosignerEnforcer
   });
 });

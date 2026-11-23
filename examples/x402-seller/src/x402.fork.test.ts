@@ -57,7 +57,7 @@ beforeAll(async () => {
   closers.push(() => anvil?.kill());
   publicClient = createPublicClient({ chain, transport: http(FORK) });
   const adapter = await createChainAdapter({ rpcUrl: FORK, network: "fork" });
-  await adapter.ensureCosignerEnforcer();
+  await adapter.ensureEnforcers();
   const cosigner = privateKeyToAccount(generatePrivateKey());
   const serviceUrl = await listen(
     createApp({

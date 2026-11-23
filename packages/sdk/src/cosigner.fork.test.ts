@@ -40,6 +40,7 @@ import { type Execution, encodeRedeem, revertReason } from "./delegations.ts";
 import { deployAccount } from "./owner.ts";
 import { ensureFork } from "./testing/fork.ts";
 import { fundUsdc, USDC } from "./testing/usdc.ts";
+import { deployPerTransferCapEnforcer } from "./transferCap.ts";
 
 const FORK = process.env.FORK_RPC_URL || "http://127.0.0.1:8545";
 const chain: Chain = baseSepolia;
@@ -96,6 +97,7 @@ beforeAll(async () => {
   }
   const ownerWallet = createWalletClient({ account: owner, chain, transport: http(FORK) });
   await deployCosignerEnforcer(ownerWallet, client);
+  await deployPerTransferCapEnforcer(ownerWallet, client); // perTx compiles to it
   const account = await toMetaMaskSmartAccount({
     client,
     implementation: Implementation.Hybrid,
@@ -156,9 +158,14 @@ describe("CosignerEnforcer through the deployed DelegationManager (fork)", () =>
     expect(await simulate(withCosignature(delegation, await cosign(exec, agent)), exec)).toMatch(/invalid-cosignature/);
   });
 
-  it("rejects a cosignature for 1.5 USDC used to send 3 USDC (above the off-chain per-payment limit)", async () => {
+  it("rejects a cosignature for 1.5 USDC used to send 1.9 USDC (bound to the exact call)", async () => {
     const cs = await cosign(usdc("1.5"));
-    expect(await simulate(withCosignature(delegation, cs), usdc("3"))).toMatch(/invalid-cosignature/);
+    expect(await simulate(withCosignature(delegation, cs), usdc("1.9"))).toMatch(/invalid-cosignature/);
+  });
+
+  it("rejects 3 USDC even with a valid cosignature (per-payment cap is on-chain too)", async () => {
+    const exec = usdc("3");
+    expect(await simulate(withCosignature(delegation, await cosign(exec)), exec)).toMatch(/amount-exceeded/);
   });
 
   it("rejects replaying a used cosignature", async () => {
@@ -174,7 +181,9 @@ describe("CosignerEnforcer through the deployed DelegationManager (fork)", () =>
   });
 
   it("still enforces the other on-chain caveats (period cap) even with a valid cosignature", async () => {
-    const exec = usdc("4"); // 1.5 + 0.5 already spent today; 4 more would exceed 5/day
+    const two = usdc("2"); // 1.5 + 0.5 already spent today; + 2 = 4
+    expect(await send(withCosignature(delegation, await cosign(two)), two)).toBe("success");
+    const exec = usdc("1.5"); // 4 + 1.5 would exceed 5/day
     expect(await simulate(withCosignature(delegation, await cosign(exec)), exec)).toMatch(
       /ERC20PeriodTransferEnforcer/,
     );

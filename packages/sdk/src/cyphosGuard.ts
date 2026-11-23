@@ -56,7 +56,7 @@ import {
   PolicyServiceError,
   PolicyViolation,
 } from "./errors.ts";
-import { encodeVaultSignature, randomVaultSalt, vaultDeployment } from "./vault.ts";
+import { encodeVaultSignature, grantVaultSalt, readVault, vaultDeployment } from "./vault.ts";
 import {
   decodeX402Header,
   encodeX402Header,
@@ -480,22 +480,42 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
     // ================= owner =================
 
     /**
-     * Grant an agent a policy: compile → passkey-sign each delegation → register.
-     * Any existing active grant for the same agent is revoked on-chain first, so caps never stack.
+     * Grant an agent a policy. Passkey steps, in this order:
+     *   1. sign each compiled delegation (one prompt per permission). Nothing is on-chain yet, so cancelling here
+     *      changes nothing;
+     *   2. ONE transaction that deploys the x402 vault(s) and revokes the agent's existing grant (so caps never
+     *      stack), only if either is needed;
+     * then the grant is registered. A retry after a failed or cancelled attempt reuses what that attempt already
+     * did (vault deployed, old grant revoked) instead of doing it again.
      */
-    async grantAgent({ policy: requested }: { policy: PolicyInput }): Promise<GrantJSON> {
+    async grantAgent({ policy: requested, onProgress }: GrantAgentArgs): Promise<GrantJSON> {
       const owner = needOwner("grantAgent");
-      // x402 permissions get their own X402Vault (sellers + cap enforced on-chain), deployed from the owner's
-      // account before signing, so its address can go into the policy and the top-up delegation.
-      const parsedRequest = parsePolicy(requested);
-      const vaultCalls: { to: Address; data: Hex }[] = [];
-      const vaultAddresses: Address[] = [];
+      // Parsed with a placeholder vault for x402 permissions that don't name one yet: the schema requires a vault
+      // or a co-signer, and the vault address is only derived below. The final policy is parsed again with it.
+      const parsedRequest = parsePolicy({
+        ...requested,
+        permissions: requested.permissions.map((p) =>
+          p.kind === "x402" && !p.vault ? { ...p, vault: VAULT_PLACEHOLDER } : p,
+        ),
+      });
+      if (parsedRequest.chainId !== chainId) {
+        throw new Error(`policy is for chain ${parsedRequest.chainId}, client is ${chainId}`);
+      }
+      const agentGrants = (await pw.getGrants()).filter(
+        (g) => g.agent.toLowerCase() === parsedRequest.agent.toLowerCase(),
+      );
+
+      // x402 permissions get their own X402Vault (sellers + cap enforced on-chain). Its address goes into the
+      // policy and the top-up delegation, so it is fixed before signing. The salt is derived from the number of
+      // grants this agent already has: a retry of a failed attempt lands on the same address (already deployed →
+      // reused), while the next successful grant gets a fresh vault.
+      const vaults: { address: Address; call: { to: Address; data: Hex }; sellers: Address[] }[] = [];
       const input: PolicyInput = {
         ...requested,
         permissions: requested.permissions.map((perm, i) => {
           const parsed = parsedRequest.permissions[i];
-          if (perm.kind !== "x402" || parsed?.kind !== "x402" || parsed.vault) return perm;
-          const salt = randomVaultSalt();
+          if (perm.kind !== "x402" || parsed?.kind !== "x402" || perm.vault) return perm;
+          const salt = grantVaultSalt(agentGrants.length, i);
           const d = vaultDeployment({
             owner: owner.account.address,
             agent: parsedRequest.agent,
@@ -504,45 +524,66 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
             sellers: parsed.sellers,
             salt,
           });
-          vaultCalls.push(d.call);
-          vaultAddresses.push(d.address);
+          vaults.push({ ...d, sellers: parsed.sellers });
           return { ...perm, vault: d.address, vaultSalt: salt };
         }),
       };
-      if (vaultCalls.length) {
-        // Idempotent: the CREATE2 address commits to the exact code and arguments, so a vault already at that
-        // address (e.g. someone front-ran the deployment with the same calldata) is exactly the one we want.
-        const deployed = async () =>
-          (await Promise.all(vaultAddresses.map((a) => publicClient.getCode({ address: a })))).every(
-            (c) => !!c && c !== "0x",
-          );
-        if (!(await deployed())) {
-          try {
-            await owner.sendCalls(vaultCalls);
-          } catch (e) {
-            if (!(await deployed())) throw e;
-          }
-        }
-        log.info?.("x402 vault(s) ready", { vaults: vaultAddresses });
-      }
       const policy = parsePolicy(input);
-      if (policy.chainId !== chainId) throw new Error(`policy is for chain ${policy.chainId}, client is ${chainId}`);
-      const existing = (await pw.getGrants()).filter(
-        (g) => g.status === "active" && g.agent.toLowerCase() === policy.agent.toLowerCase(),
-      );
-      for (const g of existing) await pw.revoke(g.id);
+
+      const calls: { to: Address; data: Hex }[] = [];
+      for (const v of vaults) {
+        const code = await publicClient.getCode({ address: v.address });
+        if (!code || code === "0x") {
+          calls.push(v.call);
+          continue;
+        }
+        // Already deployed (an earlier attempt, or someone front-ran it with the same calldata): CREATE2 commits
+        // to the exact code and constructor args. Still check the seller list, which the owner can change.
+        const state = await readVault(publicClient, v.address, v.sellers);
+        if (!state.allSellersListed) {
+          throw new Error(
+            `x402 vault ${v.address} exists but no longer lists all sellers; add them or change the grant`,
+          );
+        }
+      }
+      const vaultDeploys = calls.length;
+      // The agent's active grants must be revoked. One an earlier attempt already disabled on-chain is just
+      // recorded (the service checks the chain); the rest are revoked in the same transaction as the vault.
+      const toRevoke: GrantJSON[] = [];
+      for (const g of agentGrants.filter((x) => x.status === "active")) {
+        const r = await request("owner", "POST", `/grants/${g.id}/revoked`, {});
+        if (r.status === 409) toRevoke.push(g);
+        else ok(r);
+      }
+      for (const g of toRevoke) calls.push(...g.delegations.map((d) => revokeCall(environment, d as Delegation)));
 
       const now = Number((await publicClient.getBlock()).timestamp);
       const compiled = compilePolicy({ policy, delegator: owner.account.address, environment, now });
+      const steps = compiled.length + (calls.length > 0 ? 1 : 0);
       const delegations = [];
-      for (const c of compiled) {
+      for (const [i, c] of compiled.entries()) {
+        onProgress?.({
+          step: i + 1,
+          of: steps,
+          action: "sign",
+          label: `Sign permission ${i + 1} of ${compiled.length} (${PERMISSION_LABEL[c.permission.kind]})`,
+        });
         delegations.push({
           ...c.delegation,
           signature: await owner.account.signDelegation({ delegation: c.delegation }),
         });
       }
+      if (calls.length > 0) {
+        const what = [vaultDeploys > 0 ? "set up the x402 vault" : "", toRevoke.length ? "replace the old grant" : ""]
+          .filter(Boolean)
+          .join(" and ");
+        onProgress?.({ step: steps, of: steps, action: "transaction", label: `Confirm one transaction: ${what}` });
+        const txHash = await owner.sendCalls(calls);
+        for (const g of toRevoke) ok(await request("owner", "POST", `/grants/${g.id}/revoked`, { txHash }));
+      }
       const grant = ok(await request<GrantJSON>("owner", "POST", "/grants", { policy: jsonSafe(input), delegations }));
-      log.info?.("agent granted", { grantId: grant.id, agent: grant.agent, replaced: existing.map((g) => g.id) });
+      const replaced = agentGrants.filter((g) => g.status === "active").map((g) => g.id);
+      log.info?.("agent granted", { grantId: grant.id, agent: grant.agent, replaced });
       return grant;
     },
 
@@ -591,6 +632,20 @@ function jsonSafe(v: unknown): unknown {
 }
 
 /** The cyphos-guard client: agent methods need `agent`, owner methods need `owner` (see CyphosGuardOptions). */
+/** One passkey step of grantAgent, for UI progress ("Passkey 2 of 3: …"). */
+export type GrantProgress = { step: number; of: number; action: "sign" | "transaction"; label: string };
+
+export type GrantAgentArgs = { policy: PolicyInput; onProgress?: (p: GrantProgress) => void };
+
+const VAULT_PLACEHOLDER = "0x000000000000000000000000000000000000dEaD";
+
+const PERMISSION_LABEL = {
+  nativeTransfer: "send ETH",
+  erc20Transfer: "send tokens",
+  contractCall: "call a contract",
+  x402: "pay x402 APIs",
+} as const;
+
 export interface CyphosGuard {
   /** The MetaMask Delegation Framework deployment for the chain. */
   environment: SmartAccountsEnvironment;
@@ -616,8 +671,8 @@ export interface CyphosGuard {
   getActivity(): Promise<ActivityJSON[]>;
 
   // ---- owner ----
-  /** Grant an agent a policy: compile → passkey-sign → register (replaces the agent's existing grant). */
-  grantAgent(args: { policy: PolicyInput }): Promise<GrantJSON>;
+  /** Grant an agent a policy: passkey-sign → one tx (vault + revoke old) → register. See the implementation. */
+  grantAgent(args: GrantAgentArgs): Promise<GrantJSON>;
   /** Revoke a grant on-chain, then record it. */
   revoke(grantId: string): Promise<{ txHash: Hex }>;
   getRequests(status?: RequestStatus): Promise<ApprovalRequestJSON[]>;

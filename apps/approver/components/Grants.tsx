@@ -1,5 +1,6 @@
 "use client";
 
+import type { GrantProgress } from "@cyphos-guard/sdk";
 import type { GrantJSON, PolicyInput } from "@cyphos-guard/shared";
 import type { MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
 import { useCallback, useEffect, useState } from "react";
@@ -70,6 +71,7 @@ export function Grants({
   const [grants, setGrants] = useState<GrantJSON[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<GrantProgress | null>(null);
   const [form, setForm] = useState<Form>(EMPTY);
   const [prefilled, setPrefilled] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -174,15 +176,17 @@ export function Grants({
       };
       // SDK: validates, compiles one delegation per permission, passkey-signs each, and revokes this
       // agent's existing grant on-chain first so caps never stack.
-      await ownerClient(account, fork).grantAgent({ policy: policyInput });
+      await ownerClient(account, fork).grantAgent({ policy: policyInput, onProgress: setProgress });
       setForm(EMPTY);
       setPrefilled(false);
       await load();
       onChanged();
     } catch (e) {
-      setError((e as Error).message);
+      // A retry reuses whatever already went through (vault deployed, old grant revoked).
+      setError(`${(e as Error).message} You can safely try again.`);
     } finally {
       setBusy(null);
+      setProgress(null);
     }
   };
 
@@ -334,8 +338,17 @@ export function Grants({
         </label>
       )}
       <Button className="mt-4" disabled={!valid || busy !== null} onClick={grant}>
-        {busy === "grant" ? "Confirm with passkey…" : "Grant (sign with passkey)"}
+        {busy === "grant"
+          ? progress
+            ? `Passkey ${progress.step} of ${progress.of}: ${progress.label}…`
+            : "Preparing…"
+          : "Grant (sign with passkey)"}
       </Button>
+      {busy !== "grant" && (
+        <p className="mt-2 text-xs text-zinc-500">
+          Your passkey asks once per permission, plus one transaction if a vault is needed or an old grant is replaced.
+        </p>
+      )}
       <ErrorText error={error} />
     </Card>
   );

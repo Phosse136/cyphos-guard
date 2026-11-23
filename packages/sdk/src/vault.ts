@@ -50,6 +50,14 @@ export function vaultDeployment(p: VaultParams) {
 export const randomVaultSalt = (): Hex => toHex(crypto.getRandomValues(new Uint8Array(32)));
 
 /**
+ * Salt for the vault of permission `index` in the agent's grant number `grantNumber` (= how many grants, active or
+ * revoked, the agent had before). Deterministic, so retrying a failed grant finds the vault it already deployed;
+ * the owner and the constructor args (agent, token, cap, sellers) are part of the address anyway.
+ */
+export const grantVaultSalt = (grantNumber: number, index: number): Hex =>
+  keccak256(toHex(`cyphos-guard:x402-vault:grant-${grantNumber}:permission-${index}`));
+
+/**
  * The bytes the vault's isValidSignature expects: the payment fields (so it can recompute the EIP-712 digest and
  * check the seller and cap) plus the agent's 65-byte signature over that digest.
  */

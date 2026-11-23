@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import "./globals.css";
 
@@ -10,9 +11,15 @@ export const metadata: Metadata = {
   description: "Approve and revoke your AI agents' spending",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
-    <html lang="en">
+    // suppressHydrationWarning: /theme.js sets data-theme on <html> before React hydrates.
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Light/dark switch, shared with cyphosguard.com; copied from site/theme.js by the prebuild/predev scripts. */}
+        <script src="/theme.js" nonce={nonce} />
+      </head>
       <body className="min-h-screen antialiased">{children}</body>
     </html>
   );

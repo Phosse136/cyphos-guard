@@ -12,7 +12,9 @@
     "e2e:browser": "node --env-file-if-exists=../../.env e2e/browser.ts",
     "dev:all": "node --env-file-if-exists=../../.env scripts/dev.ts",
     "e2e:demo": "node --env-file-if-exists=../../.env e2e/demo.ts",
-    "e2e:live": "node --env-file-if-exists=../../.env e2e/live.ts"
+    "e2e:live": "node --env-file-if-exists=../../.env e2e/live.ts",
+    "predev": "mkdir -p public && cp ../../site/theme.js public/theme.js",
+    "prebuild": "mkdir -p public && cp ../../site/theme.js public/theme.js"
   },
   "dependencies": {
     "@metamask/smart-accounts-kit": "2.0.0",

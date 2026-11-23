@@ -20,3 +20,4 @@ broadcast/
 .dev/
 next-env.d.ts
 dist-site/
+apps/approver/public/theme.js

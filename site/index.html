@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; media-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; media-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>cyphos-guard · Guardrails for AI agents that spend money</title>
 <meta name="description" content="Give your AI agent a budget it can't exceed, approve big payments with a passkey, and make some things impossible. Enforced by your smart account, not by a server you have to trust.">
@@ -24,14 +24,18 @@
     --okbg: #ecfdf3; --warnbg: #fff7ed; --badbg: #fef2f2; --code: #0f1220; --codetext: #e6e8f2;
     --shadow: 0 1px 2px rgba(16,24,40,.05), 0 8px 24px rgba(16,24,40,.06);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
       --bg: #0b0d12; --bg2: #11141b; --card: #151923; --text: #eceef4; --muted: #a0a6b6; --line: #252a36;
       --brand: #818cf8; --brand2: #a78bfa; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
       --okbg: rgba(74,222,128,.08); --warnbg: rgba(251,191,36,.08); --badbg: rgba(248,113,113,.08);
       --code: #0a0c14; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
-    }
-  }
+     color-scheme: dark; } }
+  :root[data-theme="dark"] {
+      --bg: #0b0d12; --bg2: #11141b; --card: #151923; --text: #eceef4; --muted: #a0a6b6; --line: #252a36;
+      --brand: #818cf8; --brand2: #a78bfa; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+      --okbg: rgba(74,222,128,.08); --warnbg: rgba(251,191,36,.08); --badbg: rgba(248,113,113,.08);
+      --code: #0a0c14; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+     color-scheme: dark; }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.6;
@@ -128,7 +132,16 @@
   .note { border: 1px solid var(--line); background: var(--warnbg); border-radius: 14px; padding: 14px 18px; font-size: 15px; }
   footer { padding: 36px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
   footer.site .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+
+  /* Light/dark switch (site/theme.js). The icon shows the mode a click switches to. */
+  .theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--card, transparent); color: var(--text); cursor: pointer; font-size: 17px; line-height: 1; }
+  .theme-toggle:hover { border-color: var(--muted); }
+  .theme-toggle::before { content: "\263E"; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme-toggle::before { content: "\2600"; } }
+  :root[data-theme="dark"] .theme-toggle::before { content: "\2600"; }
 </style>
+<script src="theme.js"></script>
 </head>
 <body>
 
@@ -142,6 +155,7 @@
       <a href="#security">Security</a>
       <a href="#developers">Developers</a>
       <a href="https://github.com/Phosse136/cyphos-guard">GitHub</a>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch light/dark mode" title="Light/dark mode"></button>
       <a class="btn btn-primary" href="https://app.cyphosguard.com">Open app</a>
     </nav>
   </div>

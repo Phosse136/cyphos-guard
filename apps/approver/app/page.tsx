@@ -42,16 +42,26 @@ export default function Home() {
             Guardrails for your AI agents · Base Sepolia{me?.fork ? " (local fork)" : ""} · testnet only
           </p>
         </div>
-        {account && (
-          <div className="flex items-center gap-3 text-sm">
-            <span className="font-mono text-zinc-500" title={account.address}>
-              {short(account.address)}
-            </span>
-            <Button variant="ghost" onClick={() => api.logout().then(refresh)}>
-              Sign out
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-3 text-sm">
+          {account && (
+            <>
+              <span className="font-mono text-zinc-500" title={account.address}>
+                {short(account.address)}
+              </span>
+              <Button variant="ghost" onClick={() => api.logout().then(refresh)}>
+                Sign out
+              </Button>
+            </>
+          )}
+          {/* Light/dark switch: handled by /theme.js (shared with cyphosguard.com); icon via CSS. */}
+          <button
+            type="button"
+            className="theme-toggle"
+            data-theme-toggle
+            aria-label="Switch light/dark mode"
+            title="Light/dark mode"
+          />
+        </div>
       </header>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

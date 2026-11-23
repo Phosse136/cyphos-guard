@@ -120,7 +120,9 @@ describe("public stats", () => {
 
   it("renders a static page without scripts, with the threshold explained", () => {
     const early = renderStatsHtml(stats(3));
-    expect(early).not.toMatch(/<script/i);
+    // Only the same-origin light/dark switch; no inline script.
+    expect(early.match(/<script[^>]*>/gi)).toEqual(['<script src="theme.js">']);
+    expect(early).toContain("script-src 'self'");
     expect(early).toContain("Early days");
     expect(early).toContain("fewer than 5");
     const live = renderStatsHtml(stats(6));

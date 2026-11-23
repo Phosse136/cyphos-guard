@@ -11,8 +11,10 @@
 <style>
   :root { --bg:#fbfbfd; --card:#fff; --text:#14161c; --muted:#5b6170; --line:#e3e5ec; --brand:#4f46e5; --brand2:#7c3aed;
     --ok:#15803d; --bad:#b91c1c; --warnbg:#fff7ed; --okbg:#ecfdf3; --badbg:#fef2f2; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0b0d12; --card:#151923; --text:#eceef4; --muted:#a0a6b6; --line:#252a36;
-    --brand:#818cf8; --brand2:#a78bfa; --ok:#4ade80; --bad:#f87171; --warnbg:rgba(251,191,36,.08); --okbg:rgba(74,222,128,.08); --badbg:rgba(248,113,113,.08); } }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0b0d12; --card:#151923; --text:#eceef4; --muted:#a0a6b6; --line:#252a36;
+    --brand:#818cf8; --brand2:#a78bfa; --ok:#4ade80; --bad:#f87171; --warnbg:rgba(251,191,36,.08); --okbg:rgba(74,222,128,.08); --badbg:rgba(248,113,113,.08);  color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg:#0b0d12; --card:#151923; --text:#eceef4; --muted:#a0a6b6; --line:#252a36;
+    --brand:#818cf8; --brand2:#a78bfa; --ok:#4ade80; --bad:#f87171; --warnbg:rgba(251,191,36,.08); --okbg:rgba(74,222,128,.08); --badbg:rgba(248,113,113,.08);  color-scheme: dark; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text); line-height:1.6;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
@@ -38,9 +40,20 @@
   .msg.info { background: var(--warnbg); }
   .hidden { display: none; }
   footer { margin-top: 28px; color: var(--muted); font-size: 13px; }
+
+  /* Light/dark switch (site/theme.js). The icon shows the mode a click switches to. */
+  .theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--card, transparent); color: var(--text); cursor: pointer; font-size: 17px; line-height: 1; }
+  .theme-toggle:hover { border-color: var(--muted); }
+  .theme-toggle::before { content: "\263E"; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme-toggle::before { content: "\2600"; } }
+  :root[data-theme="dark"] .theme-toggle::before { content: "\2600"; }
+  .theme-corner { position: fixed; top: 12px; right: 12px; }
 </style>
+<script src="/theme.js"></script>
 </head>
 <body>
+<button class="theme-toggle theme-corner" type="button" data-theme-toggle aria-label="Switch light/dark mode" title="Light/dark mode"></button>
 <main>
   <a href="../" style="text-decoration:none;color:var(--muted)">← cyphos-guard</a>
   <h1>Recover your wallet</h1>

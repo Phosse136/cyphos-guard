@@ -176,7 +176,8 @@ export function renderStatsHtml(s: PublicStats): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<script src="theme.js"></script>
 <meta name="robots" content="index">
 <title>cyphos-guard usage</title>
 <meta name="description" content="Live, anonymous usage statistics of the public cyphos-guard instance on Base Sepolia testnet.">
@@ -200,17 +201,22 @@ export function renderStatsHtml(s: PublicStats): string {
   th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); } th { color: var(--muted); font-weight: 500; font-size: .85rem; }
   td.num { text-align: right; } tr:last-child td { border-bottom: 0; }
   .chart { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; overflow-x: auto; }
-  .chart svg { display: block; width: 100%; height: auto; min-width: 320px; }
+  .chart svg { display: block; width: 100%; height: auto; min-width: 560px; }
   .chart text { fill: var(--muted); font-size: 11px; }
   .chart .bar { fill: var(--bar); } .chart .bar:hover { opacity: .8; } .chart .gridline { stroke: var(--grid); stroke-width: 1; }
   .chart .held-week { fill: none; stroke: var(--grid); stroke-dasharray: 3 3; }
   ul { padding-left: 20px; } li { margin: 4px 0; } code { font-size: .85em; word-break: break-all; }
   footer { color: var(--muted); font-size: .85rem; margin-top: 40px; }
+  .top { display: flex; justify-content: space-between; align-items: center; }
+  .theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); cursor: pointer; font-size: 17px; line-height: 1; }
+  .theme-toggle::before { content: "\\263E"; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme-toggle::before { content: "\\2600"; } }
+  :root[data-theme="dark"] .theme-toggle::before { content: "\\2600"; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <p class="sub"><a href="https://cyphosguard.com">cyphos-guard</a></p>
+  <div class="top"><p class="sub"><a href="https://cyphosguard.com">cyphos-guard</a></p><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch light/dark mode" title="Light/dark mode"></button></div>
   <h1>Usage of the public instance</h1>
   <p class="sub">app.cyphosguard.com on ${esc(s.network)} · updated hourly · last update ${esc(updated)} UTC</p>
   ${
@@ -274,6 +280,9 @@ export function renderStatsHtml(s: PublicStats): string {
 function weeklyChart(s: PublicStats): string {
   const weeks = s.weekly.slice(-26);
   if (weeks.length === 0) return `<p class="sub">No activity yet.</p>`;
+  if (weeks.every((w) => w.payments === null)) {
+    return `<p class="banner">Every week so far had fewer than ${s.threshold} active accounts, so no weekly numbers are shown yet.</p>`;
+  }
   const W = 720;
   const H = 220;
   const pad = { l: 36, r: 8, t: 12, b: 28 };

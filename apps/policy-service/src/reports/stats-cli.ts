@@ -5,7 +5,7 @@
  *   node src/reports/stats-cli.ts --db /var/lib/cyphos-guard/app/policy-service.sqlite --out /var/lib/cyphos-guard-public/stats
  *     [--threshold 5]
  */
-import { mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { parseArgs } from "node:util";
@@ -43,7 +43,9 @@ try {
   };
   put("stats.json", `${JSON.stringify(stats, null, 2)}\n`);
   put("index.html", renderStatsHtml(stats));
-  console.log(`wrote ${values.out}/stats.json and index.html (threshold ${threshold})`);
+  // The light/dark switch shared with cyphosguard.com (same file, served same-origin for the CSP).
+  put("theme.js", readFileSync(new URL("../../../../site/theme.js", import.meta.url), "utf8"));
+  console.log(`wrote ${values.out}/stats.json, index.html, theme.js (threshold ${threshold})`);
 } finally {
   db.close();
 }

@@ -58,6 +58,24 @@ NOTIFY_SUMMARY_HOUR=20
 Messages contain the event, amounts and shortened addresses. Mention the channel in your privacy policy if other
 people use your instance.
 
+## Usage reports (CSV, TXT, XLSX)
+
+Read-only analytics from the policy-service database for the operator: key figures and activation funnel, daily
+activity, one row per owner (cohort week, activity counts), agents, payments, approval requests (time to decision),
+blocked attempts and owners' own transactions.
+
+```bash
+cd /opt/cyphos-guard/apps/policy-service
+sudo REPORT_SALT=… node src/reports/cli.ts --db /var/lib/cyphos-guard/app/policy-service.sqlite --out /root/reports
+#   --format all|csv|txt|xlsx   --since 2026-11-01 --until 2026-12-01   --delimiter ";" (German Excel)
+```
+
+Pseudonymized by default: addresses become keyed IDs (`acct_…`, `agent_…`), and free text and tx hashes are left
+out. Set `REPORT_SALT` (a long random secret, e.g. `openssl rand -hex 32`, kept in the env file) so IDs stay the same
+across exports; without it they change every run. `--raw` includes addresses, reasons and tx hashes: for debugging
+only, don't share. x402 vault top-ups aren't counted as separate payments. Files are written with mode 600. Mention
+the statistics in your privacy policy.
+
 ## Backups
 
 `deploy/backup.sh` (daily via `cyphos-guard-backup.timer`, 03:30) writes consistent SQLite copies and the env files

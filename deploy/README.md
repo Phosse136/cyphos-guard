@@ -76,6 +76,16 @@ across exports; without it they change every run. `--raw` includes addresses, re
 only, don't share. x402 vault top-ups aren't counted as separate payments. Files are written with mode 600. Mention
 the statistics in your privacy policy.
 
+## Public usage statistics (`/stats`)
+
+`cyphos-guard-stats.timer` (hourly) writes anonymous totals to `/var/lib/cyphos-guard-public/stats/` (`index.html`
+and `stats.json`, no JavaScript); Caddy serves them at `https://<app-domain>/stats/` (see `Caddyfile`). Only totals,
+and every number needs at least 5 distinct accounts behind it, otherwise it shows "fewer than 5" (`--threshold`).
+Never published: addresses or pseudonyms, free text, tx hashes, blocked attempts, single decisions. Rules and
+reasoning: [ADR 0007](../docs/decisions/0007-public-stats.md). Install:
+`cp deploy/cyphos-guard-stats.{service,timer} /etc/systemd/system/ && systemctl enable --now cyphos-guard-stats.timer`,
+then add the `/stats` block to your Caddyfile and `systemctl reload caddy`.
+
 ## Backups
 
 `deploy/backup.sh` (daily via `cyphos-guard-backup.timer`, 03:30) writes consistent SQLite copies and the env files

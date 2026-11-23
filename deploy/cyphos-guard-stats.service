@@ -1,0 +1,41 @@
+[Unit]
+Description=cyphos-guard public usage statistics (anonymous totals for app.cyphosguard.com/stats)
+
+[Service]
+Type=oneshot
+User=cyphos
+Group=cyphos
+WorkingDirectory=/opt/cyphos-guard/apps/policy-service
+EnvironmentFile=/etc/cyphos-guard/app.env
+# Writes only aggregated numbers (see apps/policy-service/src/reports/public.ts). Caddy serves this directory.
+StateDirectory=cyphos-guard-public
+StateDirectoryMode=0755
+UMask=0022
+ExecStart=/usr/local/bin/node src/reports/stats-cli.ts --db ${POLICY_DB_PATH} --out /var/lib/cyphos-guard-public/stats
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateNetwork=true
+# SQLite opens the WAL database read-only but still maps its -shm file.
+ReadWritePaths=/var/lib/cyphos-guard
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RemoveIPC=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM

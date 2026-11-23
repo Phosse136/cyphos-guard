@@ -192,10 +192,9 @@ function CreateAccount({
           <p className="mt-2 text-xs">
             Free test ETH:{" "}
             {[
-              ["Coinbase", "https://portal.cdp.coinbase.com/products/faucet"],
-              ["Alchemy", "https://www.alchemy.com/faucets/base-sepolia"],
-              ["Superchain", "https://console.optimism.io/faucet"],
-              ["all faucets", "https://docs.base.org/base-chain/tools/network-faucets"],
+              ["ETHGlobal (login, 0.05/day)", "https://ethglobal.com/faucet/base-sepolia-84532"],
+              ["Coinbase (account, 0.0001 per claim)", "https://portal.cdp.coinbase.com/products/faucet"],
+              ["more faucets", "https://docs.base.org/base-chain/tools/network-faucets"],
             ].map(([label, href], i) => (
               <span key={href}>
                 {i > 0 && " · "}

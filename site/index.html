@@ -139,7 +139,7 @@
   .news li { display: grid; grid-template-columns: 76px 1fr; gap: 14px; padding: 12px 16px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
   .news time { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; padding-top: 1px; }
   .news strong { display: block; }
-  .news span { color: var(--muted); font-size: 15px; }
+  .news .desc { color: var(--muted); font-size: 15px; }
   @media (max-width: 520px) { .news li { grid-template-columns: 1fr; gap: 2px; } }
   /* Light/dark switch (site/theme.js). The icon shows the mode a click switches to. */
   .theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0;
@@ -350,13 +350,13 @@ claude mcp add cyphos-guard \
       <h2>What's new</h2>
       <p class="sub">The biggest changes, newest first.</p>
       <ul class="news">
-        <li><time datetime="2026-11-23">23 Nov</time><div><strong>Per-payment limits for tokens are now enforced on-chain</strong><span>"At most 2 USDC per payment" holds even if the agent bypasses the SDK, with or without the co-signer. A new stateless enforcer, suggested in a review on r/ethdev. Re-grant an agent to get it.</span></div></li>
-        <li><time datetime="2026-11-23">23 Nov</time><div><strong>Fewer passkey prompts when you grant an agent</strong><span>3 instead of 4 for a re-grant, a progress label for each step, and a cancelled or failed attempt can simply be retried.</span></div></li>
-        <li><time datetime="2026-11-23">23 Nov</time><div><strong>Public usage statistics and dark mode</strong><span><a href="https://app.cyphosguard.com/stats/">Anonymous totals</a>, updated hourly (each number needs at least 5 accounts). A light/dark switch on every page.</span></div></li>
-        <li><time datetime="2026-11-23">23 Nov</time><div><strong>Easier start</strong><span>A <a href="#start">10-minute guide</a>, and one claim from the Coinbase faucet is now enough to create your account.</span></div></li>
-        <li><time datetime="2026-11-22">22 Nov</time><div><strong>Emergency stop</strong><span>With your recovery wallet you can stop every agent at once on the <a href="recover/">recovery page</a>, without the cyphos-guard service.</span></div></li>
-        <li><time datetime="2026-11-21">21 Nov</time><div><strong>Open to everyone, and on npm</strong><span>The public instance takes sign-ups. SDK, MCP server and CLI are on npm and in the MCP Registry.</span></div></li>
-        <li><time datetime="2026-11-21">21 Nov</time><div><strong>Agents pay HTTP APIs (x402)</strong><span>Per-request payments within your limits; a vault per agent enforces the list of allowed sellers on-chain.</span></div></li>
+        <li><time datetime="2026-11-23">23 Nov</time><div><strong>Per-payment limits for tokens are now enforced on-chain</strong><span class="desc">"At most 2 USDC per payment" holds even if the agent bypasses the SDK, with or without the co-signer. A new stateless enforcer, suggested in a review on r/ethdev. Re-grant an agent to get it.</span></div></li>
+        <li><time datetime="2026-11-23">23 Nov</time><div><strong>Fewer passkey prompts when you grant an agent</strong><span class="desc">3 instead of 4 for a re-grant, a progress label for each step, and a cancelled or failed attempt can simply be retried.</span></div></li>
+        <li><time datetime="2026-11-23">23 Nov</time><div><strong>Public usage statistics and dark mode</strong><span class="desc"><a href="https://app.cyphosguard.com/stats/">Anonymous totals</a>, updated hourly (each number needs at least 5 accounts). A light/dark switch on every page.</span></div></li>
+        <li><time datetime="2026-11-23">23 Nov</time><div><strong>Easier start</strong><span class="desc">A <a href="#start">10-minute guide</a>, and one claim from the Coinbase faucet is now enough to create your account.</span></div></li>
+        <li><time datetime="2026-11-22">22 Nov</time><div><strong>Emergency stop</strong><span class="desc">With your recovery wallet you can stop every agent at once on the <a href="recover/">recovery page</a>, without the cyphos-guard service.</span></div></li>
+        <li><time datetime="2026-11-21">21 Nov</time><div><strong>Open to everyone, and on npm</strong><span class="desc">The public instance takes sign-ups. SDK, MCP server and CLI are on npm and in the MCP Registry.</span></div></li>
+        <li><time datetime="2026-11-21">21 Nov</time><div><strong>Agents pay HTTP APIs (x402)</strong><span class="desc">Per-request payments within your limits; a vault per agent enforces the list of allowed sellers on-chain.</span></div></li>
       </ul>
       <p class="sub" style="margin-top:16px">Every change: <a href="https://github.com/Phosse136/cyphos-guard/commits/main">commit history on GitHub</a>.</p>
     </div>

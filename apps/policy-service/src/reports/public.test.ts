@@ -125,8 +125,26 @@ describe("public stats", () => {
     expect(early).toContain("script-src 'self'");
     expect(early).toContain("Early days");
     expect(early).toContain("fewer than 5");
+    expect(early).not.toContain("Live attack check"); // no canary.json, no section
     const live = renderStatsHtml(stats(6));
     expect(live).not.toContain("Early days");
     expect(live).toContain("2026-W47: 6 payments");
+  });
+
+  it("shows the canary's live attack check honestly: blocked, breach, inconclusive, stale", () => {
+    const s = stats(6);
+    const c = {
+      at: s.generatedAt - 600,
+      status: "ok" as const,
+      attacksBlocked: 25,
+      attacksTotal: 25,
+      controlsOk: true,
+      account: addr(1),
+    };
+    expect(renderStatsHtml(s, c)).toContain("✓ 25 of 25 attacks blocked");
+    expect(renderStatsHtml(s, { ...c, status: "breach", attacksBlocked: 24 })).toContain("an attack went through");
+    expect(renderStatsHtml(s, { ...c, controlsOk: false })).toContain("inconclusive");
+    expect(renderStatsHtml(s, { ...c, at: s.generatedAt - 4 * 3600 })).toContain("no recent run");
+    expect(renderStatsHtml(s, { ...c, account: '"><script>x</script>' })).not.toContain("<script>x");
   });
 });

@@ -24,6 +24,7 @@
   "exports": {
     "./app": "./src/app.ts",
     "./chain": "./src/chain.ts",
+    "./notify": "./src/notify.ts",
     "./store": "./src/store.ts",
     "./testing": "./src/testing.ts"
   }

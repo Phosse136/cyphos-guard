@@ -1,0 +1,46 @@
+[Unit]
+Description=cyphos-guard canary: live red-team check of a test grant on Base Sepolia (apps/canary)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=cyphos
+Group=cyphos
+WorkingDirectory=/opt/cyphos-guard/apps/canary
+# RPC_URL, BUNDLER_URL and the notification channels come from the app's env; the service's own secrets don't.
+EnvironmentFile=/etc/cyphos-guard/app.env
+UnsetEnvironment=COSIGNER_PRIVATE_KEY REPORT_SALT OWNER_SETUP_CODE
+StateDirectory=cyphos-guard-canary
+StateDirectoryMode=0700
+UMask=0022
+# Testnet keys of the canary's own account (canary init-keys), mode 600, owned by cyphos.
+ExecStart=/usr/local/bin/node src/cli.ts run --keys /etc/cyphos-guard/canary.keys --state /var/lib/cyphos-guard-canary/state.json --pay-every 86400 --public /var/lib/cyphos-guard-public/stats/canary.json
+# Exit 1 = degraded, 2 = breach: the alert went out already; don't mark the unit failed for a degraded run.
+SuccessExitStatus=1
+TimeoutStartSec=10min
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/cyphos-guard-public/stats
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RemoveIPC=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM

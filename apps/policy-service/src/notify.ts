@@ -143,6 +143,11 @@ export function createNotifier(cfg: NotifierConfig) {
 
   return {
     enabled: channels > 0,
+    /** A free-form operator message (e.g. the canary's alerts), outside the event filter and the rate limit. */
+    message(title: string, text: string, urgent = false): Promise<unknown> {
+      if (!channels) return Promise.resolve();
+      return send(title, text, urgent);
+    },
     /** Fire-and-forget; resolves when the sends settled (for tests). Never throws. */
     notify(e: NotifyEvent): Promise<unknown> {
       counts.set(e.kind, (counts.get(e.kind) ?? 0) + 1);

@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { parseArgs } from "node:util";
 import { buildReport } from "./datasets.ts";
-import { buildPublicStats, DEFAULT_THRESHOLD, renderStatsHtml } from "./public.ts";
+import { buildPublicStats, type CanaryPublic, DEFAULT_THRESHOLD, renderStatsHtml } from "./public.ts";
 
 const { values } = parseArgs({
   options: {
@@ -42,7 +42,12 @@ try {
     renameSync(tmp, join(values.out as string, name));
   };
   put("stats.json", `${JSON.stringify(stats, null, 2)}\n`);
-  put("index.html", renderStatsHtml(stats));
+  // The canary (apps/canary) writes canary.json into the same directory; show its last result if there is one.
+  let canary: CanaryPublic | null = null;
+  try {
+    canary = JSON.parse(readFileSync(join(values.out, "canary.json"), "utf8")) as CanaryPublic;
+  } catch {}
+  put("index.html", renderStatsHtml(stats, canary));
   // The light/dark switch shared with cyphosguard.com (same file, served same-origin for the CSP).
   put("theme.js", readFileSync(new URL("../../../../site/theme.js", import.meta.url), "utf8"));
   console.log(`wrote ${values.out}/stats.json, index.html, theme.js (threshold ${threshold})`);

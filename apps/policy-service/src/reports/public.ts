@@ -152,7 +152,17 @@ const CONTRACTS = [
   ["CosignerEnforcer", "0x0a2f40e9789235B6ce2a23668FD3F90cef5eefbf", "optional co-signer"],
 ] as const;
 
-export function renderStatsHtml(s: PublicStats): string {
+/** What the canary publishes (apps/canary publicStatus), read from canary.json next to the page. */
+export type CanaryPublic = {
+  at: number;
+  status: "ok" | "degraded" | "breach";
+  attacksBlocked: number;
+  attacksTotal: number;
+  controlsOk: boolean;
+  account: string;
+};
+
+export function renderStatsHtml(s: PublicStats, canary?: CanaryPublic | null): string {
   const k = s.threshold;
   const fmt = (v: Stat, digits = 0) =>
     v === null
@@ -208,6 +218,7 @@ export function renderStatsHtml(s: PublicStats): string {
   ul { padding-left: 20px; } li { margin: 4px 0; } code { font-size: .85em; word-break: break-all; }
   footer { color: var(--muted); font-size: .85rem; margin-top: 40px; }
   .top { display: flex; justify-content: space-between; align-items: center; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); font-weight: 600; font-size: .9rem; }
   .theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); cursor: pointer; font-size: 17px; line-height: 1; }
   .theme-toggle::before { content: "\\263E"; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme-toggle::before { content: "\\2600\\FE0E"; } }
@@ -224,6 +235,8 @@ export function renderStatsHtml(s: PublicStats): string {
       ? `<div class="banner"><strong>Early days.</strong> Fewer than ${k} people use the public instance so far. To protect them, numbers appear here once at least ${k} accounts stand behind each one. <a href="https://app.cyphosguard.com">Try it</a> (testnet, free).</div>`
       : ""
   }
+
+${canarySection(canary ?? null, s.generatedAt)}
 
   <h2>Key figures</h2>
   <div class="tiles">
@@ -274,6 +287,28 @@ export function renderStatsHtml(s: PublicStats): string {
 </body>
 </html>
 `;
+}
+
+const ATTACKS_SOURCE = "https://github.com/Phosse136/cyphos-guard/blob/main/packages/sdk/src/testing/attacks.ts";
+
+/** "Live attack check": the canary's last result, honest about failures and staleness. */
+function canarySection(c: CanaryPublic | null, now: number): string {
+  if (!c) return "";
+  const when = new Date(c.at * 1000).toISOString().replace("T", " ").slice(0, 16);
+  const stale = now - c.at > 3 * 3600;
+  const isAddr = /^0x[0-9a-fA-F]{40}$/.test(c.account);
+  const verdict = stale
+    ? `<span class="pill">? no recent run</span> last run ${esc(when)} UTC`
+    : c.status === "breach"
+      ? `<span class="pill">✗ an attack went through</span> ${esc(String(c.attacksBlocked))} of ${esc(String(c.attacksTotal))} blocked · ${esc(when)} UTC`
+      : !c.controlsOk
+        ? `<span class="pill">! inconclusive</span> the check itself failed (RPC, funds) · ${esc(when)} UTC`
+        : `<span class="pill">✓ ${esc(String(c.attacksBlocked))} of ${esc(String(c.attacksTotal))} attacks blocked</span> last run ${esc(when)} UTC${c.status === "degraded" ? " (a site or service check failed in that run)" : ""}`;
+  return `<h2>Live attack check</h2>
+  <div class="banner">
+    <p style="margin:0 0 8px">${verdict}</p>
+    <p class="sub" style="margin:0">Every hour a test agent with its own grant tries ${esc(String(c.attacksTotal))} known attacks straight against Base Sepolia, skipping our servers: paying more than the cap, paying someone else, approve() and batch tricks, re-delegating to the attacker, forged vault payments, permit. Every one must revert, and legitimate payments must still work. <a href="${ATTACKS_SOURCE}">The attack list</a>${isAddr ? ` · <a href="https://sepolia.basescan.org/address/${esc(c.account)}">the test account</a>` : ""}.</p>
+  </div>`;
 }
 
 /** Single-series bar chart as inline SVG; native <title> tooltips on each bar (no JavaScript). */

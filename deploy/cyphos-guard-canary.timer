@@ -1,0 +1,10 @@
+[Unit]
+Description=Hourly cyphos-guard canary (ten minutes before the stats page is rebuilt, so it shows a fresh result)
+
+[Timer]
+OnCalendar=*-*-* *:50:00
+Persistent=true
+RandomizedDelaySec=1min
+
+[Install]
+WantedBy=timers.target

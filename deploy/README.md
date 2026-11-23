@@ -86,6 +86,33 @@ reasoning: [ADR 0007](../docs/decisions/0007-public-stats.md). Install:
 `cp deploy/cyphos-guard-stats.{service,timer} /etc/systemd/system/ && systemctl enable --now cyphos-guard-stats.timer`,
 then add the `/stats` block to your Caddyfile and `systemctl reload caddy`.
 
+## Canary (live red-team check)
+
+`cyphos-guard-canary.timer` (hourly, at :50) runs `apps/canary`: a test agent with its own small grant
+(≤0.10 USDC per payment, ≤0.50 USDC/day, recipient = its own account, plus an x402 vault) on Base Sepolia. Each run
+checks the site, app, policy service and stats freshness, the RPC and the bundler, that our contracts sit at their
+CREATE2 addresses, then runs the whole attack catalog (`packages/sdk/src/testing/attacks.ts`, eth_call only, free)
+against the live grant: every attack must revert, every legitimate control must succeed. Once a day it also makes
+one real guarded payment (0.01 USDC, to itself). Changes of state go to the notification channels above; a breach
+always, urgently. The result (counts only, plus the canary's own test account) is shown on `/stats`.
+
+Setup (testnet keys of the canary's own account; never fund them with real money):
+
+```bash
+cd /opt/cyphos-guard/apps/canary
+sudo -u cyphos node src/cli.ts init-keys --keys /etc/cyphos-guard/canary.keys     # mode 600, prints the owner EOA
+set -a; . /etc/cyphos-guard/app.env; set +a
+sudo -u cyphos -E node src/cli.ts setup --keys /etc/cyphos-guard/canary.keys --state /var/lib/cyphos-guard-canary/state.json
+# → asks for ~0.002 ETH + ~0.4 USDC on the owner EOA (faucets), then run setup again
+cp deploy/cyphos-guard-canary.{service,timer} /etc/systemd/system/ && systemctl daemon-reload
+systemctl enable --now cyphos-guard-canary.timer && systemctl start cyphos-guard-canary.service
+journalctl -u cyphos-guard-canary -n 40
+```
+
+The grant lasts 90 days (the policy maximum) and renews itself a month before it ends. Exit codes: 0 ok,
+1 degraded (an endpoint or the chain failed, counted as success for systemd since the alert is out), 2 breach
+(unit fails).
+
 ## Backups
 
 `deploy/backup.sh` (daily via `cyphos-guard-backup.timer`, 03:30) writes consistent SQLite copies and the env files

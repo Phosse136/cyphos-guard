@@ -210,8 +210,8 @@ export function renderStatsHtml(s: PublicStats): string {
   .top { display: flex; justify-content: space-between; align-items: center; }
   .theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); cursor: pointer; font-size: 17px; line-height: 1; }
   .theme-toggle::before { content: "\\263E"; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme-toggle::before { content: "\\2600"; } }
-  :root[data-theme="dark"] .theme-toggle::before { content: "\\2600"; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme-toggle::before { content: "\\2600\\FE0E"; } }
+  :root[data-theme="dark"] .theme-toggle::before { content: "\\2600\\FE0E"; }
 </style>
 </head>
 <body>

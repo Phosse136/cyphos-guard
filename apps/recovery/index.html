@@ -46,8 +46,8 @@
     border: 1px solid var(--line); border-radius: 10px; background: var(--card, transparent); color: var(--text); cursor: pointer; font-size: 17px; line-height: 1; }
   .theme-toggle:hover { border-color: var(--muted); }
   .theme-toggle::before { content: "\263E"; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme-toggle::before { content: "\2600"; } }
-  :root[data-theme="dark"] .theme-toggle::before { content: "\2600"; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme-toggle::before { content: "\2600\FE0E"; } }
+  :root[data-theme="dark"] .theme-toggle::before { content: "\2600\FE0E"; }
   .theme-corner { position: fixed; top: 12px; right: 12px; }
 </style>
 <script src="/theme.js"></script>

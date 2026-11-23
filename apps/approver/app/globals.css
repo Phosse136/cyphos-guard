@@ -30,11 +30,11 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .theme-toggle::before {
-    content: "\2600";
+    content: "\2600\FE0E";
   }
 }
 :root[data-theme="dark"] .theme-toggle::before {
-  content: "\2600";
+  content: "\2600\FE0E";
 }
 body {
   @apply bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100;

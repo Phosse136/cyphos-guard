@@ -11,7 +11,8 @@ All of it is enforced by your smart account, not by a server you have to trust.
 
 **Try it:** [cyphosguard.com](https://cyphosguard.com) · public testnet instance at
 [app.cyphosguard.com](https://app.cyphosguard.com) (open sign-up with a passkey; you need a little Base Sepolia ETH
-from a faucet) · [recovery page](https://cyphosguard.com/recover/) · packages on [npm](https://www.npmjs.com/org/cyphos-guard)
+from a faucet) · [recovery page](https://cyphosguard.com/recover/) · [usage stats](https://app.cyphosguard.com/stats/) ·
+packages on [npm](https://www.npmjs.com/org/cyphos-guard) · [what's new](https://cyphosguard.com/#news)
 
 ## The three layers
 
@@ -352,6 +353,13 @@ corrections welcome).
 - **x402**: agents pay HTTP 402 APIs within your limits (`payX402`, MCP `fetch_paid_api`); an X402Vault per agent
   enforces the seller list on-chain.
 
+- **Shorter, safer grant flow** (sdk 0.2.0). Re-granting takes 3 passkey prompts instead of 4 (vault + revoke in one
+  transaction), signatures come first so cancelling changes nothing, and a retry reuses what already went through.
+
+- **Public usage statistics** ([app.cyphosguard.com/stats](https://app.cyphosguard.com/stats/),
+  [ADR 0007](docs/decisions/0007-public-stats.md)). Anonymous totals, hourly; a number appears only with at least 5
+  accounts behind it. Operator reports (CSV/TXT/XLSX, pseudonymized): [deploy/README.md](deploy/README.md).
+
 **Next**
 
 - Several ERC-20 recipients per permission (`LogicalOrWrapperEnforcer`), batch approvals, web push notifications.
@@ -373,18 +381,19 @@ corrections welcome).
 
 ```
 apps/approver         Next.js owner app: passkey login, approvals, grants, revoke, activity
-apps/policy-service   approval queue · grant registry · activity (Hono + node:sqlite), holds no keys
+apps/policy-service   approval queue · grant registry · activity (Hono + node:sqlite), holds no keys; usage reports
+                      (CSV/TXT/XLSX) and the public /stats page (src/reports)
 apps/recovery         static recovery page: withdraw everything / emergency stop with the recovery wallet
 packages/cli          cyphos-guard CLI: `agent new` / `agent show` (agent key, kept by the agent's developer)
 examples/x402-seller  x402 seller on the official x402 server logic (tests, live demo)
-packages/contracts    CosignerEnforcer + X402Vault (Foundry, on Delegation Framework v1.3.0 as submodule)
+packages/contracts    CosignerEnforcer, ERC20PerTransferCapEnforcer, X402Vault (Foundry, on Delegation Framework v1.3.0)
 packages/mcp          MCP server (pay, check_approval, … for Claude Code / Claude Desktop)
 packages/sdk          @cyphos-guard/sdk: createCyphosGuard, policy compiler, co-signer, typed errors
 packages/shared       policy schema (zod), API types, escalation and off-chain checks
 examples/poc          Phase 1 proof of concept + passkey spike + e2e escalation flow
 examples/demo-agent   Claude accounts-payable agent (Messages API tool runner)
 deploy/               self-hosted public instance: systemd, Caddy, backups, notifications
-site/                 cyphosguard.com landing page (static)
+site/                 cyphosguard.com landing page (static) + theme.js (light/dark switch, shared)
 docs/                 ADRs, policy examples, demo script, assets
 ```
 

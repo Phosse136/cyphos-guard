@@ -12,7 +12,7 @@ reproduce, impact, and a suggested fix if you have one. You'll get an acknowledg
 
 ## Scope
 
-- Smart contracts: `packages/contracts` (CosignerEnforcer, X402Vault)
+- Smart contracts: `packages/contracts` (CosignerEnforcer, ERC20PerTransferCapEnforcer, X402Vault)
 - SDK and policy compiler: `packages/sdk`, `packages/shared`
 - Policy service and approver app: `apps/policy-service`, `apps/approver`
 - Recovery page: `apps/recovery`

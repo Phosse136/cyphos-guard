@@ -95,7 +95,8 @@ Reasons, in order of weight:
 - **`NativeTokenPeriodTransfer` checks only `value`.** It must always be paired with `AllowedTargets` +
   `ExactCalldata(0x)` (plain sends) or explicit call caveats. Otherwise the agent could attach value to arbitrary calls.
 - **ERC-20 per-tx caps have no direct enforcer** (`ERC20TransferAmount` is a lifetime total). The on-chain floor is
-  the period cap. The per-tx cap is an off-chain escalation threshold.
+  the period cap. The per-tx cap is an off-chain escalation threshold. _(Superseded 2026-11-23: our own stateless
+  `ERC20PerTransferCapEnforcer` makes it on-chain, see [ADR 0006](0006-per-transfer-cap.md).)_
 - **"Forbidden" means forbidden for the agent.** The owner is sovereign and can sign anything with their passkey.
   cyphos-guard won't route a forbidden action into an approval request, but it can't stop the owner. This is
   intended (non-custodial).

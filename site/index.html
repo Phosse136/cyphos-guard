@@ -60,9 +60,8 @@
   .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); white-space: nowrap; }
   .logo:hover { text-decoration: none; }
   video.demo { width: 100%; max-width: 960px; height: auto; border-radius: 16px; border: 1px solid var(--line); box-shadow: var(--shadow); margin-top: 24px; background: var(--bg2); }
-  .navlinks { display: flex; gap: 22px; align-items: center; font-size: 15px; }
+  .navlinks { display: flex; gap: 22px; align-items: center; font-size: 15px; white-space: nowrap; }
   .navlinks a:not(.btn) { color: var(--muted); }
-  .navlinks a, .navlinks .btn { white-space: nowrap; }
   /* Narrower screens keep the links that matter most for a first visit. */
   @media (max-width: 1080px) { .navlinks a.nav-extra { display: none; } }
   @media (max-width: 760px) { .navlinks a:not(.btn) { display: none; } .navlinks { gap: 12px; } }

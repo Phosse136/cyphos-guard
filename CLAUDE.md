@@ -53,7 +53,10 @@ Guardrails + human approval for AI agents with crypto wallets. Stack decision: `
 
 Phases 0-5 done (see README). License Apache-2.0. CI: `.github/workflows/ci.yml` (checks job offline; fork job runs
 fork/e2e/browser suites with the runner's Chrome via `CHROMIUM_PATH`). Public testnet instance: app.cyphosguard.com
-(`deploy/`), landing page cyphosguard.com (`site/`, built with `scripts/build-site.sh`), packages 0.1.0 on npm.
+(`deploy/`), landing page cyphosguard.com (`site/`, built with `scripts/build-site.sh`; `site/theme.js` is the light/dark
+switch shared with the app, /recover and /stats), public anonymous stats at app.cyphosguard.com/stats (ADR 0007,
+`apps/policy-service/src/reports/public.ts`). npm: contracts 0.2.0, shared 0.1.1, sdk 0.2.0, mcp 0.1.2, cli 0.1.0
+(`docs/releasing.md`). When shipping something user-visible, add a line to "What's new" in `site/index.html`.
 The README/landing demo video and GIF come from `apps/approver/e2e/promo/promo-video.ts`.
 
 ## Commands
@@ -66,5 +69,5 @@ The README/landing demo video and GIF come from `apps/approver/e2e/promo/promo-v
 ## Layout
 
 `apps/approver` (Next.js), `apps/policy-service` (queue API), `apps/recovery` (static recovery page), `packages/shared`
-(schema, types), `packages/sdk`, `packages/contracts` (Foundry: CosignerEnforcer, X402Vault), `packages/mcp`,
+(schema, types), `packages/sdk`, `packages/contracts` (Foundry: CosignerEnforcer, ERC20PerTransferCapEnforcer, X402Vault), `packages/mcp`,
 `packages/cli`, `examples/poc`, `examples/demo-agent`, `examples/x402-seller`, `deploy/`, `site/`, `docs/decisions` (ADRs).

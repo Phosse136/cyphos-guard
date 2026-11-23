@@ -49,7 +49,7 @@ Fork tests start anvil themselves if nothing listens on `127.0.0.1:8545`.
 ## Where things are
 
 `packages/shared` (policy schema, API types) · `packages/sdk` (compiler, `createCyphosGuard`, typed errors) ·
-`packages/contracts` (Foundry: CosignerEnforcer, X402Vault) · `packages/mcp` (MCP server) · `packages/cli` (agent keys) ·
+`packages/contracts` (Foundry: CosignerEnforcer, ERC20PerTransferCapEnforcer, X402Vault) · `packages/mcp` (MCP server) · `packages/cli` (agent keys) ·
 `apps/policy-service` (Hono + SQLite) · `apps/approver` (Next.js) · `apps/recovery` (static recovery page) ·
 `examples/poc`, `examples/demo-agent`, `examples/x402-seller` · `deploy/` (public instance) · `site/` (landing page) ·
 `docs/decisions` (ADRs).

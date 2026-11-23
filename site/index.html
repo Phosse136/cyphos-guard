@@ -102,7 +102,9 @@
   .steps { counter-reset: s; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
   @media (max-width: 900px) { .steps { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 560px) { .steps { grid-template-columns: 1fr; } }
+  section[id] { scroll-margin-top: 72px; }
   .step { position: relative; padding-top: 44px; }
+  .step code { font-size: 12.5px; word-break: break-all; background: var(--line); padding: 1px 5px; border-radius: 6px; }
   .step::before { counter-increment: s; content: counter(s); position: absolute; top: 18px; left: 22px; width: 28px; height: 28px;
     border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; color: #fff;
     background: linear-gradient(135deg, var(--brand), var(--brand2)); }
@@ -134,6 +136,7 @@
   <div class="wrap">
     <a class="logo" href="./"><img src="favicon.svg" width="28" height="28" alt=""> cyphos-guard</a>
     <nav class="navlinks">
+      <a href="#start">Get started</a>
       <a href="#layers">How it works</a>
       <a href="#features">Features</a>
       <a href="#security">Security</a>
@@ -153,7 +156,7 @@
         <p class="lead">Give your agent a budget it can't exceed. Approve big payments with a passkey. Make some things impossible. Enforced by your own smart account, not by a server you have to trust.</p>
         <div class="ctas">
           <a class="btn btn-primary" href="https://app.cyphosguard.com">Open the app</a>
-          <a class="btn btn-ghost" href="https://github.com/Phosse136/cyphos-guard">View on GitHub</a>
+          <a class="btn btn-ghost" href="#start">How to start</a>
         </div>
         <p class="fine">Testnet only · not audited · don't use with real funds yet.</p>
       </div>
@@ -215,15 +218,20 @@
     </div>
   </section>
 
-  <section>
+  <section id="start">
     <div class="wrap">
-      <h2>Up and running in minutes</h2>
-      <p class="sub">The money stays in your own wallet. The agent only gets a limited permission to spend from it.</p>
+      <h2>Try it in 10 minutes</h2>
+      <p class="sub">Everything runs on the Base Sepolia testnet with free test tokens. You need a phone or laptop with a passkey (Face ID, fingerprint, Windows Hello) and, optionally, a wallet like MetaMask as recovery address.</p>
       <div class="steps">
-        <div class="card step"><h3>Create your wallet</h3><p>A smart account owned by your passkey, with an optional recovery address. No seed phrase.</p></div>
-        <div class="card step"><h3>Add a budget</h3><p>Send the amount your agents may work with. Everything else stays untouchable in your main wallet.</p></div>
-        <div class="card step"><h3>Grant your agent</h3><p>Paste the agent's address, set recipients, limits and a denylist, and sign once with your passkey.</p></div>
-        <div class="card step"><h3>Let it work</h3><p>Routine payments flow; big ones ping your phone; forbidden ones bounce. Revoke anytime in one click.</p></div>
+        <div class="card step"><h3>Open the app</h3><p>Go to <a href="https://app.cyphosguard.com">app.cyphosguard.com</a> and create a passkey. If you want a recovery address, enter it now: changing it later changes your account address.</p></div>
+        <div class="card step"><h3>Get test ETH</h3><p>Copy the account address the app shows and send it at least 0.0003 test ETH from a faucet, e.g. <a href="https://portal.cdp.coinbase.com/products/faucet">Coinbase</a>, <a href="https://www.alchemy.com/faucets/base-sepolia">Alchemy</a> or the <a href="https://console.optimism.io/faucet">Superchain faucet</a> (<a href="https://docs.base.org/base-chain/tools/network-faucets">all faucets</a>). Test USDC: <a href="https://faucet.circle.com">Circle faucet</a>.</p></div>
+        <div class="card step"><h3>Create your agent's key</h3><p>On the machine where your agent runs: <code>npx @cyphos-guard/cli agent new --env agent.env</code>. It prints the agent's address; send that a little test ETH for gas. The key never leaves your machine.</p></div>
+        <div class="card step"><h3>Grant and try</h3><p>In the app, click <em>Create account</em>, then grant the agent's address a budget. Connect it to Claude with the <a href="#developers">MCP command</a> and ask it to pay something. Above the limit, approve on your phone.</p></div>
+      </div>
+      <div class="grid3" style="margin-top:18px">
+        <div class="card"><h3>No sign-up at all</h3><p>Run everything locally on a fork of Base Sepolia: no faucet, no API key. <a href="https://github.com/Phosse136/cyphos-guard#quick-start-5-minutes-no-faucet-no-api-keys">Quick start on GitHub</a>.</p></div>
+        <div class="card"><h3>See it on-chain</h3><p>Paste your account address into <a href="https://sepolia.basescan.org">Basescan (Base Sepolia)</a> to see every payment. Add the network to your wallet via <a href="https://chainlist.org/chain/84532">Chainlist</a>.</p></div>
+        <div class="card"><h3>Stuck or found a bug?</h3><p><a href="https://github.com/Phosse136/cyphos-guard/issues">Open an issue on GitHub</a>. Security problems: please report privately via the repo's <a href="https://github.com/Phosse136/cyphos-guard/security">Security tab</a>. Guides: <a href="https://github.com/Phosse136/cyphos-guard/blob/main/packages/mcp/README.md">MCP setup</a> · <a href="https://github.com/Phosse136/cyphos-guard/blob/main/packages/sdk/README.md">SDK</a> · <a href="recover/">recovery page</a>.</p></div>
       </div>
     </div>
   </section>

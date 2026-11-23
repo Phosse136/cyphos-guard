@@ -189,6 +189,26 @@ function CreateAccount({
             {formatEther(MIN_DEPLOY_BALANCE)} ETH to pay for its own deployment. Send from your wallet or a Base Sepolia
             faucet; this updates automatically. Changing the recovery address changes this address.
           </p>
+          <p className="mt-2 text-xs">
+            Free test ETH:{" "}
+            {[
+              ["Coinbase", "https://portal.cdp.coinbase.com/products/faucet"],
+              ["Alchemy", "https://www.alchemy.com/faucets/base-sepolia"],
+              ["Superchain", "https://console.optimism.io/faucet"],
+              ["all faucets", "https://docs.base.org/base-chain/tools/network-faucets"],
+            ].map(([label, href], i) => (
+              <span key={href}>
+                {i > 0 && " · "}
+                <a className="underline" href={href} target="_blank" rel="noreferrer">
+                  {label}
+                </a>
+              </span>
+            ))}
+            {" · "}test USDC:{" "}
+            <a className="underline" href="https://faucet.circle.com" target="_blank" rel="noreferrer">
+              Circle
+            </a>
+          </p>
         </div>
       )}
       <div className="mt-4 flex gap-2">

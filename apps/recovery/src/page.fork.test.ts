@@ -35,17 +35,20 @@ beforeAll(async () => {
   account = (await recoverableSmartAccount(publicClient, FORK, recovery.address, createSoftPasskey())).address;
   const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript" };
   server = createServer((req, res) => {
-    const path = join(
-      dist,
-      (req.url ?? "/").split("?")[0] === "/" ? "index.html" : ((req.url ?? "").split("?")[0] ?? ""),
-    );
+    const name = (req.url ?? "/").split("?")[0] ?? "/";
+    // In production the page sits under cyphosguard.com/recover/ and /theme.js comes from the site root.
+    const path =
+      name === "/theme.js"
+        ? resolve(import.meta.dirname, "../../../site/theme.js")
+        : join(dist, name === "/" ? "index.html" : name);
+    let body: Buffer;
     try {
-      res
-        .writeHead(200, { "content-type": types[extname(path)] ?? "application/octet-stream" })
-        .end(readFileSync(path));
+      body = readFileSync(path);
     } catch {
       res.writeHead(404).end();
+      return;
     }
+    res.writeHead(200, { "content-type": types[extname(path)] ?? "application/octet-stream" }).end(body);
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const a = server.address();

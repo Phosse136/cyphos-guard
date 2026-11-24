@@ -2,7 +2,7 @@
  * Renders e2e/promo/scene.html frame by frame (deterministic: window.render(t)) and encodes it with ffmpeg:
  *   cyphos-guard-demo.gif   for X / README (palette-optimised)
  *   cyphos-guard-demo.mp4   for X (H.264, better quality per byte)
- *   cyphos-guard-demo.webm  + poster.png for the landing page
+ *   cyphos-guard-demo.webm  + poster.webp for the landing page (poster.png for og:image)
  *
  *   node e2e/promo/promo-video.ts [outDir]      (needs Chromium + ffmpeg)
  */
@@ -69,12 +69,32 @@ ff(
   join(out, "cyphos-guard-demo.webm"),
 );
 rmSync(frames, { recursive: true, force: true });
+// The landing page uses the WebP poster (~4x smaller); the PNG stays for og:image (social previews).
+execFileSync(
+  "ffmpeg",
+  [
+    "-y",
+    "-loglevel",
+    "error",
+    "-i",
+    join(out, "cyphos-guard-demo-poster.png"),
+    "-c:v",
+    "libwebp",
+    "-quality",
+    "82",
+    "-compression_level",
+    "6",
+    join(out, "cyphos-guard-demo-poster.webp"),
+  ],
+  { stdio: "inherit" },
+);
 
 for (const f of [
   "cyphos-guard-demo.gif",
   "cyphos-guard-demo.mp4",
   "cyphos-guard-demo.webm",
   "cyphos-guard-demo-poster.png",
+  "cyphos-guard-demo-poster.webp",
 ]) {
   console.log(`${(statSync(join(out, f)).size / 1024).toFixed(0).padStart(6)} KB  ${join(out, f)}`);
 }

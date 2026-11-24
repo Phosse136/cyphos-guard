@@ -1,17 +1,20 @@
 "use client";
 
 import type { MetaMaskSmartAccount } from "@metamask/smart-accounts-kit";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
-import { Activity } from "@/components/Activity";
-import { Grants } from "@/components/Grants";
-import { History } from "@/components/History";
-import { Onboarding } from "@/components/Onboarding";
-import { Requests } from "@/components/Requests";
 import { Button } from "@/components/ui";
-import { Wallet } from "@/components/Wallet";
 import { api, type Me } from "@/lib/api";
-import { short } from "@/lib/format";
-import { linkedAccount } from "@/lib/wallet";
+import { short } from "@/lib/short";
+
+// The sections (and through them the smart-account kit, ~1 MB) load after the first paint, in parallel with
+// the /me request, instead of blocking it.
+const Onboarding = dynamic(() => import("@/components/Onboarding").then((m) => m.Onboarding));
+const Wallet = dynamic(() => import("@/components/Wallet").then((m) => m.Wallet));
+const Requests = dynamic(() => import("@/components/Requests").then((m) => m.Requests));
+const Grants = dynamic(() => import("@/components/Grants").then((m) => m.Grants));
+const Activity = dynamic(() => import("@/components/Activity").then((m) => m.Activity));
+const History = dynamic(() => import("@/components/History").then((m) => m.History));
 
 export default function Home() {
   const [me, setMe] = useState<Me | null>(null);
@@ -21,10 +24,10 @@ export default function Home() {
 
   const refresh = useCallback(async () => {
     try {
-      const m = await api.me();
+      const [m, wallet] = await Promise.all([api.me(), import("@/lib/wallet")]);
       setMe(m);
       const o = m.owner;
-      setAccount(o?.accountAddress ? await linkedAccount({ ...o, accountAddress: o.accountAddress }) : null);
+      setAccount(o?.accountAddress ? await wallet.linkedAccount({ ...o, accountAddress: o.accountAddress }) : null);
     } catch (e) {
       setError(`Policy service unreachable: ${(e as Error).message}`);
     }

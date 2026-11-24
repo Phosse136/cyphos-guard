@@ -9,7 +9,7 @@ const TOKENS: Record<string, { symbol: string; decimals: number }> = {
   "0x036cbd53842c5426634e7929541ec2318f3dcf7e": { symbol: "USDC", decimals: 6 },
 };
 
-export const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+export { short } from "./short";
 export const eth = (wei: string | bigint) => `${formatEther(BigInt(wei))} ETH`;
 export const ago = (unix: number) => {
   const s = Math.max(0, Math.floor(Date.now() / 1000) - unix);

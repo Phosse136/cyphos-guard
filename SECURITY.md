@@ -26,7 +26,7 @@ infrastructure, and denial of service against the public demo instance.
 
 - [Threat model](docs/security/threat-model.md): attackers, which layer stops what, and the known limits.
 - [How we check it](docs/security/verification.md): invariant tests, Halmos proofs, Slither, a mutation test, and a
-  red-team catalog of 25 attacks that runs in CI on a fork and every hour against a live grant (`apps/canary`).
+  red-team catalog of 25 attacks that runs in CI on a fork on every push (and on demand against a live grant, `apps/canary`).
 - [X402Vault security review](docs/security/x402-vault-review.md) and the hardening notes in
   [deploy/README.md](deploy/README.md).
 

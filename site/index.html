@@ -311,7 +311,7 @@
         </div>
         <div class="card">
           <h3>Honest status</h3>
-          <p>Working MVP on Base Sepolia testnet. Not audited yet: until then, 25 known attacks run against a live grant <a href="https://app.cyphosguard.com/stats/">every hour</a>, and the contracts have <a href="https://github.com/Phosse136/cyphos-guard/blob/main/docs/security/verification.md">symbolic proofs and mutation tests</a>. No token, no DAO, no mainnet before an independent audit.</p>
+          <p>Working MVP on Base Sepolia testnet. Not audited yet: until then, 25 known attacks run against a copy of the chain <a href="https://github.com/Phosse136/cyphos-guard/blob/main/docs/security/verification.md">on every change</a>, and the contracts have <a href="https://github.com/Phosse136/cyphos-guard/blob/main/docs/security/verification.md">symbolic proofs and mutation tests</a>. No token, no DAO, no mainnet before an independent audit.</p>
         </div>
       </div>
     </div>
@@ -350,7 +350,7 @@ claude mcp add cyphos-guard \
       <h2>What's new</h2>
       <p class="sub">The biggest changes, newest first.</p>
       <ul class="news">
-        <li><time datetime="2026-11-23">23 Nov</time><div><strong>We attack ourselves, every hour</strong><span class="desc">A test agent tries 25 known attacks (overspending, paying someone else, approve and batch tricks, re-delegation, forged vault payments) against a live grant; the result is on the <a href="https://app.cyphosguard.com/stats/">stats page</a>. The contracts got symbolic proofs, invariant and mutation tests. <a href="https://github.com/Phosse136/cyphos-guard/blob/main/docs/security/threat-model.md">Threat model</a>.</span></div></li>
+        <li><time datetime="2026-11-23">23 Nov</time><div><strong>We attack ourselves</strong><span class="desc">On every change, a test agent with a stolen key tries 25 known attacks (overspending, paying someone else, approve and batch tricks, re-delegation, forged vault payments) straight against a copy of Base Sepolia; every one must fail. The contracts got symbolic proofs, invariant and mutation tests. <a href="https://github.com/Phosse136/cyphos-guard/blob/main/docs/security/threat-model.md">Threat model</a>.</span></div></li>
         <li><time datetime="2026-11-23">23 Nov</time><div><strong>Per-payment limits for tokens are now enforced on-chain</strong><span class="desc">"At most 2 USDC per payment" holds even if the agent bypasses the SDK, with or without the co-signer. A new stateless enforcer, suggested in a review on r/ethdev. Re-grant an agent to get it.</span></div></li>
         <li><time datetime="2026-11-23">23 Nov</time><div><strong>Fewer passkey prompts when you grant an agent</strong><span class="desc">3 instead of 4 for a re-grant, a progress label for each step, and a cancelled or failed attempt can simply be retried.</span></div></li>
         <li><time datetime="2026-11-23">23 Nov</time><div><strong>Public usage statistics and dark mode</strong><span class="desc"><a href="https://app.cyphosguard.com/stats/">Anonymous totals</a>, updated hourly (each number needs at least 5 accounts). A light/dark switch on every page.</span></div></li>

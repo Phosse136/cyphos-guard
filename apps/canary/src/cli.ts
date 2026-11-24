@@ -6,7 +6,7 @@
  *   node src/cli.ts run   --keys … --state … [--pay | --pay-every 86400] [--public …/stats/canary.json]
  *
  * --pay makes one real guarded payment (0.01 USDC, to the canary's own account); --pay-every N only when the last
- * one is at least N seconds ago (the hourly timer uses a day).
+ * one is at least N seconds ago (for a scheduled run; the deployed unit runs on demand and uses --pay).
  *
  * Env: RPC_URL, BUNDLER_URL, CANARY_APP_URL (https://app.cyphosguard.com), CANARY_SITE_URL (https://cyphosguard.com),
  * and the operator notification settings of the policy service (TELEGRAM_*, DISCORD_WEBHOOK_URL, NTFY_*).

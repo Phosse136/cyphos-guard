@@ -236,7 +236,7 @@ export function renderStatsHtml(s: PublicStats, canary?: CanaryPublic | null): s
       : ""
   }
 
-${canarySection(canary ?? null, s.generatedAt)}
+${canarySection(canary ?? null)}
 
   <h2>Key figures</h2>
   <div class="tiles">
@@ -292,22 +292,21 @@ ${canarySection(canary ?? null, s.generatedAt)}
 const ATTACKS_SOURCE = "https://github.com/Phosse136/cyphos-guard/blob/main/packages/sdk/src/testing/attacks.ts";
 
 /** "Live attack check": the canary's last result, honest about failures and staleness. */
-function canarySection(c: CanaryPublic | null, now: number): string {
+function canarySection(c: CanaryPublic | null): string {
   if (!c) return "";
   const when = new Date(c.at * 1000).toISOString().replace("T", " ").slice(0, 16);
-  const stale = now - c.at > 3 * 3600;
   const isAddr = /^0x[0-9a-fA-F]{40}$/.test(c.account);
-  const verdict = stale
-    ? `<span class="pill">? no recent run</span> last run ${esc(when)} UTC`
-    : c.status === "breach"
+  // Runs on demand (no schedule), so every verdict carries the date of its run.
+  const verdict =
+    c.status === "breach"
       ? `<span class="pill">✗ an attack went through</span> ${esc(String(c.attacksBlocked))} of ${esc(String(c.attacksTotal))} blocked · ${esc(when)} UTC`
       : !c.controlsOk
         ? `<span class="pill">! inconclusive</span> the check itself failed (RPC, funds) · ${esc(when)} UTC`
         : `<span class="pill">✓ ${esc(String(c.attacksBlocked))} of ${esc(String(c.attacksTotal))} attacks blocked</span> last run ${esc(when)} UTC${c.status === "degraded" ? " (a site or service check failed in that run)" : ""}`;
-  return `<h2>Live attack check</h2>
+  return `<h2>Last live attack check</h2>
   <div class="banner">
     <p style="margin:0 0 8px">${verdict}</p>
-    <p class="sub" style="margin:0">Every hour a test agent with its own grant tries ${esc(String(c.attacksTotal))} known attacks straight against Base Sepolia, skipping our servers: paying more than the cap, paying someone else, approve() and batch tricks, re-delegating to the attacker, forged vault payments, permit. Every one must revert, and legitimate payments must still work. <a href="${ATTACKS_SOURCE}">The attack list</a>${isAddr ? ` · <a href="https://sepolia.basescan.org/address/${esc(c.account)}">the test account</a>` : ""}.</p>
+    <p class="sub" style="margin:0">A test agent with its own grant tries ${esc(String(c.attacksTotal))} known attacks straight against Base Sepolia, skipping our servers: paying more than the cap, paying someone else, approve() and batch tricks, re-delegating to the attacker, forged vault payments, permit. Every one must revert, and legitimate payments must still work. <a href="${ATTACKS_SOURCE}">The attack list</a>${isAddr ? ` · <a href="https://sepolia.basescan.org/address/${esc(c.account)}">the test account</a>` : ""}.</p>
   </div>`;
 }
 

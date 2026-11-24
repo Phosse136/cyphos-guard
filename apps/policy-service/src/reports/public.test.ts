@@ -131,7 +131,7 @@ describe("public stats", () => {
     expect(live).toContain("2026-W47: 6 payments");
   });
 
-  it("shows the canary's live attack check honestly: blocked, breach, inconclusive, stale", () => {
+  it("shows the canary's live attack check honestly: blocked, breach, inconclusive, always dated", () => {
     const s = stats(6);
     const c = {
       at: s.generatedAt - 600,
@@ -144,7 +144,10 @@ describe("public stats", () => {
     expect(renderStatsHtml(s, c)).toContain("✓ 25 of 25 attacks blocked");
     expect(renderStatsHtml(s, { ...c, status: "breach", attacksBlocked: 24 })).toContain("an attack went through");
     expect(renderStatsHtml(s, { ...c, controlsOk: false })).toContain("inconclusive");
-    expect(renderStatsHtml(s, { ...c, at: s.generatedAt - 4 * 3600 })).toContain("no recent run");
+    // On demand, not scheduled: an old run is shown as what it is, with its date, and the section never says "every hour".
+    const old = renderStatsHtml(s, { ...c, at: Date.UTC(2026, 0, 2, 3, 4) / 1000 });
+    expect(old).toContain("last run 2026-01-02 03:04 UTC");
+    expect(old).not.toMatch(/every hour/i);
     expect(renderStatsHtml(s, { ...c, account: '"><script>x</script>' })).not.toContain("<script>x");
   });
 });

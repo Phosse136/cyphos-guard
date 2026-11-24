@@ -1,5 +1,6 @@
 [Unit]
-Description=cyphos-guard canary: live red-team check of a test grant on Base Sepolia (apps/canary)
+Description=cyphos-guard canary: live red-team check of a test grant on Base Sepolia (apps/canary), on demand
+# No timer on purpose: run it by hand with `systemctl start cyphos-guard-canary`.
 After=network-online.target
 Wants=network-online.target
 
@@ -15,7 +16,7 @@ StateDirectory=cyphos-guard-canary
 StateDirectoryMode=0700
 UMask=0022
 # Testnet keys of the canary's own account (canary init-keys), mode 600, owned by cyphos.
-ExecStart=/usr/local/bin/node src/cli.ts run --keys /etc/cyphos-guard/canary.keys --state /var/lib/cyphos-guard-canary/state.json --pay-every 86400 --public /var/lib/cyphos-guard-public/stats/canary.json
+ExecStart=/usr/local/bin/node src/cli.ts run --keys /etc/cyphos-guard/canary.keys --state /var/lib/cyphos-guard-canary/state.json --pay --public /var/lib/cyphos-guard-public/stats/canary.json
 # Exit 1 = degraded, 2 = breach: the alert went out already; don't mark the unit failed for a degraded run.
 SuccessExitStatus=1
 TimeoutStartSec=10min

@@ -86,15 +86,15 @@ reasoning: [ADR 0007](../docs/decisions/0007-public-stats.md). Install:
 `cp deploy/cyphos-guard-stats.{service,timer} /etc/systemd/system/ && systemctl enable --now cyphos-guard-stats.timer`,
 then add the `/stats` block to your Caddyfile and `systemctl reload caddy`.
 
-## Canary (live red-team check)
+## Canary (live red-team check, on demand)
 
-`cyphos-guard-canary.timer` (hourly, at :50) runs `apps/canary`: a test agent with its own small grant
+`cyphos-guard-canary.service` runs `apps/canary` when you start it (there is deliberately no timer): a test agent with its own small grant
 (≤0.10 USDC per payment, ≤0.50 USDC/day, recipient = its own account, plus an x402 vault) on Base Sepolia. Each run
 checks the site, app, policy service and stats freshness, the RPC and the bundler, that our contracts sit at their
 CREATE2 addresses, then runs the whole attack catalog (`packages/sdk/src/testing/attacks.ts`, eth_call only, free)
-against the live grant: every attack must revert, every legitimate control must succeed. Once a day it also makes
-one real guarded payment (0.01 USDC, to itself). Changes of state go to the notification channels above; a breach
-always, urgently. The result (counts only, plus the canary's own test account) is shown on `/stats`.
+against the live grant: every attack must revert, every legitimate control must succeed. Each run also makes one
+real guarded payment (0.01 USDC, to itself). Changes of state go to the notification channels above; a breach
+always, urgently. The result (counts only, plus the canary's own test account) is shown on `/stats` with the date of the run.
 
 Setup (testnet keys of the canary's own account; never fund them with real money):
 
@@ -104,8 +104,8 @@ sudo -u cyphos node src/cli.ts init-keys --keys /etc/cyphos-guard/canary.keys   
 set -a; . /etc/cyphos-guard/app.env; set +a
 sudo -u cyphos -E node src/cli.ts setup --keys /etc/cyphos-guard/canary.keys --state /var/lib/cyphos-guard-canary/state.json
 # → asks for ~0.002 ETH + ~0.4 USDC on the owner EOA (faucets), then run setup again
-cp deploy/cyphos-guard-canary.{service,timer} /etc/systemd/system/ && systemctl daemon-reload
-systemctl enable --now cyphos-guard-canary.timer && systemctl start cyphos-guard-canary.service
+cp deploy/cyphos-guard-canary.service /etc/systemd/system/ && systemctl daemon-reload
+systemctl start cyphos-guard-canary.service      # each time you want a live check
 journalctl -u cyphos-guard-canary -n 40
 ```
 

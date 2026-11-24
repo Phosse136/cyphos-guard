@@ -334,9 +334,9 @@ corrections welcome).
 **Done recently**
 
 - **We attack ourselves** ([verification](docs/security/verification.md), [threat model](docs/security/threat-model.md)).
-  A catalog of 25 attacks with a stolen agent key runs in CI on a fork and every hour against a live grant
-  ([apps/canary](apps/canary), result on [/stats](https://app.cyphosguard.com/stats/)). Contracts: invariant tests,
-  Halmos proofs, Slither, a mutation test of 26 planted bugs. Not an audit, but checked by machines, continuously.
+  A catalog of 25 attacks with a stolen agent key runs in CI on a fork on every push, and on demand against a live
+  grant ([apps/canary](apps/canary)). Contracts: invariant tests, Halmos proofs, Slither, a mutation test of 26
+  planted bugs. Not an audit, but checked by machines on every change.
 
 - **Public instance + npm** (0.1.0). [app.cyphosguard.com](https://app.cyphosguard.com) with open sign-up, the five
   packages on npm, the MCP server in the MCP Registry. Operator notifications via Telegram, Discord or ntfy.
@@ -390,7 +390,7 @@ apps/approver         Next.js owner app: passkey login, approvals, grants, revok
 apps/policy-service   approval queue · grant registry · activity (Hono + node:sqlite), holds no keys; usage reports
                       (CSV/TXT/XLSX) and the public /stats page (src/reports)
 apps/recovery         static recovery page: withdraw everything / emergency stop with the recovery wallet
-apps/canary           hourly live red-team check of a test grant on Base Sepolia (alerts, result on /stats)
+apps/canary           on-demand live red-team check of a test grant on Base Sepolia (alerts, result on /stats)
 packages/cli          cyphos-guard CLI: `agent new` / `agent show` (agent key, kept by the agent's developer)
 examples/x402-seller  x402 seller on the official x402 server logic (tests, live demo)
 packages/contracts    CosignerEnforcer, ERC20PerTransferCapEnforcer, X402Vault (Foundry, on Delegation Framework v1.3.0)

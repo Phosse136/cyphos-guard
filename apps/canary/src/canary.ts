@@ -1,5 +1,5 @@
 /**
- * The canary: our own guarded agent on the live testnet, checked every hour.
+ * The canary: our own guarded agent on the live testnet, checked on demand.
  *
  * It owns a small Hybrid smart account (EOA owner, testnet keys on the server only) with a standing grant to its
  * own agent: ≤0.10 USDC per payment, ≤0.50 USDC/day, to one recipient (the account itself, so real test payments

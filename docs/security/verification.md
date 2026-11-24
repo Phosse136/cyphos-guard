@@ -1,7 +1,7 @@
 # How cyphos-guard checks its own security
 
-We have no independent audit yet (and won't go to mainnet without one). Until then, everything below runs in CI or
-every hour against the live testnet, so a claim on the website is either checked by a machine or marked as a
+We have no independent audit yet (and won't go to mainnet without one). Until then, everything below runs in CI on every
+push (the live canary on demand), so a claim on the website is either checked by a machine or marked as a
 limit in the [threat model](threat-model.md). **None of this is a substitute for an audit.**
 
 | Layer                     | What                                                                                                                                                                | Where / how to run                                                    | When            |
@@ -12,7 +12,7 @@ limit in the [threat model](threat-model.md). **None of this is a substitute for
 | Static analysis (Slither) | 0 open findings; 4 informational ones annotated in the source with the reason                                                                                       | `pnpm --filter @cyphos-guard/contracts slither`                       | every push (CI) |
 | Mutation test             | 26 planted bugs (one security check weakened or removed each): all must be caught                                                                                   | `pnpm --filter @cyphos-guard/contracts mutation`                      | every push (CI) |
 | Red team (fork)           | 25 attacks with a stolen agent key, straight to the chain, plus 7 stateful ones                                                                                     | `packages/sdk/src/attacks.fork.test.ts` (`pnpm test:fork`)            | every push (CI) |
-| Red team (live canary)    | the same 25 attacks against a live grant on Base Sepolia, plus site/service/chain health                                                                            | `apps/canary`, result on [/stats](https://app.cyphosguard.com/stats/) | hourly          |
+| Red team (live canary)    | the same 25 attacks against a live grant on Base Sepolia, plus site/service/chain health                                                                            | `apps/canary`, result on [/stats](https://app.cyphosguard.com/stats/) | on demand       |
 
 `pnpm contracts:verify` runs Slither, Halmos and the mutation test (needs `pip install slither-analyzer==0.11.6
 halmos==0.3.3`).

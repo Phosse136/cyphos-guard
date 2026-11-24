@@ -7,7 +7,7 @@ import { createApp } from "@cyphos-guard/policy-service/app";
 import { createChainAdapter } from "@cyphos-guard/policy-service/chain";
 import { openStore } from "@cyphos-guard/policy-service/store";
 import { setupSoftOwner } from "@cyphos-guard/policy-service/testing";
-import { createCyphosGuard, X402Error, x402VaultAbi } from "@cyphos-guard/sdk";
+import { createCyphosGuard, encodeVaultSignature, X402Error, x402VaultAbi } from "@cyphos-guard/sdk";
 import { ensureFork, fundUsdc } from "@cyphos-guard/sdk/testing";
 import { serve } from "@hono/node-server";
 import {
@@ -15,8 +15,10 @@ import {
   type Chain,
   createPublicClient,
   erc20Abi,
+  type Hex,
   http,
   type PublicClient,
+  parseAbi,
   parseEther,
   parseEventLogs,
   parseUnits,
@@ -40,6 +42,9 @@ let pw: ReturnType<typeof createCyphosGuard>;
 let shop: string;
 let shady: string;
 let vault: Address;
+let firstVault: Address;
+let serviceUrl: string;
+let soft: Awaited<ReturnType<typeof setupSoftOwner>>;
 
 const listen = async (fetch: (r: Request) => Response | Promise<Response>) => {
   const s = serve({ fetch, port: 0, hostname: "127.0.0.1" });
@@ -60,7 +65,7 @@ beforeAll(async () => {
   const adapter = await createChainAdapter({ rpcUrl: FORK, network: "fork" });
   await adapter.ensureEnforcers();
   const cosigner = privateKeyToAccount(generatePrivateKey());
-  const serviceUrl = await listen(
+  serviceUrl = await listen(
     createApp({
       store: openStore(":memory:"),
       chain: adapter,
@@ -74,7 +79,8 @@ beforeAll(async () => {
       },
     }).fetch,
   );
-  ({ owner } = await setupSoftOwner({ serviceUrl, publicClient }));
+  soft = await setupSoftOwner({ serviceUrl, publicClient });
+  ({ owner } = soft);
   await setEth(agent.address);
   await setEth(facilitatorKey.address);
   const now = Number((await publicClient.getBlock()).timestamp);
@@ -128,6 +134,7 @@ beforeAll(async () => {
   const perm = (grant.policy as { permissions: { kind: string; vault?: Address }[] }).permissions[0];
   if (!perm?.vault) throw new Error("grantAgent did not set up an x402 vault");
   vault = perm.vault;
+  firstVault = vault;
 });
 
 afterAll(() => {
@@ -269,5 +276,101 @@ describe("leftovers in a vault go back to the account (issue #2)", () => {
     const { txHash } = await owner.revoke(g.id);
     const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
     expect(parseEventLogs({ abi: x402VaultAbi, eventName: "Withdrawn", logs: receipt.logs })).toEqual([]);
+  });
+});
+
+// Security review 2026-11-24 (the checklist pass after issue #2). Both tests pin today's behaviour, which is a gap:
+// when it is fixed, flip the final assertion. Neither is a regression of the issue #2 fix; they show what it
+// doesn't cover.
+describe("known gaps after revoke (review 2026-11-24)", () => {
+  const usdcAbi = parseAbi([
+    "function name() view returns (string)",
+    "function version() view returns (string)",
+    "function transferWithAuthorization(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, bytes signature)",
+  ]);
+  const AMOUNT = parseUnits("0.5", 6);
+  /** The first grant's policy without its vault, so grantAgent derives one (same params as grant #0). */
+  const basePolicy = async () => {
+    const first = (await owner.getGrants()).at(-1); // newest first
+    if (!first) throw new Error("no grants");
+    const policy = first.policy as Parameters<typeof owner.grantAgent>[0]["policy"];
+    const perms = (policy.permissions as { vault?: Address; vaultSalt?: string }[]).map(
+      ({ vault: _v, vaultSalt: _s, ...p }) => p,
+    );
+    return { ...policy, permissions: perms as never };
+  };
+  const vaultOf = (g: { policy: unknown }) =>
+    (g.policy as { permissions: { vault?: Address }[] }).permissions[0]?.vault as Address;
+  /** What a stolen agent key can do without the SDK: sign a TransferWithAuthorization from the vault. */
+  const presign = async (from: Address, validBefore: bigint) => {
+    const [name, version] = await Promise.all([
+      publicClient.readContract({ address: USDC, abi: usdcAbi, functionName: "name" }),
+      publicClient.readContract({ address: USDC, abi: usdcAbi, functionName: "version" }),
+    ]);
+    const nonce = toHex(crypto.getRandomValues(new Uint8Array(32))) as Hex;
+    const message = { from, to: SELLER, value: AMOUNT, validAfter: 0n, validBefore, nonce };
+    const sig = await agent.signTypedData({
+      domain: { name, version, chainId: chain.id, verifyingContract: USDC },
+      types: {
+        TransferWithAuthorization: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
+        ],
+      },
+      primaryType: "TransferWithAuthorization",
+      message,
+    });
+    const wrapped = encodeVaultSignature(
+      { to: SELLER, value: String(AMOUNT), validAfter: "0", validBefore: String(validBefore), nonce },
+      sig,
+    );
+    return [from, SELLER, AMOUNT, 0n, validBefore, nonce, wrapped] as const;
+  };
+
+  it("an authorization the agent key signed before the revoke, valid for a year, still pays from the vault later", async () => {
+    const g = await owner.grantAgent({ policy: await basePolicy() });
+    const v = vaultOf(g);
+    const now = Number((await publicClient.getBlock()).timestamp);
+    // The SDK caps validity at 10 minutes (MAX_AUTHORIZATION_SECONDS), but a stolen key doesn't use the SDK.
+    const held = await presign(v, BigInt(now + 365 * 86_400));
+    await owner.revoke(g.id);
+    expect(await usdcOf(v)).toBe(0n); // the issue #2 sweep works: nothing to pay from right now
+    await fundUsdc(publicClient, v, AMOUNT); // later, money reaches the vault again (sent by anyone, or see below)
+    const sim = await publicClient.simulateContract({
+      account: facilitatorKey.address,
+      address: USDC,
+      abi: usdcAbi,
+      functionName: "transferWithAuthorization",
+      args: held,
+    });
+    // GAP: the held authorization is accepted. After a fix (e.g. an owner-only disable() the revoke calls),
+    // this simulation must revert.
+    expect(sim.request.functionName).toBe("transferWithAuthorization");
+  });
+
+  it("if the service forgets the agent's grants (lost or restored database), a re-grant reuses grant #0's vault", async () => {
+    // The vault salt is the number of grants the service lists for this agent. A fresh database lists none.
+    const forgetful: typeof fetch = async (input, init) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if ((init?.method ?? "GET") === "GET" && new URL(url).pathname === "/grants") {
+        return new Response("[]", { headers: { "content-type": "application/json" } });
+      }
+      return soft.ownerFetch(input, init);
+    };
+    const amnesiac = createCyphosGuard({
+      policyServiceUrl: serviceUrl,
+      publicClient,
+      owner: { account: soft.account, sendCalls: soft.sendCalls, fetch: forgetful },
+    });
+    const g = await amnesiac.grantAgent({ policy: await basePolicy() });
+    // GAP: same address as the very first (long revoked) vault, reused because the contract already exists there.
+    // Authorizations the agent key signed for grant #0 work again on the new grant's top-ups.
+    // After a fix, grantAgent must not hand out a vault that already served a grant.
+    expect(vaultOf(g)).toBe(firstVault);
+    await owner.revoke(g.id);
   });
 });

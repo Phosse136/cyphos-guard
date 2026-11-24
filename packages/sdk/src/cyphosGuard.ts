@@ -62,6 +62,7 @@ import {
   grantVaults,
   readVault,
   vaultDeployment,
+  vaultDisabled,
   vaultSweepCalls,
 } from "./vault.ts";
 import {
@@ -534,26 +535,38 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
       // x402 permissions get their own X402Vault (sellers + cap enforced on-chain). Its address goes into the
       // policy and the top-up delegation, so it is fixed before signing. The salt is derived from the number of
       // grants this agent already has: a retry of a failed attempt lands on the same address (already deployed →
-      // reused), while the next successful grant gets a fresh vault.
+      // reused), while the next successful grant gets a fresh vault. A vault that is already switched off served a
+      // revoked grant (e.g. the service lost its grant history, so the count started again): never reuse it, since
+      // authorizations the agent key signed for it would work again (review finding 10). Skip to the next salt.
       const vaults: { address: Address; call: { to: Address; data: Hex }; sellers: Address[] }[] = [];
-      const input: PolicyInput = {
-        ...requested,
-        permissions: requested.permissions.map((perm, i) => {
-          const parsed = parsedRequest.permissions[i];
-          if (perm.kind !== "x402" || parsed?.kind !== "x402" || perm.vault) return perm;
-          const salt = grantVaultSalt(agentGrants.length, i);
-          const d = vaultDeployment({
-            owner: owner.account.address,
-            agent: parsedRequest.agent,
-            token: parsed.token,
-            maxPerPayment: x402VaultCap(parsedRequest, parsed),
-            sellers: parsed.sellers,
+      const permissions: PolicyInput["permissions"] = [];
+      for (const [i, perm] of requested.permissions.entries()) {
+        const parsed = parsedRequest.permissions[i];
+        if (perm.kind !== "x402" || parsed?.kind !== "x402" || perm.vault) {
+          permissions.push(perm);
+          continue;
+        }
+        const derive = (grantNumber: number) => {
+          const salt = grantVaultSalt(grantNumber, i);
+          return {
             salt,
-          });
-          vaults.push({ ...d, sellers: parsed.sellers });
-          return { ...perm, vault: d.address, vaultSalt: salt };
-        }),
-      };
+            ...vaultDeployment({
+              owner: owner.account.address,
+              agent: parsedRequest.agent,
+              token: parsed.token,
+              maxPerPayment: x402VaultCap(parsedRequest, parsed),
+              sellers: parsed.sellers,
+              salt,
+            }),
+          };
+        };
+        let n = agentGrants.length;
+        let d = derive(n);
+        while ((await vaultDisabled(publicClient, d.address)) === true) d = derive(++n);
+        vaults.push({ address: d.address, call: d.call, sellers: parsed.sellers });
+        permissions.push({ ...perm, vault: d.address, vaultSalt: d.salt });
+      }
+      const input: PolicyInput = { ...requested, permissions };
       const policy = parsePolicy(input);
 
       const calls: { to: Address; data: Hex }[] = [];
@@ -632,7 +645,8 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
       const grant = (await pw.getGrants()).find((g) => g.id === grantId);
       if (!grant) throw new PolicyServiceError(404, `no such grant ${grantId}`);
       // Disabling the delegations stops new top-ups, but the grant's x402 vault would keep approving agent-signed
-      // payments from whatever is left in it. So the same transaction moves that rest back to the account (#2).
+      // payments from whatever is left in it. So the same transaction switches the vault off (finding 9) and moves
+      // that rest back to the account (#2).
       const sweeps = await vaultSweepCalls(publicClient, grantVaults(grant.policy), owner.account.address);
       const txHash = await owner.sendCalls([
         ...grant.delegations.map((d) => revokeCall(environment, d as Delegation)),

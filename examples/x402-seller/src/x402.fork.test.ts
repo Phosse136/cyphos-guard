@@ -7,7 +7,7 @@ import { createApp } from "@cyphos-guard/policy-service/app";
 import { createChainAdapter } from "@cyphos-guard/policy-service/chain";
 import { openStore } from "@cyphos-guard/policy-service/store";
 import { setupSoftOwner } from "@cyphos-guard/policy-service/testing";
-import { createCyphosGuard, encodeVaultSignature, X402Error, x402VaultAbi } from "@cyphos-guard/sdk";
+import { createCyphosGuard, encodeVaultSignature, vaultDisabled, X402Error, x402VaultAbi } from "@cyphos-guard/sdk";
 import { ensureFork, fundUsdc } from "@cyphos-guard/sdk/testing";
 import { serve } from "@hono/node-server";
 import {
@@ -279,10 +279,10 @@ describe("leftovers in a vault go back to the account (issue #2)", () => {
   });
 });
 
-// Security review 2026-11-24 (the checklist pass after issue #2). Both tests pin today's behaviour, which is a gap:
-// when it is fixed, flip the final assertion. Neither is a regression of the issue #2 fix; they show what it
-// doesn't cover.
-describe("known gaps after revoke (review 2026-11-24)", () => {
+// Security review 2026-11-24 (the checklist pass after issue #2), findings 9 and 10 in the vault review. Both
+// tests first pinned the gap (commit 4da3f73) and now check the fix: revoke switches the vault off, and a re-grant
+// never reuses a switched-off vault.
+describe("after revoke, held authorizations and old vaults stay dead (review findings 9, 10)", () => {
   const usdcAbi = parseAbi([
     "function name() view returns (string)",
     "function version() view returns (string)",
@@ -331,7 +331,7 @@ describe("known gaps after revoke (review 2026-11-24)", () => {
     return [from, SELLER, AMOUNT, 0n, validBefore, nonce, wrapped] as const;
   };
 
-  it("an authorization the agent key signed before the revoke, valid for a year, still pays from the vault later", async () => {
+  it("an authorization the agent key signed before the revoke, valid for a year, can't pay from the vault later", async () => {
     const g = await owner.grantAgent({ policy: await basePolicy() });
     const v = vaultOf(g);
     const now = Number((await publicClient.getBlock()).timestamp);
@@ -340,19 +340,20 @@ describe("known gaps after revoke (review 2026-11-24)", () => {
     await owner.revoke(g.id);
     expect(await usdcOf(v)).toBe(0n); // the issue #2 sweep works: nothing to pay from right now
     await fundUsdc(publicClient, v, AMOUNT); // later, money reaches the vault again (sent by anyone, or see below)
-    const sim = await publicClient.simulateContract({
-      account: facilitatorKey.address,
-      address: USDC,
-      abi: usdcAbi,
-      functionName: "transferWithAuthorization",
-      args: held,
-    });
-    // GAP: the held authorization is accepted. After a fix (e.g. an owner-only disable() the revoke calls),
-    // this simulation must revert.
-    expect(sim.request.functionName).toBe("transferWithAuthorization");
+    expect(await vaultDisabled(publicClient, v)).toBe(true);
+    await expect(
+      publicClient.simulateContract({
+        account: facilitatorKey.address,
+        address: USDC,
+        abi: usdcAbi,
+        functionName: "transferWithAuthorization",
+        args: held,
+      }),
+    ).rejects.toThrow(/invalid signature/i);
+    expect(await usdcOf(v)).toBe(AMOUNT); // still the owner's: withdrawable, not payable
   });
 
-  it("if the service forgets the agent's grants (lost or restored database), a re-grant reuses grant #0's vault", async () => {
+  it("if the service forgets the agent's grants (lost or restored database), a re-grant skips the old, switched-off vault", async () => {
     // The vault salt is the number of grants the service lists for this agent. A fresh database lists none.
     const forgetful: typeof fetch = async (input, init) => {
       const url = String(input instanceof Request ? input.url : input);
@@ -367,10 +368,11 @@ describe("known gaps after revoke (review 2026-11-24)", () => {
       owner: { account: soft.account, sendCalls: soft.sendCalls, fetch: forgetful },
     });
     const g = await amnesiac.grantAgent({ policy: await basePolicy() });
-    // GAP: same address as the very first (long revoked) vault, reused because the contract already exists there.
-    // Authorizations the agent key signed for grant #0 work again on the new grant's top-ups.
-    // After a fix, grantAgent must not hand out a vault that already served a grant.
-    expect(vaultOf(g)).toBe(firstVault);
+    // The count restarts at 0, so the first candidate is grant #0's vault; it was switched off when it was
+    // replaced, so grantAgent moves on to a fresh one.
+    expect(await vaultDisabled(publicClient, firstVault)).toBe(true);
+    expect(vaultOf(g)).not.toBe(firstVault);
+    expect(await vaultDisabled(publicClient, vaultOf(g))).toBe(false);
     await owner.revoke(g.id);
   });
 });

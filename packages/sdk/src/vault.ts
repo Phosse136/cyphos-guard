@@ -17,6 +17,7 @@ import {
   getContractAddress,
   type Hex,
   keccak256,
+  maxUint256,
   type PublicClient,
   toHex,
 } from "viem";
@@ -113,13 +114,27 @@ export function grantVaults(policy: unknown): { address: Address; token: Address
 }
 
 /**
- * Calls (sent from the owner's smart account, the vault's owner) that move each vault's whole token balance to
- * `to`. Empty vaults get no call. A vault can't be switched off: it approves any agent-signed payment to a listed
- * seller for as long as it exists, so revoking or replacing a grant must also empty its vaults (issue #2).
+ * Whether a vault is switched off: true/false for vaults with `disable()`, null for vaults deployed before it
+ * existed (their bytecode has no `disabled()`, so the call reverts) or no contract at all.
+ */
+export async function vaultDisabled(client: PublicClient, vault: Address): Promise<boolean | null> {
+  try {
+    return (await client.readContract({ address: vault, abi: x402VaultAbi, functionName: "disabled" })) as boolean;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Calls (sent from the owner's smart account, the vault's owner) that retire each vault when its grant is revoked
+ * or replaced: switch it off and move its whole token balance to `to`.
  *
- * The amount is read now and withdrawn exactly. If an agent payment lowers the balance before the transaction
- * lands, the withdraw (and so the whole transaction) reverts and the owner retries with the new, smaller balance;
- * the agent can lower it only by paying a listed seller, and only until the vault is empty.
+ * - Vaults with `disable()` (review finding 9): `disable()`, so authorizations the agent key signed earlier stop
+ *   working too, then `withdraw(token, to, max)`, which takes the balance at execution time (no race with a
+ *   payment landing first). Already-disabled vaults only get the withdraw, empty ones only the disable.
+ * - Older vaults (no `disable()`): they approve agent-signed payments to listed sellers for as long as they exist,
+ *   so they are emptied (issue #2). The amount is read now and withdrawn exactly; if an agent payment lowers it
+ *   before the transaction lands, the transaction reverts and the owner retries with the smaller balance.
  */
 export async function vaultSweepCalls(
   client: PublicClient,
@@ -127,19 +142,33 @@ export async function vaultSweepCalls(
   to: Address,
 ): Promise<{ to: Address; data: Hex }[]> {
   const unique = [...new Map(vaults.map((v) => [`${v.address.toLowerCase()}:${v.token.toLowerCase()}`, v])).values()];
-  const balances = await Promise.all(
-    unique.map((v) =>
-      client.readContract({ address: v.token, abi: erc20Abi, functionName: "balanceOf", args: [v.address] }),
-    ),
+  const state = await Promise.all(
+    unique.map(async (v) => {
+      const [balance, disabled] = await Promise.all([
+        client.readContract({ address: v.token, abi: erc20Abi, functionName: "balanceOf", args: [v.address] }),
+        vaultDisabled(client, v.address),
+      ]);
+      return { balance, disabled };
+    }),
   );
+  const withdraw = (v: { address: Address; token: Address }, amount: bigint) => ({
+    to: v.address,
+    data: encodeFunctionData({ abi: x402VaultAbi, functionName: "withdraw", args: [v.token, to, amount] }),
+  });
+  const disable = (v: { address: Address }) => ({
+    to: v.address,
+    data: encodeFunctionData({ abi: x402VaultAbi, functionName: "disable" }),
+  });
+  // One disable per vault address, even if it is listed with several tokens.
+  const disabling = new Set<string>();
   return unique.flatMap((v, i) => {
-    const amount = balances[i] ?? 0n;
-    if (amount === 0n) return [];
-    return [
-      {
-        to: v.address,
-        data: encodeFunctionData({ abi: x402VaultAbi, functionName: "withdraw", args: [v.token, to, amount] }),
-      },
-    ];
+    const { balance = 0n, disabled = null } = state[i] ?? {};
+    const calls: { to: Address; data: Hex }[] = [];
+    if (disabled === false && !disabling.has(v.address.toLowerCase())) {
+      disabling.add(v.address.toLowerCase());
+      calls.push(disable(v));
+    }
+    if (balance > 0n) calls.push(withdraw(v, disabled === null ? balance : maxUint256));
+    return calls;
   });
 }

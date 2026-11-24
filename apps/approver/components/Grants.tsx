@@ -193,7 +193,9 @@ export function Grants({
   const revoke = async (g: GrantJSON) => {
     const perms = (g.policy as { permissions?: { kind?: string; vault?: string }[] }).permissions ?? [];
     const hasVault = perms.some((p) => p.kind === "x402" && p.vault);
-    const vaultNote = hasVault ? " Anything left in its x402 vault moves back to your account in the same step." : "";
+    const vaultNote = hasVault
+      ? " Anything left in its x402 vault moves back to your account in the same step, and the vault is switched off for good (vaults made before 25 Nov 2026 are only emptied)."
+      : "";
     if (!confirm(`Revoke all permissions of agent ${g.agent}? This is enforced on-chain immediately.${vaultNote}`))
       return;
     setBusy(g.id);

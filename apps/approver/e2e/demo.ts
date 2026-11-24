@@ -213,8 +213,9 @@ try {
   const rights = (await page.locator("main").textContent()) ?? "";
   check(
     "agent details show per-payment limit, denylist, co-signer and on-chain enforcers",
-    /max 2 USDC \(binding via co-signer\)/.test(rights) &&
+    /max 2 USDC \(enforced on-chain\)/.test(rights) &&
       /Denylist/.test(rights) &&
+      /Enforced on-chain by: .*ERC20PerTransferCapEnforcer/.test(rights) &&
       /Enforced on-chain by: .*CosignerEnforcer/.test(rights),
   );
   await page

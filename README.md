@@ -335,7 +335,8 @@ corrections welcome).
 
 - **We attack ourselves** ([verification](docs/security/verification.md), [threat model](docs/security/threat-model.md)).
   A catalog of 25 attacks with a stolen agent key runs in CI on a fork on every push, and on demand against a live
-  grant ([apps/canary](apps/canary)). Contracts: invariant tests, Halmos proofs, Slither, a mutation test of 26
+  grant ([apps/canary](apps/canary); [first live run](docs/security/verification.md#live-run-2026-11-24): 25/25
+  blocked). Found one we missed? [Suggest an attack](https://github.com/Phosse136/cyphos-guard/issues/new?template=attack-idea.yml). Contracts: invariant tests, Halmos proofs, Slither, a mutation test of 26
   planted bugs. Not an audit, but checked by machines on every change.
 
 - **Public instance + npm** (0.1.0). [app.cyphosguard.com](https://app.cyphosguard.com) with open sign-up, the five

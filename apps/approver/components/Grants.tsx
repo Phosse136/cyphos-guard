@@ -191,7 +191,11 @@ export function Grants({
   };
 
   const revoke = async (g: GrantJSON) => {
-    if (!confirm(`Revoke all permissions of agent ${g.agent}? This is enforced on-chain immediately.`)) return;
+    const perms = (g.policy as { permissions?: { kind?: string; vault?: string }[] }).permissions ?? [];
+    const hasVault = perms.some((p) => p.kind === "x402" && p.vault);
+    const vaultNote = hasVault ? " Anything left in its x402 vault moves back to your account in the same step." : "";
+    if (!confirm(`Revoke all permissions of agent ${g.agent}? This is enforced on-chain immediately.${vaultNote}`))
+      return;
     setBusy(g.id);
     setError(null);
     try {

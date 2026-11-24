@@ -12,6 +12,8 @@ import {
   concat,
   encodeAbiParameters,
   encodeDeployData,
+  encodeFunctionData,
+  erc20Abi,
   getContractAddress,
   type Hex,
   keccak256,
@@ -100,4 +102,44 @@ export async function readVault(client: PublicClient, vault: Address, sellers: A
     ),
   ]);
   return { owner, agent, token, maxPerPayment, allSellersListed: listed.every(Boolean) };
+}
+
+/** The x402 vaults a grant's policy names (one per x402 permission), with the token each one pays in. */
+export function grantVaults(policy: unknown): { address: Address; token: Address }[] {
+  const permissions = (policy as { permissions?: { kind?: string; vault?: Address; token?: Address }[] }).permissions;
+  return (permissions ?? []).flatMap((p) =>
+    p.kind === "x402" && p.vault && p.token ? [{ address: p.vault, token: p.token }] : [],
+  );
+}
+
+/**
+ * Calls (sent from the owner's smart account, the vault's owner) that move each vault's whole token balance to
+ * `to`. Empty vaults get no call. A vault can't be switched off: it approves any agent-signed payment to a listed
+ * seller for as long as it exists, so revoking or replacing a grant must also empty its vaults (issue #2).
+ *
+ * The amount is read now and withdrawn exactly. If an agent payment lowers the balance before the transaction
+ * lands, the withdraw (and so the whole transaction) reverts and the owner retries with the new, smaller balance;
+ * the agent can lower it only by paying a listed seller, and only until the vault is empty.
+ */
+export async function vaultSweepCalls(
+  client: PublicClient,
+  vaults: { address: Address; token: Address }[],
+  to: Address,
+): Promise<{ to: Address; data: Hex }[]> {
+  const unique = [...new Map(vaults.map((v) => [`${v.address.toLowerCase()}:${v.token.toLowerCase()}`, v])).values()];
+  const balances = await Promise.all(
+    unique.map((v) =>
+      client.readContract({ address: v.token, abi: erc20Abi, functionName: "balanceOf", args: [v.address] }),
+    ),
+  );
+  return unique.flatMap((v, i) => {
+    const amount = balances[i] ?? 0n;
+    if (amount === 0n) return [];
+    return [
+      {
+        to: v.address,
+        data: encodeFunctionData({ abi: x402VaultAbi, functionName: "withdraw", args: [v.token, to, amount] }),
+      },
+    ];
+  });
 }

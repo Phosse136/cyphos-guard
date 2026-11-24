@@ -56,7 +56,14 @@ import {
   PolicyServiceError,
   PolicyViolation,
 } from "./errors.ts";
-import { encodeVaultSignature, grantVaultSalt, readVault, vaultDeployment } from "./vault.ts";
+import {
+  encodeVaultSignature,
+  grantVaultSalt,
+  grantVaults,
+  readVault,
+  vaultDeployment,
+  vaultSweepCalls,
+} from "./vault.ts";
 import {
   decodeX402Header,
   encodeX402Header,
@@ -575,6 +582,15 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
         else ok(r);
       }
       for (const g of toRevoke) calls.push(...g.delegations.map((d) => revokeCall(environment, d as Delegation)));
+      // Empty the agent's earlier vaults (active and revoked grants) into the account, in the same transaction:
+      // a vault keeps approving agent-signed payments to its sellers, and the next grant gets a new one (#2).
+      const newVaults = new Set(vaults.map((v) => v.address.toLowerCase()));
+      const sweeps = await vaultSweepCalls(
+        publicClient,
+        agentGrants.flatMap((g) => grantVaults(g.policy)).filter((v) => !newVaults.has(v.address.toLowerCase())),
+        owner.account.address,
+      );
+      calls.push(...sweeps);
 
       const now = Number((await publicClient.getBlock()).timestamp);
       const compiled = compilePolicy({ policy, delegator: owner.account.address, environment, now });
@@ -593,7 +609,11 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
         });
       }
       if (calls.length > 0) {
-        const what = [vaultDeploys > 0 ? "set up the x402 vault" : "", toRevoke.length ? "replace the old grant" : ""]
+        const what = [
+          vaultDeploys > 0 ? "set up the x402 vault" : "",
+          toRevoke.length ? "replace the old grant" : "",
+          sweeps.length ? "move what's left in the old x402 vault back to your account" : "",
+        ]
           .filter(Boolean)
           .join(" and ");
         onProgress?.({ step: steps, of: steps, action: "transaction", label: `Confirm one transaction: ${what}` });
@@ -611,9 +631,15 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
       const owner = needOwner("revoke");
       const grant = (await pw.getGrants()).find((g) => g.id === grantId);
       if (!grant) throw new PolicyServiceError(404, `no such grant ${grantId}`);
-      const txHash = await owner.sendCalls(grant.delegations.map((d) => revokeCall(environment, d as Delegation)));
+      // Disabling the delegations stops new top-ups, but the grant's x402 vault would keep approving agent-signed
+      // payments from whatever is left in it. So the same transaction moves that rest back to the account (#2).
+      const sweeps = await vaultSweepCalls(publicClient, grantVaults(grant.policy), owner.account.address);
+      const txHash = await owner.sendCalls([
+        ...grant.delegations.map((d) => revokeCall(environment, d as Delegation)),
+        ...sweeps,
+      ]);
       ok(await request("owner", "POST", `/grants/${grantId}/revoked`, { txHash }));
-      log.info?.("grant revoked", { grantId, txHash });
+      log.info?.("grant revoked", { grantId, txHash, vaultsEmptied: sweeps.length });
       return { txHash };
     },
 

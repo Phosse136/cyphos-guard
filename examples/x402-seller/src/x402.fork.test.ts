@@ -8,7 +8,7 @@ import { createChainAdapter } from "@cyphos-guard/policy-service/chain";
 import { openStore } from "@cyphos-guard/policy-service/store";
 import { setupSoftOwner } from "@cyphos-guard/policy-service/testing";
 import { createCyphosGuard, X402Error, x402VaultAbi } from "@cyphos-guard/sdk";
-import { ensureFork } from "@cyphos-guard/sdk/testing";
+import { ensureFork, fundUsdc } from "@cyphos-guard/sdk/testing";
 import { serve } from "@hono/node-server";
 import {
   type Address,
@@ -18,6 +18,7 @@ import {
   http,
   type PublicClient,
   parseEther,
+  parseEventLogs,
   parseUnits,
   toHex,
 } from "viem";
@@ -200,5 +201,73 @@ describe("x402 against the reference server + facilitator (fork)", () => {
       `${shop}/data`,
       `${shop}/report`,
     ]);
+  });
+});
+
+// Issue #2: a vault can't be switched off, so whatever is left in it (e.g. a top-up whose settlement failed) stays
+// spendable with the agent key after the owner revoked the agent. Revoking and re-granting therefore empty the
+// grant's vaults back into the account, in the same transaction that disables the delegations.
+describe("leftovers in a vault go back to the account (issue #2)", () => {
+  const LEFTOVER = parseUnits("0.7", 6);
+  const permsOf = (g: { policy: unknown }) =>
+    (g.policy as { permissions: { kind: string; vault?: Address; vaultSalt?: string }[] }).permissions;
+
+  it("re-granting the agent empties the old grant's vault into the account", async () => {
+    const [old] = (await owner.getGrants()).filter((g) => g.status === "active");
+    if (!old) throw new Error("no active grant");
+    const oldVault = permsOf(old)[0]?.vault as Address;
+    await fundUsdc(publicClient, oldVault, LEFTOVER); // as if a top-up's settlement had failed
+    const before = await usdcOf(old.account);
+    // Same policy, but let grantAgent derive a fresh vault (the next grant gets a new one).
+    const policy = old.policy as Parameters<typeof owner.grantAgent>[0]["policy"];
+    const fresh = await owner.grantAgent({
+      policy: { ...policy, permissions: permsOf(old).map(({ vault: _v, vaultSalt: _s, ...p }) => p) as never },
+    });
+    const newVault = permsOf(fresh)[0]?.vault as Address;
+    expect(newVault).not.toBe(oldVault);
+    expect(await usdcOf(oldVault)).toBe(0n);
+    expect((await usdcOf(old.account)) - before).toBe(LEFTOVER);
+    vault = newVault;
+  });
+
+  it("revoking empties the vault in the same transaction, so the agent key has nothing left to pay from", async () => {
+    const [grant] = (await owner.getGrants()).filter((g) => g.status === "active");
+    if (!grant) throw new Error("no active grant");
+    await fundUsdc(publicClient, vault, LEFTOVER);
+    const before = await usdcOf(grant.account);
+    const { txHash } = await owner.revoke(grant.id);
+    expect(await usdcOf(vault)).toBe(0n);
+    expect((await usdcOf(grant.account)) - before).toBe(LEFTOVER);
+    // One transaction did both: the delegations are disabled and the vault was emptied.
+    const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+    const withdrawn = parseEventLogs({ abi: x402VaultAbi, eventName: "Withdrawn", logs: receipt.logs });
+    expect(withdrawn.map((l) => [l.address.toLowerCase(), l.args.amount])).toEqual([[vault.toLowerCase(), LEFTOVER]]);
+    // The vault itself still accepts the agent's signature (it can't be disabled), but there is nothing to pay.
+    expect(await usdcOf(vault)).toBe(0n);
+  });
+
+  it("revoking a grant whose vault is already empty adds no withdraw call", async () => {
+    const now = Number((await publicClient.getBlock()).timestamp);
+    const g = await owner.grantAgent({
+      policy: {
+        version: 1,
+        chainId: 84532,
+        agent: agent.address,
+        validFrom: now - 60,
+        expiresAt: now + 86_400,
+        permissions: [
+          {
+            kind: "x402",
+            token: USDC,
+            sellers: [SELLER],
+            perTx: parseUnits("1", 6),
+            perPeriod: { amount: parseUnits("5", 6), periodSeconds: 86_400 },
+          },
+        ],
+      },
+    });
+    const { txHash } = await owner.revoke(g.id);
+    const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+    expect(parseEventLogs({ abi: x402VaultAbi, eventName: "Withdrawn", logs: receipt.logs })).toEqual([]);
   });
 });

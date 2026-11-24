@@ -353,6 +353,11 @@ corrections welcome).
   policy-service signature per redemption. It makes blocked addresses and range checks on arguments binding
   even for a compromised agent, while the co-signer still can't move funds.
 
+- **Revoking empties the x402 vault** ([issue #2](https://github.com/Phosse136/cyphos-guard/issues/2), the first
+  outside report). A vault can't be switched off, so a rest left in it stayed payable with the agent key after a
+  revoke. Revoke and re-grant now move it back to your account in the same transaction, and the recovery page can
+  withdraw vaults after an emergency stop.
+
 - **Per-payment cap enforcer** ([ADR 0006](docs/decisions/0006-per-transfer-cap.md)). `ERC20PerTransferCapEnforcer`
   caps every single token payment on-chain (stateless, pins `transfer` and single-call mode), so "max 2 USDC per
   payment" holds without the co-signer.

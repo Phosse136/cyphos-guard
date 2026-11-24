@@ -58,7 +58,9 @@ enforced by the chain, not by our servers.**
 - **L03 recovery wallet = full power.** The recovery EOA can withdraw everything or remove the passkey. That's its
   job; keep it offline. If it leaks, the account is lost.
 - **L04 vault balance.** A compromised agent can spend whatever is in its vault (≤ the top-ups, which are capped by
-  the period budget) to listed sellers. Sellers are chosen by the owner.
+  the period budget) to listed sellers. Sellers are chosen by the owner. A vault can't be switched off, so revoking
+  or re-granting moves its rest back to the account in the same transaction, and after an emergency stop the
+  recovery page withdraws it ([issue #2](https://github.com/Phosse136/cyphos-guard/issues/2)).
 - **L05 off-chain rules.** Without the co-signer, rules the chain can't express (blocked addresses beyond the
   recipient pin, argument ranges) are checked by the SDK and the service only; a compromised agent skips them. With
   the co-signer they're binding. See `ENFORCEMENT` in `packages/shared/src/policy.ts`, which states per field where

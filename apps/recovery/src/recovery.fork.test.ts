@@ -3,14 +3,16 @@
  * address) empties it through an EIP-1193 wallet only: USDC, ETH and the EntryPoint deposit. A stranger can't.
  * And the emergency stop: removing the passkey kills every delegation it signed.
  */
-import { buildApprovalDelegation, encodeRedeem } from "@cyphos-guard/sdk";
-import { createSoftPasskey, ensureFork } from "@cyphos-guard/sdk/testing";
+import { buildApprovalDelegation, encodeRedeem, vaultDeployment } from "@cyphos-guard/sdk";
+import { createSoftPasskey, ensureFork, fundUsdc } from "@cyphos-guard/sdk/testing";
 import { getSmartAccountsEnvironment } from "@metamask/smart-accounts-kit";
 import {
   type Address,
   type Chain,
   createPublicClient,
+  createWalletClient,
   erc20Abi,
+  type Hex,
   http,
   type PublicClient,
   parseEther,
@@ -25,11 +27,13 @@ import {
   buildUserOp,
   encodeBatchExecute,
   inspect,
+  inspectVaults,
   RecoveryError,
   signAndSubmit,
   stopAgentsCalls,
   USDC,
   withdrawAllCalls,
+  withdrawVaultCalls,
 } from "./recovery.ts";
 
 const FORK = process.env.FORK_RPC_URL || "http://127.0.0.1:8545";
@@ -167,5 +171,64 @@ describe("emergency stop (fork)", () => {
     const op = await buildUserOp(wallet, sa.address, encodeBatchExecute(stopAgentsCalls(s)));
     await expect(signAndSubmit(wallet, strangerAddr, op)).rejects.toThrow();
     expect((await inspect(wallet, sa.address)).passkeys).toBe(1);
+  });
+});
+
+// Issue #2: the emergency stop removes the passkey but can't switch off an x402 vault, and the app's passkey-signed
+// vault withdraw no longer works afterwards. The recovery address empties the vault through the account instead.
+describe("x402 vaults (fork)", () => {
+  /** Deploys an X402Vault owned by `owner` through the public CREATE2 deployer, holding `usdc`. */
+  async function vaultOf(owner: Address, payerKey: Hex, usdc: bigint) {
+    const d = vaultDeployment({
+      owner,
+      agent: privateKeyToAccount(generatePrivateKey()).address,
+      token: USDC,
+      maxPerPayment: parseUnits("1", 6),
+      sellers: [privateKeyToAccount(generatePrivateKey()).address],
+      salt: toHex(crypto.getRandomValues(new Uint8Array(32))),
+    });
+    const w = createWalletClient({ account: privateKeyToAccount(payerKey), chain, transport: http(FORK) });
+    await publicClient.waitForTransactionReceipt({ hash: await w.sendTransaction(d.call) });
+    if (usdc > 0n) await fundUsdc(publicClient, d.address, usdc);
+    return d.address;
+  }
+
+  it("after the emergency stop, the recovery address withdraws what's left in the account's vaults", async () => {
+    const key = generatePrivateKey();
+    const rec = privateKeyToAccount(key);
+    const sa = await recoverableSmartAccount(publicClient, FORK, rec.address, createSoftPasskey());
+    const full = await vaultOf(sa.address, key, parseUnits("0.7", 6));
+    const empty = await vaultOf(sa.address, key, 0n);
+    const wallet = testWallet(key, FORK);
+    await signAndSubmit(
+      wallet,
+      rec.address,
+      await buildUserOp(wallet, sa.address, encodeBatchExecute(stopAgentsCalls(await inspect(wallet, sa.address)))),
+    );
+
+    const vaults = await inspectVaults(wallet, sa.address, [full, empty, full]);
+    expect(vaults.map((v) => v.balance)).toEqual([parseUnits("0.7", 6), 0n]); // de-duplicated
+    const calls = withdrawVaultCalls(vaults, rec.address);
+    expect(calls).toHaveLength(1); // nothing for the empty vault
+    const stopped = await inspect(wallet, sa.address);
+    const op = await buildUserOp(
+      wallet,
+      sa.address,
+      encodeBatchExecute([...withdrawAllCalls(stopped, rec.address), ...calls]),
+    );
+    await signAndSubmit(wallet, rec.address, op);
+    expect(await usdcOf(full)).toBe(0n);
+    expect(await usdcOf(rec.address)).toBe(parseUnits("14.8", 6) + parseUnits("0.7", 6));
+  });
+
+  it("refuses an address that isn't a vault of this account (a foreign vault, a token, a typo'd EOA)", async () => {
+    const key = generatePrivateKey();
+    const rec = privateKeyToAccount(key);
+    const sa = await recoverableSmartAccount(publicClient, FORK, rec.address);
+    const foreign = await vaultOf(account, key, parseUnits("0.1", 6));
+    const wallet = testWallet(key, FORK);
+    for (const a of [foreign, USDC, privateKeyToAccount(generatePrivateKey()).address]) {
+      await expect(inspectVaults(wallet, sa.address, [a])).rejects.toBeInstanceOf(RecoveryError);
+    }
   });
 });

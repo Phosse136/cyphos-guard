@@ -13,9 +13,11 @@ import {
   CHAIN,
   encodeBatchExecute,
   inspect,
+  inspectVaults,
   signAndSubmit,
   stopAgentsCalls,
   withdrawAllCalls,
+  withdrawVaultCalls,
 } from "./recovery.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -24,6 +26,8 @@ const checkBtn = $<HTMLButtonElement>("check");
 const withdrawBtn = $<HTMLButtonElement>("withdraw");
 const stopBtn = $<HTMLButtonElement>("stop");
 const accountInput = $<HTMLInputElement>("account");
+const vaultsInput = $<HTMLInputElement>("vaults");
+const tokenTxnsLink = $<HTMLAnchorElement>("tokentxns");
 const connectedEl = $("connected");
 const stateEl = $("state");
 const resultEl = $("result");
@@ -53,10 +57,17 @@ const errText = (e: unknown) => {
   const m = (e as { shortMessage?: string; message?: string }).shortMessage ?? (e as Error).message ?? String(e);
   return m.split("\n")[0] ?? m;
 };
+/** Addresses typed into the vault field (separated by spaces, commas or new lines). */
+const vaultAddresses = () =>
+  vaultsInput.value
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map((a) => a.trim());
 const isRecovery = () => !!recovery && !!state?.recovery && isAddressEqual(state.recovery, recovery);
 const refresh = () => {
   checkBtn.disabled = !recovery || !isAddress(accountInput.value.trim());
-  withdrawBtn.disabled = !isRecovery() || (state?.eth === 0n && state.usdc === 0n && state.deposit === 0n);
+  const accountEmpty = state?.eth === 0n && state.usdc === 0n && state.deposit === 0n;
+  withdrawBtn.disabled = !isRecovery() || (accountEmpty && vaultAddresses().length === 0);
   stopBtn.disabled = !isRecovery() || state?.passkeys === 0;
 };
 
@@ -103,6 +114,8 @@ connectBtn.addEventListener("click", async () => {
   refresh();
 });
 
+vaultsInput.addEventListener("input", refresh);
+
 accountInput.addEventListener("input", () => {
   state = null;
   stateEl.classList.add("hidden");
@@ -114,6 +127,7 @@ checkBtn.addEventListener("click", async () => {
   checkBtn.disabled = true;
   try {
     state = await inspect(provider, getAddress(accountInput.value.trim()));
+    tokenTxnsLink.href = `https://sepolia.basescan.org/address/${state.account}#tokentxns`;
     stateEl.replaceChildren();
     const dl = document.createElement("dl");
     for (const [k, v] of [
@@ -190,15 +204,34 @@ stopBtn.addEventListener("click", () => {
   );
 });
 
-withdrawBtn.addEventListener("click", () => {
-  if (!recovery || !state) return;
-  run(
-    withdrawBtn,
-    resultEl,
-    "withdrawal",
-    withdrawAllCalls(state, recovery),
-    "Done. Everything was sent to your recovery address.",
-  );
+withdrawBtn.addEventListener("click", async () => {
+  if (!provider || !recovery || !state) return;
+  const typed = vaultAddresses();
+  const bad = typed.find((a) => !isAddress(a));
+  if (bad) {
+    msg(resultEl, "bad", `Not an address: ${bad}`);
+    return;
+  }
+  let vaultCalls: ReturnType<typeof withdrawVaultCalls> = [];
+  try {
+    vaultCalls = withdrawVaultCalls(
+      await inspectVaults(
+        provider,
+        state.account,
+        typed.map((a) => getAddress(a)),
+      ),
+      recovery,
+    );
+  } catch (e) {
+    msg(resultEl, "bad", `Could not read the vaults: ${errText(e)}`);
+    return;
+  }
+  const calls = [...withdrawAllCalls(state, recovery), ...vaultCalls];
+  if (calls.length === 0) {
+    msg(resultEl, "info", "Nothing to withdraw: the account and the vaults you entered are empty.");
+    return;
+  }
+  run(withdrawBtn, resultEl, "withdrawal", calls, "Done. Everything was sent to your recovery address.");
 });
 
 const pre = new URLSearchParams(location.search).get("account");

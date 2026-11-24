@@ -50,6 +50,12 @@ const entryPointAbi = parseAbi([
   "event UserOperationRevertReason(bytes32 indexed userOpHash, address indexed sender, uint256 nonce, bytes revertReason)",
 ]);
 
+const vaultAbi = parseAbi([
+  "function owner() view returns (address)",
+  "function token() view returns (address)",
+  "function withdraw(address token, address to, uint256 amount)",
+]);
+
 export type PackedUserOperation = {
   sender: Address;
   nonce: bigint;
@@ -137,6 +143,52 @@ export function withdrawAllCalls(state: AccountState, to: Address) {
   }
   if (state.eth > 0n) calls.push({ target: to, value: state.eth, callData: "0x", label: `${state.eth} wei` });
   return calls;
+}
+
+export type VaultState = { address: Address; token: Address; balance: bigint };
+
+/**
+ * Reads the x402 vaults the user entered. A vault can't be switched off and isn't emptied by the emergency stop
+ * (issue #2), so its rest is withdrawn here. Each address must be a vault this account owns; anything else is
+ * refused, so a typo or a foreign contract never ends up in the signed call.
+ */
+export async function inspectVaults(
+  provider: EIP1193Provider,
+  account: Address,
+  addresses: Address[],
+): Promise<VaultState[]> {
+  const { publicClient } = clients(provider);
+  const unique = [...new Map(addresses.map((a) => [a.toLowerCase(), a])).values()];
+  return Promise.all(
+    unique.map(async (address) => {
+      const owner = await publicClient
+        .readContract({ address, abi: vaultAbi, functionName: "owner" })
+        .catch(() => null);
+      if (!owner || !isAddressEqual(owner, account)) {
+        throw new RecoveryError(`${address} is not an x402 vault of this account`);
+      }
+      const token = await publicClient.readContract({ address, abi: vaultAbi, functionName: "token" });
+      const balance = await publicClient.readContract({
+        address: token,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [address],
+      });
+      return { address, token, balance };
+    }),
+  );
+}
+
+/** The calls (from the account, the vaults' owner) that send each non-empty vault's balance to `to`. */
+export function withdrawVaultCalls(vaults: VaultState[], to: Address) {
+  return vaults
+    .filter((v) => v.balance > 0n)
+    .map((v) => ({
+      target: v.address,
+      value: 0n,
+      callData: encodeFunctionData({ abi: vaultAbi, functionName: "withdraw", args: [v.token, to, v.balance] }),
+      label: `${v.balance} base units from vault ${v.address}`,
+    }));
 }
 
 /**

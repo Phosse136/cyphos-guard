@@ -209,7 +209,13 @@ describe("x402 vaults (fork)", () => {
     const vaults = await inspectVaults(wallet, sa.address, [full, empty, full]);
     expect(vaults.map((v) => v.balance)).toEqual([parseUnits("0.7", 6), 0n]); // de-duplicated
     const calls = withdrawVaultCalls(vaults, rec.address);
-    expect(calls).toHaveLength(1); // nothing for the empty vault
+    // Both vaults get switched off (review finding 9); only the full one gets a withdraw.
+    expect(vaults.map((v) => v.disabled)).toEqual([false, false]);
+    expect(calls.map((c) => c.label)).toEqual([
+      `switch off vault ${full}`,
+      `${parseUnits("0.7", 6)} base units from vault ${full}`,
+      `switch off vault ${empty}`,
+    ]);
     const stopped = await inspect(wallet, sa.address);
     const op = await buildUserOp(
       wallet,
@@ -218,6 +224,8 @@ describe("x402 vaults (fork)", () => {
     );
     await signAndSubmit(wallet, rec.address, op);
     expect(await usdcOf(full)).toBe(0n);
+    const after = await inspectVaults(wallet, sa.address, [full, empty]);
+    expect(after.map((v) => v.disabled)).toEqual([true, true]);
     expect(await usdcOf(rec.address)).toBe(parseUnits("14.8", 6) + parseUnits("0.7", 6));
   });
 

@@ -82,7 +82,7 @@
       the account; your recovery wallet can still withdraw them below. Use this if you think an agent, its key or your
       passkey is compromised. Afterwards the passkey can't use this account any more.</p>
     <p class="muted">The stop does not empty your agents' x402 vaults. They are normally empty (topped up just before
-      each payment), but a rest stays payable to your listed sellers with the agent's key, so withdraw it in step 4.</p>
+      each payment), but a rest stays payable to your listed sellers with the agent's key, so switch them off and withdraw it in step 4.</p>
     <button id="stop" type="button" disabled>Stop all agents</button>
     <div id="stop-result"></div>
   </div>
@@ -91,7 +91,7 @@
     <h2><span class="step">4</span>Withdraw</h2>
     <p class="muted">Sends all USDC and ETH of the account (and any gas deposit it holds) to your recovery address. Your wallet
       asks you to sign, then to send the transaction; it pays a small network fee.</p>
-    <label class="muted" for="vaults">x402 vaults to empty too (optional; one or more addresses). Agents that pay x402 APIs
+    <label class="muted" for="vaults">x402 vaults to switch off and empty too (optional; one or more addresses). Agents that pay x402 APIs
       have one each: see the agent's details in the app, or the contracts your account sent USDC to in its
       <a id="tokentxns" href="https://sepolia.basescan.org" target="_blank" rel="noreferrer">token transfers on Basescan ↗</a>.</label>
     <input id="vaults" placeholder="0x… 0x…" autocomplete="off" spellcheck="false">

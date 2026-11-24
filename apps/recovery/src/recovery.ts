@@ -21,6 +21,7 @@ import {
   type Hex,
   hashTypedData,
   isAddressEqual,
+  maxUint256,
   pad,
   parseAbi,
   parseEventLogs,
@@ -54,6 +55,8 @@ const vaultAbi = parseAbi([
   "function owner() view returns (address)",
   "function token() view returns (address)",
   "function withdraw(address token, address to, uint256 amount)",
+  "function disabled() view returns (bool)",
+  "function disable()",
 ]);
 
 export type PackedUserOperation = {
@@ -145,11 +148,12 @@ export function withdrawAllCalls(state: AccountState, to: Address) {
   return calls;
 }
 
-export type VaultState = { address: Address; token: Address; balance: bigint };
+/** `disabled` is null for vaults deployed before `disable()` existed. */
+export type VaultState = { address: Address; token: Address; balance: bigint; disabled: boolean | null };
 
 /**
- * Reads the x402 vaults the user entered. A vault can't be switched off and isn't emptied by the emergency stop
- * (issue #2), so its rest is withdrawn here. Each address must be a vault this account owns; anything else is
+ * Reads the x402 vaults the user entered. The emergency stop doesn't touch vaults (issue #2), so they are switched
+ * off (where the vault supports it, review finding 9) and emptied here. Each address must be a vault this account owns; anything else is
  * refused, so a typo or a foreign contract never ends up in the signed call.
  */
 export async function inspectVaults(
@@ -174,21 +178,45 @@ export async function inspectVaults(
         functionName: "balanceOf",
         args: [address],
       });
-      return { address, token, balance };
+      const disabled = await publicClient
+        .readContract({ address, abi: vaultAbi, functionName: "disabled" })
+        .catch(() => null);
+      return { address, token, balance, disabled };
     }),
   );
 }
 
-/** The calls (from the account, the vaults' owner) that send each non-empty vault's balance to `to`. */
+/**
+ * The calls (from the account, the vaults' owner): switch each vault off if it supports that and isn't yet, and send
+ * each non-empty vault's balance to `to` (newer vaults: the whole balance at execution time).
+ */
 export function withdrawVaultCalls(vaults: VaultState[], to: Address) {
-  return vaults
-    .filter((v) => v.balance > 0n)
-    .map((v) => ({
-      target: v.address,
-      value: 0n,
-      callData: encodeFunctionData({ abi: vaultAbi, functionName: "withdraw", args: [v.token, to, v.balance] }),
-      label: `${v.balance} base units from vault ${v.address}`,
-    }));
+  return vaults.flatMap((v) => [
+    ...(v.disabled === false
+      ? [
+          {
+            target: v.address,
+            value: 0n,
+            callData: encodeFunctionData({ abi: vaultAbi, functionName: "disable" }),
+            label: `switch off vault ${v.address}`,
+          },
+        ]
+      : []),
+    ...(v.balance > 0n
+      ? [
+          {
+            target: v.address,
+            value: 0n,
+            callData: encodeFunctionData({
+              abi: vaultAbi,
+              functionName: "withdraw",
+              args: [v.token, to, v.disabled === null ? v.balance : maxUint256],
+            }),
+            label: `${v.balance} base units from vault ${v.address}`,
+          },
+        ]
+      : []),
+  ]);
 }
 
 /**

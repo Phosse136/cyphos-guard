@@ -40,9 +40,8 @@ beforeAll(async () => {
       (req.url ?? "/").split("?")[0] === "/" ? "index.html" : ((req.url ?? "").split("?")[0] ?? ""),
     );
     try {
-      res
-        .writeHead(200, { "content-type": types[extname(path)] ?? "application/octet-stream" })
-        .end(readFileSync(path));
+      const body = readFileSync(path);
+      res.writeHead(200, { "content-type": types[extname(path)] ?? "application/octet-stream" }).end(body);
     } catch {
       res.writeHead(404).end();
     }

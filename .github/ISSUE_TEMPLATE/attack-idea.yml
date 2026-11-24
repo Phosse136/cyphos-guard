@@ -1,0 +1,43 @@
+name: Attack idea
+description: A way a stolen agent key (or anything else) could get past the limits. It becomes a test in the attack catalog.
+title: "Attack idea: "
+labels: ["security", "attack-idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! The current catalog (25 attacks plus stateful ones) is in
+        [docs/security/verification.md](https://github.com/Phosse136/cyphos-guard/blob/main/docs/security/verification.md),
+        the code in [packages/sdk/src/testing/attacks.ts](https://github.com/Phosse136/cyphos-guard/blob/main/packages/sdk/src/testing/attacks.ts).
+        Testnet only. **If you found a working exploit, please don't post it here**: use
+        [private vulnerability reporting](https://github.com/Phosse136/cyphos-guard/security/advisories/new) (see SECURITY.md).
+  - type: dropdown
+    id: attacker
+    attributes:
+      label: Attacker
+      options:
+        - Stolen agent key / prompt-injected agent
+        - Leaked delegation (no key)
+        - Malicious x402 seller or facilitator
+        - Compromised policy service
+        - Someone else on-chain
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: attack
+    attributes:
+      label: The attack
+      description: What does the attacker send or do, step by step? Which limit should it get past?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should stop it (if you know)
+      description: The caveat, contract check or service rule you'd expect to refuse it.
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Links, similar attacks on other systems, a transaction on Base Sepolia.

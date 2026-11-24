@@ -60,6 +60,31 @@ owner removed with an authorization signed before, **S07** calling the period en
 the owner's budget. Known limit **L01** (period boundary, up to 2× the period budget) is asserted so it can't change
 unnoticed. The suite also proves it isn't vacuous: a grant without the per-payment cap is reported as a hole.
 
+## Live run 2026-11-24
+
+The canary (`apps/canary`) ran the catalog once against a live grant on Base Sepolia (it runs on demand, not on a
+schedule: `systemctl start cyphos-guard-canary`). Grant: ≤0.10 USDC per payment, ≤0.50 USDC/day, recipient = the
+canary's own account, plus an x402 vault with one seller.
+
+| Check                                            | Result                 |
+| ------------------------------------------------ | ---------------------- |
+| every attack reverts                             | 25/25                  |
+| ...for the expected reason                       | 25/25                  |
+| positive controls (a payment of exactly the cap) | all succeed            |
+| real guarded payment, 0.01 USDC to itself        | [0x8019e9d3…2903][pay] |
+| our contracts at their CREATE2 addresses         | yes                    |
+| site, app, API, stats, RPC, bundler              | all up                 |
+
+Canary account: [0x9fF612c6…8e97][acct], vault [0x747f50D9…03ED][vault]. No finding. The live result is on
+[/stats](https://app.cyphosguard.com/stats/).
+
+[pay]: https://sepolia.basescan.org/tx/0x8019e9d3b2566475c552ab331228e03dba2586ed7533c988a9accb94ee152903
+[acct]: https://sepolia.basescan.org/address/0x9fF612c60720032554278084005FFdF69d958e97
+[vault]: https://sepolia.basescan.org/address/0x747f50D9FFD31F48aa73316C19FB98572d7C03ED
+
+**An attack we missed?** [Open an attack idea](https://github.com/Phosse136/cyphos-guard/issues/new?template=attack-idea.yml).
+It goes into the catalog as a probe (expected revert reason + what stops it), so it runs on every push from then on.
+
 ## Findings from this work (2026-11-23)
 
 - Slither: 4 informational results (unchecked third return value of `tryRecover`, event after an owner-only external

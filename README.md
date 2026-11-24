@@ -358,6 +358,11 @@ corrections welcome).
   revoke. Revoke and re-grant now move it back to your account in the same transaction, and the recovery page can
   withdraw vaults after an emergency stop.
 
+- **Revoking switches the x402 vault off** (vault review findings 9 and 10, from a checklist review after issue
+  #2). The 10-minute limit on signed payments is in the SDK, so a stolen agent key could hold longer ones and use
+  them on any money that reached the vault later. New vaults have a one-way `disable()`, which revoke, re-grant and
+  the recovery page call, and a re-grant never reuses a switched-off vault.
+
 - **Per-payment cap enforcer** ([ADR 0006](docs/decisions/0006-per-transfer-cap.md)). `ERC20PerTransferCapEnforcer`
   caps every single token payment on-chain (stateless, pins `transfer` and single-call mode), so "max 2 USDC per
   payment" holds without the co-signer.

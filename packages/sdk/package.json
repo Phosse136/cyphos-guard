@@ -1,6 +1,6 @@
 {
   "name": "@cyphos-guard/sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "cyphos-guard SDK: on-chain spending limits and passkey approvals for AI agents (MetaMask Delegation Framework, x402).",
   "keywords": [
     "ai-agents",

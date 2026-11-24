@@ -22,6 +22,10 @@ interface IEIP3009Token {
 /// A stolen agent key can therefore only pay listed sellers, at most `maxPerPayment` per payment, out of
 /// whatever the owner put in the vault. The owner (the user's smart account) manages sellers and can withdraw.
 ///
+/// `disable()` switches the vault off for good: from then on it approves nothing, including authorizations the
+/// agent key signed earlier (the vault doesn't bound `validBefore`, so a stolen key could hold long-lived ones).
+/// Revoking a grant calls it. It is one-way on purpose: a revoked vault is never reused for a new grant.
+///
 /// Signature format expected in isValidSignature:
 ///   abi.encode(address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, bytes agentSig)
 /// where agentSig is the agent's 65-byte ECDSA signature over the same EIP-712 digest.
@@ -44,9 +48,12 @@ contract X402Vault is IERC1271 {
     uint256 public immutable maxPerPayment;
 
     mapping(address seller => bool allowed) public isSeller;
+    /// @notice Set once by `disable()`; the vault then approves no payment ever again.
+    bool public disabled;
 
     event SellerSet(address indexed seller, bool allowed);
     event Withdrawn(address indexed to, uint256 amount);
+    event Disabled();
 
     error NotOwner();
     error ZeroAddress();
@@ -70,7 +77,7 @@ contract X402Vault is IERC1271 {
     /// @inheritdoc IERC1271
     function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4) {
         // 6 head words (the last is agentSig's offset) + its length word + 65 bytes padded to 96 = 320 bytes.
-        if (signature.length < 32 * 7 + 96) return INVALID;
+        if (disabled || signature.length < 32 * 7 + 96) return INVALID;
         (address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, bytes memory agentSig) =
             abi.decode(signature, (address, uint256, uint256, uint256, bytes32, bytes));
         if (!isSeller[to] || value == 0 || value > maxPerPayment) return INVALID;
@@ -88,13 +95,22 @@ contract X402Vault is IERC1271 {
         return MAGIC;
     }
 
+    /// @notice Owner switches the vault off for good (called on revoke). Withdraw still works afterwards.
+    function disable() external onlyOwner {
+        disabled = true;
+        emit Disabled();
+    }
+
     function setSeller(address seller, bool allowed) external onlyOwner {
         _setSeller(seller, allowed);
     }
 
     /// @notice Owner pulls funds back (e.g. to the smart account). Any token, in case something else lands here.
+    ///         `amount == type(uint256).max` withdraws the whole balance at execution time, so a payment that lands
+    ///         between reading the balance and the withdraw can't make the owner's transaction revert.
     function withdraw(address token_, address to, uint256 amount) external onlyOwner {
         if (to == address(0)) revert ZeroAddress();
+        if (amount == type(uint256).max) amount = IERC20(token_).balanceOf(address(this));
         // slither-disable-next-line reentrancy-events (onlyOwner, no state after the call; event order is cosmetic)
         IERC20(token_).safeTransfer(to, amount);
         emit Withdrawn(to, amount);

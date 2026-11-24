@@ -34,7 +34,9 @@ const MUTANTS = [
   ["vault-recover-error-ignored", VAULT, "err != ECDSA.RecoverError.NoError || ", ""],
   ["vault-open-setSeller", VAULT, "bool allowed) external onlyOwner", "bool allowed) external"],
   ["vault-open-withdraw", VAULT, "uint256 amount) external onlyOwner", "uint256 amount) external"],
-  ["vault-sig-length", VAULT, "if (signature.length < 32 * 7 + 96) return INVALID;", ""],
+  ["vault-sig-length", VAULT, "disabled || signature.length < 32 * 7 + 96", "disabled"],
+  ["vault-disable-ignored", VAULT, "if (disabled || ", "if ("],
+  ["vault-open-disable", VAULT, "function disable() external onlyOwner", "function disable() external"],
   ["cosign-no-deadline", COSIGN, "block.timestamp <= deadline_", "true"],
   [
     "cosign-replay-check",

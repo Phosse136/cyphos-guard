@@ -97,7 +97,25 @@ contract SymbolicProofs {
         assert(hash == keccak256(abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)));
     }
 
-    /// Only the owner can change the seller list or withdraw.
+    /// Once disabled, the vault approves nothing: for ANY hash and ANY payment fields + signature.
+    function check_vault_disabledApprovesNothing(
+        bytes32 hash,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        bytes calldata agentSig
+    )
+        public
+    {
+        vm.prank(vault.owner());
+        vault.disable();
+        bytes memory signature = abi.encode(to, value, validAfter, validBefore, nonce, agentSig);
+        assert(vault.isValidSignature(hash, signature) != bytes4(0x1626ba7e));
+    }
+
+    /// Only the owner can change the seller list, withdraw or disable.
     function check_vault_onlyOwnerManages(address caller, address seller, address to, uint256 amount) public {
         vm.assume(caller != vault.owner());
         vm.prank(caller);
@@ -106,6 +124,10 @@ contract SymbolicProofs {
         } catch { }
         vm.prank(caller);
         try vault.withdraw(address(token), to, amount) {
+            assert(false);
+        } catch { }
+        vm.prank(caller);
+        try vault.disable() {
             assert(false);
         } catch { }
     }

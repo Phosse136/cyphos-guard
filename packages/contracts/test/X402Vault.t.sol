@@ -13,6 +13,21 @@ contract MockToken {
     }
 }
 
+/// @dev Plain balance-tracking token for the withdraw tests.
+contract BalanceToken {
+    mapping(address => uint256) public balanceOf;
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+}
+
 contract X402VaultTest is Test {
     X402Vault internal vault;
     MockToken internal token;
@@ -104,6 +119,44 @@ contract X402VaultTest is Test {
         );
         vm.prank(owner);
         vault.withdraw(address(token), owner, 1);
+    }
+
+    /// Review finding 9: an authorization the agent signed before the revoke (any validity) must stop working once
+    /// the owner disables the vault, and only the owner can disable it. Withdraw keeps working.
+    function test_disableRejectsEvenEarlierSignedPayments() public {
+        bytes32 nonce = keccak256("held");
+        bytes memory held = _sig(agentKey, seller, CAP, nonce);
+        bytes32 digest = _digest(seller, CAP, nonce);
+        assertEq(vault.isValidSignature(digest, held), bytes4(0x1626ba7e));
+
+        vm.prank(stranger);
+        vm.expectRevert(X402Vault.NotOwner.selector);
+        vault.disable();
+        assertFalse(vault.disabled());
+
+        vm.expectEmit(address(vault));
+        emit X402Vault.Disabled();
+        vm.prank(owner);
+        vault.disable();
+        assertTrue(vault.disabled());
+        assertEq(vault.isValidSignature(digest, held), bytes4(0xffffffff));
+
+        // Re-listing the seller doesn't bring it back; withdraw still works.
+        vm.prank(owner);
+        vault.setSeller(seller, true);
+        assertEq(vault.isValidSignature(digest, held), bytes4(0xffffffff));
+        vm.prank(owner);
+        vault.withdraw(address(token), owner, 1);
+    }
+
+    /// withdraw(type(uint256).max) takes the balance at execution time (no race with a payment landing first).
+    function test_withdrawMaxTakesWholeBalance() public {
+        BalanceToken t = new BalanceToken();
+        t.mint(address(vault), 700);
+        vm.prank(owner);
+        vault.withdraw(address(t), owner, type(uint256).max);
+        assertEq(t.balanceOf(address(vault)), 0);
+        assertEq(t.balanceOf(owner), 700);
     }
 
     // ---------------- security review (2026-11-21): adversarial cases ----------------

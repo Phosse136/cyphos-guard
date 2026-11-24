@@ -217,13 +217,16 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
   async function redeem(delegation: Delegation, exec: Execution): Promise<{ hash: Hex } | { reason: string }> {
     const agent = needAgent("execute");
     const data = encodeRedeem(delegation, exec);
+    // The gas estimate is the simulation: a caveat that fails reverts here with its reason, and nothing is
+    // sent. Passing the estimate on saves sendTransaction a second, identical simulation.
+    let gas: bigint;
     try {
-      await publicClient.call({ account: agent, to: environment.DelegationManager, data });
+      gas = await publicClient.estimateGas({ account: agent, to: environment.DelegationManager, data });
     } catch (e) {
       return { reason: revertReason(e) };
     }
     const wallet = createWalletClient({ account: agent, chain, transport: writeTransport });
-    const hash = await wallet.sendTransaction({ to: environment.DelegationManager, data });
+    const hash = await wallet.sendTransaction({ to: environment.DelegationManager, data, gas });
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     return receipt.status === "success" ? { hash } : { reason: `reverted on-chain (${hash})` };
   }
@@ -239,6 +242,100 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
     ok(await request("agent", "POST", `/agent/requests/${req.id}/executed`, { txHash: r.hash }));
     log.info?.("approved action executed", { requestId: req.id, txHash: r.hash });
     return { status: "executed", txHash: r.hash, via: "approval", requestId: req.id };
+  }
+
+  const knownAccount = opts.accountAddress ?? opts.owner?.account.address;
+  /** The account the agent acts for, from grants already fetched (saves a round trip to the service). */
+  function accountOf(grants: GrantJSON[]): Address {
+    if (knownAccount) return knownAccount;
+    const accounts = [...new Set(grants.map((g) => g.account.toLowerCase()))];
+    if (accounts.length === 0) throw new PolicyViolation("no_grant", "this agent has no active grant", []);
+    if (accounts.length > 1) throw new Error("agent has grants on several accounts; pass accountAddress");
+    return accounts[0] as Address;
+  }
+
+  /** execute() with the agent's grants already fetched (payX402 reuses its own list). */
+  async function executeWithin(
+    grants: GrantJSON[],
+    input: ExecuteInput,
+    wait: boolean | WaitOptions | undefined,
+  ): Promise<ExecutionResult> {
+    const account = accountOf(grants);
+    const exec = { to: input.to, value: input.value ?? 0n, data: input.data ?? ("0x" as Hex) };
+    const violations: string[] = [];
+    for (const grant of grants) {
+      const policy = parsePolicy(grant.policy);
+      for (const [i, delegation] of grant.delegations.entries()) {
+        const permission = policy.permissions[i];
+        const offchain = permission
+          ? offchainCheck(permission, exec, input.x402 ? { x402: input.x402 } : {})
+          : "unknown permission";
+        if (offchain) {
+          violations.push(offchain);
+          continue;
+        }
+        // Co-signed grant: get a fresh cosignature for this exact call (the service re-checks the
+        // off-chain rules and refuses if they fail; on-chain, the redemption can't happen without it).
+        let toRedeem = delegation as Delegation;
+        if (delegationCosigner(toRedeem)) {
+          const cs = await request<Cosignature & { error?: string; message?: string }>(
+            "agent",
+            "POST",
+            "/agent/cosign",
+            {
+              account,
+              grantId: grant.id,
+              delegationIndex: i,
+              to: exec.to,
+              value: exec.value.toString(),
+              data: exec.data,
+              ...x402Wire(input.x402),
+            },
+          );
+          if (cs.status !== 200) {
+            violations.push(`co-signer refused: ${cs.data.message ?? cs.data.error ?? `HTTP ${cs.status}`}`);
+            continue;
+          }
+          toRedeem = withCosignature(toRedeem, cs.data);
+        }
+        const r = await redeem(toRedeem, exec);
+        if ("hash" in r) {
+          await request("agent", "POST", "/agent/activity", {
+            account,
+            txHash: r.hash,
+            to: exec.to,
+            value: exec.value.toString(),
+            reason: input.reason,
+          }).catch((e) => log.warn?.("could not report activity", { error: String(e) }));
+          log.info?.("executed within grant", { grantId: grant.id, txHash: r.hash });
+          return { status: "executed", txHash: r.hash, via: "grant", grantId: grant.id };
+        }
+        violations.push(r.reason);
+      }
+    }
+    log.debug?.("not covered by grants, escalating", { violations });
+
+    const res = await request<ApprovalRequestJSON & { error?: EscalationRefusal; message?: string }>(
+      "agent",
+      "POST",
+      "/agent/requests",
+      {
+        account,
+        to: exec.to,
+        value: exec.value.toString(),
+        data: exec.data,
+        reason: input.reason,
+        ...x402Wire(input.x402),
+      },
+    );
+    if (res.status !== 201) {
+      if (res.data.error && res.status < 500)
+        throw new PolicyViolation(res.data.error, res.data.message ?? "", violations);
+      throw new PolicyServiceError(res.status, res.data.error ?? `HTTP ${res.status}`);
+    }
+    log.info?.("approval requested", { requestId: res.data.id });
+    if (!wait) throw new ApprovalPending(res.data, violations);
+    return pw.waitForApproval(res.data.id, wait === true ? {} : wait);
   }
 
   const pw: CyphosGuard = {
@@ -257,12 +354,7 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
 
     /** The account this agent acts for: `accountAddress`, or the account of its single active grant. */
     async getAccount(): Promise<Address> {
-      const known = opts.accountAddress ?? opts.owner?.account.address;
-      if (known) return known;
-      const accounts = [...new Set((await pw.getGrants()).map((g) => g.account.toLowerCase()))];
-      if (accounts.length === 0) throw new PolicyViolation("no_grant", "this agent has no active grant", []);
-      if (accounts.length > 1) throw new Error("agent has grants on several accounts; pass accountAddress");
-      return accounts[0] as Address;
+      return knownAccount ?? accountOf(await pw.getGrants());
     },
 
     /**
@@ -271,82 +363,7 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
      * ApprovalRejected / ApprovalExpired (when waiting), ExecutionFailed.
      */
     async execute(input: ExecuteInput, { wait }: { wait?: boolean | WaitOptions } = {}): Promise<ExecutionResult> {
-      const account = await pw.getAccount();
-      const exec = { to: input.to, value: input.value ?? 0n, data: input.data ?? ("0x" as Hex) };
-      const violations: string[] = [];
-      for (const grant of await pw.getGrants()) {
-        const policy = parsePolicy(grant.policy);
-        for (const [i, delegation] of grant.delegations.entries()) {
-          const permission = policy.permissions[i];
-          const offchain = permission
-            ? offchainCheck(permission, exec, input.x402 ? { x402: input.x402 } : {})
-            : "unknown permission";
-          if (offchain) {
-            violations.push(offchain);
-            continue;
-          }
-          // Co-signed grant: get a fresh cosignature for this exact call (the service re-checks the
-          // off-chain rules and refuses if they fail; on-chain, the redemption can't happen without it).
-          let toRedeem = delegation as Delegation;
-          if (delegationCosigner(toRedeem)) {
-            const cs = await request<Cosignature & { error?: string; message?: string }>(
-              "agent",
-              "POST",
-              "/agent/cosign",
-              {
-                account,
-                grantId: grant.id,
-                delegationIndex: i,
-                to: exec.to,
-                value: exec.value.toString(),
-                data: exec.data,
-                ...x402Wire(input.x402),
-              },
-            );
-            if (cs.status !== 200) {
-              violations.push(`co-signer refused: ${cs.data.message ?? cs.data.error ?? `HTTP ${cs.status}`}`);
-              continue;
-            }
-            toRedeem = withCosignature(toRedeem, cs.data);
-          }
-          const r = await redeem(toRedeem, exec);
-          if ("hash" in r) {
-            await request("agent", "POST", "/agent/activity", {
-              account,
-              txHash: r.hash,
-              to: exec.to,
-              value: exec.value.toString(),
-              reason: input.reason,
-            }).catch((e) => log.warn?.("could not report activity", { error: String(e) }));
-            log.info?.("executed within grant", { grantId: grant.id, txHash: r.hash });
-            return { status: "executed", txHash: r.hash, via: "grant", grantId: grant.id };
-          }
-          violations.push(r.reason);
-        }
-      }
-      log.debug?.("not covered by grants, escalating", { violations });
-
-      const res = await request<ApprovalRequestJSON & { error?: EscalationRefusal; message?: string }>(
-        "agent",
-        "POST",
-        "/agent/requests",
-        {
-          account,
-          to: exec.to,
-          value: exec.value.toString(),
-          data: exec.data,
-          reason: input.reason,
-          ...x402Wire(input.x402),
-        },
-      );
-      if (res.status !== 201) {
-        if (res.data.error && res.status < 500)
-          throw new PolicyViolation(res.data.error, res.data.message ?? "", violations);
-        throw new PolicyServiceError(res.status, res.data.error ?? `HTTP ${res.status}`);
-      }
-      log.info?.("approval requested", { requestId: res.data.id });
-      if (!wait) throw new ApprovalPending(res.data, violations);
-      return pw.waitForApproval(res.data.id, wait === true ? {} : wait);
+      return executeWithin(await pw.getGrants(), input, wait);
     },
 
     async getRequest(id: string): Promise<ApprovalRequestJSON> {
@@ -385,7 +402,8 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
       if (!header) throw new X402Error(`402 without a ${X402_HEADERS.required} header (only x402 v2 is supported)`);
       const required = decodeX402Header<PaymentRequired>(header);
 
-      const permissions = (await pw.getGrants()).flatMap((g) => {
+      const grants = await pw.getGrants();
+      const permissions = grants.flatMap((g) => {
         const policy = parsePolicy(g.policy);
         return policy.permissions.flatMap((p) => (p.kind === "x402" ? [{ ...p, cap: x402VaultCap(policy, p) }] : []));
       });
@@ -427,14 +445,15 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
       });
       let topUp: ExecutionResult | undefined;
       if (held < amount) {
-        topUp = await pw.execute(
+        topUp = await executeWithin(
+          grants,
           {
             to: choice.asset,
             data: encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [payer, amount - held] }),
             reason: `x402 payment to ${choice.payTo} for ${payment.resource}: ${reason}`,
             x402: { payTo: choice.payTo, amount, resource: payment.resource },
           },
-          { wait },
+          wait,
         );
       }
 
@@ -453,7 +472,7 @@ export function createCyphosGuard(opts: CyphosGuardOptions): CyphosGuard {
       const paid = response.ok && settlement?.success === true;
       if (paid && settlement?.transaction) {
         await request("agent", "POST", "/agent/x402/paid", {
-          account: await pw.getAccount(),
+          account: accountOf(grants),
           txHash: settlement.transaction,
           asset: choice.asset,
           payTo: choice.payTo,

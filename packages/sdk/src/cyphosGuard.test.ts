@@ -75,6 +75,43 @@ describe("createCyphosGuard", () => {
     await expect(agentPw().execute({ to: SHOP, value: 1n, reason: "x" })).rejects.toBeInstanceOf(ApprovalPending);
   });
 
+  it("execute fetches the grants once, also when it has to find the account from them", async () => {
+    const agent = privateKeyToAccount(generatePrivateKey());
+    const now = Math.floor(Date.now() / 1000);
+    const grant = {
+      id: "g1",
+      account: ACCOUNT,
+      agent: agent.address,
+      status: "active",
+      // x402 top-ups only, so the plain ETH payment below is refused off-chain and escalated.
+      policy: {
+        version: 1,
+        chainId: 84532,
+        agent: agent.address,
+        expiresAt: now + 3600,
+        permissions: [
+          {
+            kind: "x402",
+            token: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+            sellers: ["0x3333333333333333333333333333333333333333"],
+            vault: "0x5555555555555555555555555555555555555555",
+            perTx: "1000",
+            perPeriod: { amount: "5000", periodSeconds: 86400 },
+          },
+        ],
+      },
+      delegations: [{}],
+    };
+    const f = mockFetch((url) =>
+      url.endsWith("/agent/grants") ? { status: 200, body: [grant] } : { status: 201, body: req("pending") },
+    );
+    const pw = createCyphosGuard({ policyServiceUrl: "http://svc", publicClient: fakeClient, agent });
+    await expect(pw.execute({ to: SHOP, value: 1n, reason: "x" })).rejects.toBeInstanceOf(ApprovalPending);
+    expect(f.mock.calls.filter((c) => String(c[0]).endsWith("/agent/grants"))).toHaveLength(1);
+    const escalation = f.mock.calls.find((c) => String(c[0]).endsWith("/agent/requests"));
+    expect(JSON.parse(String(escalation?.[1]?.body)).account).toBe(ACCOUNT);
+  });
+
   it("maps refusals to PolicyViolation with the reason code", async () => {
     mockFetch((url) =>
       url.endsWith("/agent/grants")

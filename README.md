@@ -265,7 +265,8 @@ Design records: [account stack](docs/decisions/0001-account-stack.md) ·
 [policy schema](docs/decisions/0002-policy-schema.md) ·
 [owner actions](docs/decisions/0003-owner-actions-without-bundler.md) ·
 [approval flow & trust model](docs/decisions/0004-approval-flow.md) ·
-[co-signer](docs/decisions/0005-cosigner-enforcer.md) · [security](SECURITY.md) ·
+[co-signer](docs/decisions/0005-cosigner-enforcer.md) ·
+[ERC-7710 x402, proposed](docs/decisions/0008-erc7710-x402.md) · [security](SECURITY.md) ·
 [threat model](docs/security/threat-model.md) · [how we check it](docs/security/verification.md)
 
 | Pending approval (decoded locally from what will be signed)                                       | Activity after the demo run                                                                   |

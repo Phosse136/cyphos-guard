@@ -4,7 +4,9 @@ The publishable packages are `@cyphos-guard/shared`, `contracts`, `sdk`, `mcp` a
 point at their TypeScript sources; `publishConfig` switches them to the compiled `dist/` on publish. **0.1.0 was published on
 2026-11-21** (npm org `cyphos-guard`, MCP Registry `io.github.Phosse136/cyphos-guard`, `packages/mcp/server.json`). 2026-11-23: contracts 0.2.0, shared 0.1.1, sdk 0.2.0, mcp 0.1.2 (per-payment cap
 on-chain, ADR 0006); cli stays 0.1.0. 2026-11-24: sdk 0.2.1 only (revoke/re-grant empty the x402 vault, issue #2;
-fewer round trips per payment; `testing` exports the red-team attack catalog). Only bump the packages that changed.
+fewer round trips per payment; `testing` exports the red-team attack catalog). 2026-11-25: contracts 0.3.0, sdk 0.3.0, mcp 0.1.3 (X402Vault
+one-way `disable()` and `withdraw(max)`; revoke/re-grant switch vaults off, vault review findings 9 and 10; mcp only to
+pin the new sdk, since 0.1.2 still pinned sdk 0.2.0); shared and cli unchanged. Only bump the packages that changed.
 
 Verified (2026-11-21): packed tarballs installed with plain `npm` into an empty project; the SDK made a signed
 request against the public instance and compiled a policy, `npx cyphos-guard agent new` created a key file (mode
